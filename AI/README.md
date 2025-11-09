@@ -1,31 +1,29 @@
-# AI Models and Prompts for LearnerAI
+# AI Module
 
-## Overview
-This directory contains AI models, prompts, and related components for the LearnerAI microservice.
+This directory contains all AI-related components, models, prompts, and utilities for the LearnerAI project.
 
-## Structure
+## Purpose
+
+The AI module manages:
+- **Models**: AI model configurations, fine-tuning data, and model management scripts
+- **Prompts**: Prompt templates, prompt engineering utilities, and version control for prompts
+- **Utilities**: AI inference logic, API integrations, and helper functions
+
+## Directory Structure
+
 ```
-AI/
-├── models/           # AI model files and configurations
-├── prompts/          # Prompt templates and versions
-├── scripts/          # AI processing scripts
-├── tests/            # AI model tests
-└── requirements.txt  # Python dependencies
+ai/
+├── models/          # AI model configurations and data
+├── prompts/         # Prompt templates and versions
+└── utils/           # AI utilities and helpers
 ```
 
-## Models
-- Learning Path Generator: Creates personalized learning paths based on skill gaps
-- Material Expander: Enhances course content with AI-generated materials
-- Skill Gap Analyzer: Analyzes assessment results to identify skill gaps
-- Progress Predictor: Predicts learning progress and completion times
+## Future Development
 
-## Prompts
-- Learning path generation prompts
-- Material expansion prompts
-- Skill gap analysis prompts
-- Assessment question generation prompts
+This module will be expanded as the project evolves to include:
+- Model fine-tuning pipelines
+- Prompt versioning system
+- AI inference endpoints
+- Model evaluation metrics
+- Integration with various AI providers (OpenAI, Anthropic, etc.)
 
-## Usage
-1. Install Python dependencies: `pip install -r requirements.txt`
-2. Run tests: `python -m pytest tests/`
-3. Deploy models: Use the GitHub Actions workflow with manual approval

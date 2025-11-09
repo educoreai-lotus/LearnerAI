@@ -1,184 +1,231 @@
 -- LearnerAI Database Schema
--- This file contains all the SQL commands to set up the Supabase database
+-- Supabase PostgreSQL Database
+-- Run this script in Supabase SQL Editor
 
--- Enable necessary extensions
-CREATE EXTENSION IF NOT EXISTS "uuid-ossp";
-
--- Workers table
-CREATE TABLE IF NOT EXISTS workers (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    name VARCHAR(100) NOT NULL,
-    email VARCHAR(255) UNIQUE NOT NULL,
-    department VARCHAR(50) NOT NULL,
-    position VARCHAR(100) NOT NULL,
-    status VARCHAR(20) DEFAULT 'active' CHECK (status IN ('active', 'inactive', 'pending')),
-    overall_progress INTEGER DEFAULT 0 CHECK (overall_progress >= 0 AND overall_progress <= 100),
-    completed_courses INTEGER DEFAULT 0,
-    last_assessment_date TIMESTAMP WITH TIME ZONE,
+-- ============================================
+-- 1. Cache Skills Table
+-- ============================================
+-- Stores Micro/Nano Skill divisions for each learner
+-- Updated whenever a new gap is received from Skills Engine
+CREATE TABLE IF NOT EXISTS cache_skills (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    learner_id VARCHAR(255) NOT NULL,
+    skill_id VARCHAR(255) NOT NULL,
+    skill_type VARCHAR(50) NOT NULL CHECK (skill_type IN ('micro', 'nano')),
+    competency_name TEXT NOT NULL,
+    skill_name TEXT NOT NULL,
+    skill_description TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    UNIQUE(learner_id, skill_id, skill_type)
 );
 
--- Courses table
-CREATE TABLE IF NOT EXISTS courses (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    description TEXT NOT NULL,
-    duration VARCHAR(50) NOT NULL,
-    difficulty VARCHAR(20) NOT NULL CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
-    content TEXT,
-    learning_objectives TEXT[],
-    expanded_materials JSONB,
-    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Indexes for cache_skills
+CREATE INDEX IF NOT EXISTS idx_cache_skills_learner_id ON cache_skills(learner_id);
+CREATE INDEX IF NOT EXISTS idx_cache_skills_skill_id ON cache_skills(skill_id);
+CREATE INDEX IF NOT EXISTS idx_cache_skills_learner_skill ON cache_skills(learner_id, skill_id);
 
--- Learning paths table
+-- ============================================
+-- 2. Learning Paths Table
+-- ============================================
+-- Stores generated learning paths with versioning and auditability
 CREATE TABLE IF NOT EXISTS learning_paths (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    title VARCHAR(200) NOT NULL,
-    description TEXT NOT NULL,
-    difficulty VARCHAR(20) NOT NULL CHECK (difficulty IN ('beginner', 'intermediate', 'advanced')),
-    estimated_hours INTEGER NOT NULL,
-    status VARCHAR(20) DEFAULT 'draft' CHECK (status IN ('draft', 'active', 'completed', 'archived')),
-    worker_id UUID REFERENCES workers(id) ON DELETE CASCADE,
-    assigned_at TIMESTAMP WITH TIME ZONE,
-    completed_at TIMESTAMP WITH TIME ZONE,
-    final_score INTEGER,
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255) NOT NULL,
+    company_id VARCHAR(255) NOT NULL,
+    course_id VARCHAR(255),
+    gap_id VARCHAR(255) NOT NULL,
+    path_version INTEGER DEFAULT 1,
+    path_data JSONB NOT NULL, -- Complete learning path structure
+    status VARCHAR(50) DEFAULT 'active' CHECK (status IN ('active', 'archived', 'superseded')),
+    generated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Learning path courses junction table
-CREATE TABLE IF NOT EXISTS learning_path_courses (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    learning_path_id UUID REFERENCES learning_paths(id) ON DELETE CASCADE,
-    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-    order_index INTEGER NOT NULL,
+-- Indexes for learning_paths
+CREATE INDEX IF NOT EXISTS idx_learning_paths_user_id ON learning_paths(user_id);
+CREATE INDEX IF NOT EXISTS idx_learning_paths_company_id ON learning_paths(company_id);
+CREATE INDEX IF NOT EXISTS idx_learning_paths_course_id ON learning_paths(course_id);
+CREATE INDEX IF NOT EXISTS idx_learning_paths_user_company ON learning_paths(user_id, company_id);
+CREATE INDEX IF NOT EXISTS idx_learning_paths_gap_id ON learning_paths(gap_id);
+
+-- ============================================
+-- 3. Jobs Table
+-- ============================================
+-- Tracks background job processing status for async operations
+CREATE TABLE IF NOT EXISTS jobs (
+    job_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255) NOT NULL,
+    job_type VARCHAR(100) NOT NULL CHECK (job_type IN ('path_generation', 'course_suggestion', 'path_distribution')),
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'processing', 'completed', 'failed')),
+    input_data JSONB,
+    output_data JSONB,
+    error_message TEXT,
+    retry_count INTEGER DEFAULT 0,
+    max_retries INTEGER DEFAULT 3,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
-    UNIQUE(learning_path_id, course_id)
+    started_at TIMESTAMP WITH TIME ZONE,
+    completed_at TIMESTAMP WITH TIME ZONE,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Skill gaps table
-CREATE TABLE IF NOT EXISTS skill_gaps (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    worker_id UUID REFERENCES workers(id) ON DELETE CASCADE,
-    skill_name VARCHAR(100) NOT NULL,
-    priority VARCHAR(20) NOT NULL CHECK (priority IN ('low', 'medium', 'high')),
-    status VARCHAR(20) DEFAULT 'pending' CHECK (status IN ('pending', 'in-progress', 'completed', 'failed')),
-    gap_level VARCHAR(20) NOT NULL CHECK (gap_level IN ('beginner', 'intermediate', 'advanced')),
-    confidence DECIMAL(3,2) CHECK (confidence >= 0 AND confidence <= 1),
-    completed_at TIMESTAMP WITH TIME ZONE,
+-- Indexes for jobs
+CREATE INDEX IF NOT EXISTS idx_jobs_job_id ON jobs(job_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_user_id ON jobs(user_id);
+CREATE INDEX IF NOT EXISTS idx_jobs_status ON jobs(status);
+CREATE INDEX IF NOT EXISTS idx_jobs_user_status ON jobs(user_id, status);
+CREATE INDEX IF NOT EXISTS idx_jobs_type_status ON jobs(job_type, status);
+
+-- ============================================
+-- 4. Course Suggestions Table
+-- ============================================
+-- Stores RAG-generated course suggestions after completion
+CREATE TABLE IF NOT EXISTS course_suggestions (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    user_id VARCHAR(255) NOT NULL,
+    completed_course_id VARCHAR(255) NOT NULL,
+    suggestion_data JSONB NOT NULL, -- RAG-generated suggestions
+    status VARCHAR(50) DEFAULT 'pending' CHECK (status IN ('pending', 'viewed', 'accepted', 'dismissed')),
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Assessments table
-CREATE TABLE IF NOT EXISTS assessments (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    worker_id UUID REFERENCES workers(id) ON DELETE CASCADE,
-    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-    learning_path_id UUID REFERENCES learning_paths(id) ON DELETE CASCADE,
-    score INTEGER NOT NULL CHECK (score >= 0 AND score <= 100),
-    passed BOOLEAN NOT NULL,
-    attempt_number INTEGER NOT NULL CHECK (attempt_number >= 1),
-    answers JSONB,
-    time_spent INTEGER, -- in minutes
-    completed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+-- Indexes for course_suggestions
+CREATE INDEX IF NOT EXISTS idx_course_suggestions_user_id ON course_suggestions(user_id);
+CREATE INDEX IF NOT EXISTS idx_course_suggestions_course_id ON course_suggestions(completed_course_id);
+CREATE INDEX IF NOT EXISTS idx_course_suggestions_status ON course_suggestions(status);
+
+-- ============================================
+-- 5. Prompt Registry Table
+-- ============================================
+-- Tracks which version of each prompt is currently active
+CREATE TABLE IF NOT EXISTS prompt_registry (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    prompt_name VARCHAR(100) NOT NULL UNIQUE,
+    prompt_file_path TEXT NOT NULL,
+    version VARCHAR(50) NOT NULL,
+    is_active BOOLEAN DEFAULT true,
+    description TEXT,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    activated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW(),
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- Worker progress tracking table
-CREATE TABLE IF NOT EXISTS worker_progress (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    worker_id UUID REFERENCES workers(id) ON DELETE CASCADE,
-    progress INTEGER NOT NULL CHECK (progress >= 0 AND progress <= 100),
-    completed_courses INTEGER DEFAULT 0,
-    active_learning_paths INTEGER DEFAULT 0,
+-- Indexes for prompt_registry
+CREATE INDEX IF NOT EXISTS idx_prompt_registry_name ON prompt_registry(prompt_name);
+CREATE INDEX IF NOT EXISTS idx_prompt_registry_active ON prompt_registry(is_active);
+
+-- ============================================
+-- 6. Audit Log Table
+-- ============================================
+-- Tracks all changes to learning_paths and cache_skills for auditability
+CREATE TABLE IF NOT EXISTS audit_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    table_name VARCHAR(100) NOT NULL,
+    record_id UUID NOT NULL,
+    action VARCHAR(50) NOT NULL CHECK (action IN ('INSERT', 'UPDATE', 'DELETE')),
+    old_data JSONB,
+    new_data JSONB,
+    changed_by VARCHAR(255), -- user_id or service name
+    changed_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
+);
+
+-- Indexes for audit_log
+CREATE INDEX IF NOT EXISTS idx_audit_log_table_record ON audit_log(table_name, record_id);
+CREATE INDEX IF NOT EXISTS idx_audit_log_changed_at ON audit_log(changed_at);
+CREATE INDEX IF NOT EXISTS idx_audit_log_action ON audit_log(action);
+
+-- ============================================
+-- 7. AI Execution Logs Table
+-- ============================================
+-- Tracks AI prompt executions for performance monitoring and cost tracking
+CREATE TABLE IF NOT EXISTS ai_execution_logs (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    prompt_name VARCHAR(100) NOT NULL,
+    prompt_version VARCHAR(50),
+    user_id VARCHAR(255),
+    job_id UUID REFERENCES jobs(job_id),
+    input_tokens INTEGER,
+    output_tokens INTEGER,
+    total_tokens INTEGER,
+    execution_time_ms INTEGER,
+    cost_usd DECIMAL(10, 6),
+    status VARCHAR(50) NOT NULL CHECK (status IN ('success', 'failed', 'timeout')),
+    error_message TEXT,
+    response_data JSONB,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
--- AI recommendations log table
-CREATE TABLE IF NOT EXISTS ai_recommendations_log (
-    id UUID DEFAULT uuid_generate_v4() PRIMARY KEY,
-    worker_id UUID REFERENCES workers(id) ON DELETE CASCADE,
-    learning_path_id UUID REFERENCES learning_paths(id) ON DELETE CASCADE,
-    course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-    skill_gap_id UUID REFERENCES skill_gaps(id) ON DELETE CASCADE,
-    action VARCHAR(50) NOT NULL,
-    data JSONB,
-    timestamp TIMESTAMP WITH TIME ZONE DEFAULT NOW()
-);
+-- Indexes for ai_execution_logs
+CREATE INDEX IF NOT EXISTS idx_ai_logs_prompt_name ON ai_execution_logs(prompt_name);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_user_id ON ai_execution_logs(user_id);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_job_id ON ai_execution_logs(job_id);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_created_at ON ai_execution_logs(created_at);
+CREATE INDEX IF NOT EXISTS idx_ai_logs_status ON ai_execution_logs(status);
 
--- Create indexes for better performance
-CREATE INDEX IF NOT EXISTS idx_workers_department ON workers(department);
-CREATE INDEX IF NOT EXISTS idx_workers_status ON workers(status);
-CREATE INDEX IF NOT EXISTS idx_learning_paths_worker_id ON learning_paths(worker_id);
-CREATE INDEX IF NOT EXISTS idx_learning_paths_status ON learning_paths(status);
-CREATE INDEX IF NOT EXISTS idx_skill_gaps_worker_id ON skill_gaps(worker_id);
-CREATE INDEX IF NOT EXISTS idx_skill_gaps_status ON skill_gaps(status);
-CREATE INDEX IF NOT EXISTS idx_assessments_worker_id ON assessments(worker_id);
-CREATE INDEX IF NOT EXISTS idx_assessments_course_id ON assessments(course_id);
-CREATE INDEX IF NOT EXISTS idx_ai_log_worker_id ON ai_recommendations_log(worker_id);
-CREATE INDEX IF NOT EXISTS idx_ai_log_timestamp ON ai_recommendations_log(timestamp);
-
--- Create updated_at trigger function
+-- ============================================
+-- Triggers for Updated At
+-- ============================================
+-- Function to update updated_at timestamp
 CREATE OR REPLACE FUNCTION update_updated_at_column()
 RETURNS TRIGGER AS $$
 BEGIN
     NEW.updated_at = NOW();
     RETURN NEW;
 END;
-$$ language 'plpgsql';
+$$ LANGUAGE plpgsql;
 
--- Create triggers for updated_at
-CREATE TRIGGER update_workers_updated_at BEFORE UPDATE ON workers FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_courses_updated_at BEFORE UPDATE ON courses FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_learning_paths_updated_at BEFORE UPDATE ON learning_paths FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
-CREATE TRIGGER update_skill_gaps_updated_at BEFORE UPDATE ON skill_gaps FOR EACH ROW EXECUTE FUNCTION update_updated_at_column();
+-- Apply trigger to cache_skills
+CREATE TRIGGER update_cache_skills_updated_at
+    BEFORE UPDATE ON cache_skills
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
--- Insert sample data for development
-INSERT INTO workers (name, email, department, position, overall_progress, completed_courses) VALUES
-('John Smith', 'john.smith@company.com', 'Engineering', 'Software Developer', 75, 3),
-('Sarah Johnson', 'sarah.johnson@company.com', 'Engineering', 'Frontend Developer', 60, 2),
-('Mike Wilson', 'mike.wilson@company.com', 'Marketing', 'Digital Marketing Specialist', 45, 1),
-('Emily Davis', 'emily.davis@company.com', 'Engineering', 'Backend Developer', 90, 5),
-('David Brown', 'david.brown@company.com', 'Sales', 'Sales Manager', 30, 1)
-ON CONFLICT (email) DO NOTHING;
+-- Apply trigger to learning_paths
+CREATE TRIGGER update_learning_paths_updated_at
+    BEFORE UPDATE ON learning_paths
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
-INSERT INTO courses (title, description, duration, difficulty, learning_objectives) VALUES
-('JavaScript Fundamentals', 'Learn the basics of JavaScript programming', '4 hours', 'beginner', ARRAY['Variables and data types', 'Functions and scope', 'DOM manipulation']),
-('React Components', 'Master React component development', '6 hours', 'intermediate', ARRAY['Component lifecycle', 'State management', 'Props and events']),
-('API Integration', 'Learn how to integrate with REST APIs', '3 hours', 'intermediate', ARRAY['HTTP methods', 'Authentication', 'Error handling']),
-('Advanced JavaScript', 'Deep dive into advanced JavaScript concepts', '8 hours', 'advanced', ARRAY['Closures', 'Prototypes', 'Async programming']),
-('Project Management', 'Essential project management skills', '5 hours', 'beginner', ARRAY['Planning', 'Team coordination', 'Risk management'])
-ON CONFLICT DO NOTHING;
+-- Apply trigger to jobs
+CREATE TRIGGER update_jobs_updated_at
+    BEFORE UPDATE ON jobs
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
--- Create sample learning paths
-INSERT INTO learning_paths (title, description, difficulty, estimated_hours, status) VALUES
-('Frontend Development Path', 'Complete path for frontend developers', 'intermediate', 20, 'draft'),
-('Backend Development Path', 'Complete path for backend developers', 'intermediate', 25, 'draft'),
-('Full Stack Development Path', 'Comprehensive full-stack development path', 'advanced', 40, 'draft')
-ON CONFLICT DO NOTHING;
+-- Apply trigger to course_suggestions
+CREATE TRIGGER update_course_suggestions_updated_at
+    BEFORE UPDATE ON course_suggestions
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
--- Create sample skill gaps
-INSERT INTO skill_gaps (worker_id, skill_name, priority, status, gap_level) 
-SELECT 
-    w.id,
-    'React Hooks',
-    'high',
-    'pending',
-    'intermediate'
-FROM workers w 
-WHERE w.email = 'john.smith@company.com'
-ON CONFLICT DO NOTHING;
+-- Apply trigger to prompt_registry
+CREATE TRIGGER update_prompt_registry_updated_at
+    BEFORE UPDATE ON prompt_registry
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
 
-INSERT INTO skill_gaps (worker_id, skill_name, priority, status, gap_level) 
-SELECT 
-    w.id,
-    'TypeScript',
-    'medium',
-    'pending',
-    'beginner'
-FROM workers w 
-WHERE w.email = 'sarah.johnson@company.com'
-ON CONFLICT DO NOTHING;
+-- ============================================
+-- Initial Data: Prompt Registry
+-- ============================================
+-- Insert initial prompt registry entries
+INSERT INTO prompt_registry (prompt_name, prompt_file_path, version, description, is_active)
+VALUES
+    ('skill_expansion', 'ai/prompts/prompt1-skill-expansion.txt', '1.0.0', 'Expands skills gap with additional competencies', true),
+    ('competency_identification', 'ai/prompts/prompt2-competency-identification.txt', '1.0.0', 'Identifies and extracts expanded competencies', true),
+    ('path_creation', 'ai/prompts/prompt3-path-creation.txt', '1.0.0', 'Creates detailed learning path from gap and expansion', true),
+    ('course_suggestions', 'ai/prompts/prompt4-course-suggestions.txt', '1.0.0', 'Generates follow-up course suggestions after completion', true)
+ON CONFLICT (prompt_name) DO NOTHING;
+
+-- ============================================
+-- Comments for Documentation
+-- ============================================
+COMMENT ON TABLE cache_skills IS 'Stores Micro/Nano Skill divisions for each learner. Updated whenever a new gap is received.';
+COMMENT ON TABLE learning_paths IS 'Stores generated learning paths with versioning and auditability.';
+COMMENT ON TABLE jobs IS 'Tracks background job processing status for async operations.';
+COMMENT ON TABLE course_suggestions IS 'Stores RAG-generated course suggestions after completion.';
+COMMENT ON TABLE prompt_registry IS 'Tracks which version of each prompt is currently active.';
+COMMENT ON TABLE audit_log IS 'Tracks all changes to learning_paths and cache_skills for auditability.';
+COMMENT ON TABLE ai_execution_logs IS 'Tracks AI prompt executions for performance monitoring and cost tracking.';
+
