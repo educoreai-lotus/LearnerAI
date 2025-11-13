@@ -1,5 +1,3 @@
-VI: The following JSON is the project roadmap. When you re-run this flow, you must keep all tasks marked `completed: true` exactly as they are. You will only update tasks marked `completed: false` based on new inputs.
-
 [
   {
     "phase_name": "Phase 1: Project Initialization & Environment Setup",
@@ -47,10 +45,14 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
     "tasks": [
       {
         "task_description": "[USER-DECISION] Implement Feature 1: Adaptive Learning Path Generation (3 prompts: Skill Expansion, Competency Identification, Path Creation)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Implement Feature 2: Path Distribution to Course Builder and Analytics Updates",
+        "completed": false
+      },
+      {
+        "task_description": "[USER-DECISION] Implement Company Approval Workflow: Receive company registration from Directory microservice, store approval policy (auto/manual) and decision maker info, route learning paths through approval process if manual, send to Course Builder only after approval",
         "completed": false
       },
       {
@@ -59,7 +61,7 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
       },
       {
         "task_description": "[USER-DECISION] Integrate Gemini API for all AI prompts (free tier)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Implement mock data rollback system for microservice failures",
@@ -117,7 +119,7 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
     "tasks": [
       {
         "task_description": "[USER-DECISION] Implement Onion Architecture: Domain Layer, Application Layer, Infrastructure Layer, API Layer",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Ensure all frontend requests go through Railway API (never directly to Supabase)",
@@ -125,7 +127,7 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
       },
       {
         "task_description": "[USER-DECISION] Set up prompt storage in ai/prompts/ directory with Git version control",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Implement prompt version registry system (database or config file) for active version tracking",
@@ -133,15 +135,15 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
       },
       {
         "task_description": "[USER-DECISION] Implement asynchronous job processing system with job status tracking in Supabase",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Create job status endpoints for frontend polling (GET /api/jobs/:jobId/status)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Implement progress indicators for long-running processes with stage updates",
-        "completed": false
+        "completed": true
       }
     ]
   },
@@ -151,6 +153,10 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
       {
         "task_description": "[USER-DECISION] Write tests for all three main features before implementation (TDD approach)",
         "completed": false
+      },
+      {
+        "task_description": "Write tests for Feature 1: Adaptive Learning Path Generation (TDD approach)",
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Use AI-powered tools to generate basic tests with human expert review",
@@ -166,11 +172,11 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
       },
       {
         "task_description": "[USER-DECISION] Create unified AI service module that orchestrates all prompts (Prompt 1, 2, 3, suggestion)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Implement strict data validation before sending data to Gemini API",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Manually build core UI components using design system for consistency",
@@ -182,7 +188,7 @@ VI: The following JSON is the project roadmap. When you re-run this flow, you mu
       },
       {
         "task_description": "[USER-DECISION] Implement API versioning (e.g., /api/v1/learning-paths/generate)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Combine automatic retries with specific error codes for frontend error handling",

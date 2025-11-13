@@ -185,6 +185,12 @@
     "decision_context": "Security Measures",
     "user_answer": "Implement layered security: API validation for prompt injection detection. Use both API key rotation and rate limiting for access control to protect Gemini API access",
     "tags": ["USER-DECISION", "SECURITY", "PROMPT-INJECTION", "API-KEYS", "RATE-LIMITING"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Company Approval Workflow for Learning Paths",
+    "user_answer": "When a new company is registered, Directory microservice sends company info (company_id, company_name, approval_policy: 'auto' or 'manual', decision_maker: {employee_id, name, email}). If approval_policy is 'auto', send learning path directly to Course Builder. If 'manual', send learning path to decision maker for approval first. Only send to Course Builder after approval. If rejected, decision maker sends feedback for corrections.",
+    "tags": ["USER-DECISION", "FEATURE-2", "APPROVAL-WORKFLOW", "COMPANY-POLICY", "COURSE-BUILDER"]
   }
 ]
 ```

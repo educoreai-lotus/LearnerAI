@@ -1,45 +1,33 @@
-# DataBase Directory (AI-Specific Data)
+# Database Directory
 
-This directory contains AI-specific data storage for the LearnerAI microservice.
+This directory contains database schema files and SQL scripts for the LearnerAI microservice.
 
 ## Purpose
 
-This directory is separate from `database/` and is specifically for:
-- AI model embeddings
-- Training datasets
-- AI-generated content cache
-- Model artifacts and weights (if stored locally)
-- AI-specific data files
+This directory stores all database-related files for Supabase (PostgreSQL) setup and maintenance.
+
+## Current Status
+
+✅ **Old tables have been dropped** - Ready for new schema creation
 
 ## Contents
 
-- Embeddings (JSON/CSV files)
-- Training datasets
-- AI model cache files
-- Generated content samples
+- **`migrations/`** - Database migration files (will be created from your prompt)
+  - Migration files are numbered sequentially (001, 002, 003...)
+  - Each migration should be idempotent (safe to run multiple times)
 
-## Git Configuration
+- **`backup-before-drop.js`** - Script to backup database before major changes
+  - Run with: `node database/backup-before-drop.js`
+  - Requires database connection variables in `backend/.env`
 
-This directory is configured in `.gitignore` to exclude sensitive data files:
-- `*.json` files (except `.gitkeep`)
-- `*.csv` files (except `.gitkeep`)
+## Next Steps
 
-The `.gitkeep` file ensures the directory is tracked by Git even when empty.
-
-## Usage
-
-This directory is used by the AI service layer for:
-1. Storing embeddings for RAG (Retrieval-Augmented Generation)
-2. Caching AI-generated learning path templates
-3. Storing training data for fine-tuning (if applicable)
-4. Temporary storage for AI processing artifacts
-
-## Security Note
-
-⚠️ **Important**: Do not commit sensitive AI training data or model weights to this directory. Use environment variables or secure storage for production AI models.
+1. **Provide your prompt** describing the new table structure
+2. **New migration files will be generated** based on your requirements
+3. **New `schema.sql` will be created** with the complete schema
+4. **Run migrations** in Supabase SQL Editor to create tables
 
 ## Related Directories
 
-- `database/` - Application database schemas and SQL files
 - `ai/prompts/` - AI prompt templates
-- `ai/models/` - AI model configurations
+- `backend/src/infrastructure/repositories/` - Repository implementations that use these tables

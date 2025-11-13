@@ -1,0 +1,66 @@
+<svg width="200" height="70" viewBox="0 0 200 70" xmlns="http://www.w3.org/2000/svg">
+  <!-- UNICORE AI Logo - Dark version for light backgrounds -->
+  
+  <defs>
+    <!-- Teal/cyan gradient for organic cloud shape -->
+    <linearGradient id="cloudGradLight" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" style="stop-color:#5eead4;stop-opacity:0.9" />
+      <stop offset="30%" style="stop-color:#2dd4bf;stop-opacity:1" />
+      <stop offset="70%" style="stop-color:#14b8a6;stop-opacity:1" />
+      <stop offset="100%" style="stop-color:#0d9488;stop-opacity:0.8" />
+    </linearGradient>
+    <!-- Highlight for 3D effect -->
+    <radialGradient id="cloudHighlightLight" cx="40%" cy="30%">
+      <stop offset="0%" style="stop-color:#99f6e4;stop-opacity:0.8" />
+      <stop offset="100%" style="stop-color:#2dd4bf;stop-opacity:0" />
+    </radialGradient>
+  </defs>
+  
+  <!-- Logo container centered -->
+  <g transform="translate(100, 20)">
+    
+    <!-- Organic cloud-like flowing shape -->
+    <path d="M -18,-8 
+             Q -22,-5 -20,0 
+             Q -18,5 -15,8 
+             Q -10,12 -5,10 
+             Q 0,8 5,10 
+             Q 10,12 15,8 
+             Q 18,5 20,0 
+             Q 22,-5 18,-8 
+             Q 15,-12 10,-10 
+             Q 5,-8 0,-10 
+             Q -5,-8 -10,-10 
+             Q -15,-12 -18,-8 Z" 
+          fill="url(#cloudGradLight)" opacity="0.9"/>
+    
+    <!-- Overlay highlight for depth -->
+    <path d="M -15,-5 
+             Q -18,-2 -16,2 
+             Q -14,6 -10,8 
+             Q -6,10 -3,8 
+             Q 0,6 3,8 
+             Q 6,10 10,8 
+             Q 14,6 16,2 
+             Q 18,-2 15,-5 
+             Q 12,-8 8,-6 
+             Q 4,-4 0,-6 
+             Q -4,-4 -8,-6 
+             Q -12,-8 -15,-5 Z" 
+          fill="url(#cloudHighlightLight)"/>
+    
+    <!-- Additional soft layers for organic feel -->
+    <ellipse cx="-8" cy="-3" rx="6" ry="8" fill="url(#cloudGradLight)" opacity="0.5" transform="rotate(-20)"/>
+    <ellipse cx="8" cy="3" rx="6" ry="8" fill="url(#cloudGradLight)" opacity="0.5" transform="rotate(20)"/>
+    
+    <!-- Dark circular center with white E -->
+    <circle cx="0" cy="0" r="10" fill="#1e293b"/>
+    <text x="0" y="4" font-family="Arial, sans-serif" font-size="14" font-weight="bold" fill="#f8fafc" text-anchor="middle">E</text>
+    
+  </g>
+  
+  <!-- UNICORE AI text below logo -->
+  <text x="100" y="55" font-family="Arial, sans-serif" font-size="13" font-weight="600" fill="#1e293b" text-anchor="middle" letter-spacing="2px">
+    UNICORE AI
+  </text>
+</svg>

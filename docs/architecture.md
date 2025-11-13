@@ -150,17 +150,35 @@ Frontend (Vercel) → Railway API → [Supabase | Gemini API | External Microser
 
 ### Data Flow
 
-1. **Path Completion**
+1. **Company Registration**
+   - Directory microservice sends company registration data
+   - Store company info in `companies` table:
+     - `company_id`, `company_name`
+     - `approval_policy`: "auto" or "manual"
+     - `decision_maker`: {employee_id, name, email}
+
+2. **Path Completion**
    - Learning path generated and stored in Supabase
    - Job status: "completed"
+   - Check company's `approval_policy`
 
-2. **Distribution Process**
-   - **To Course Builder**: Send complete learning path via REST API
+3. **Approval Workflow**
+   - **Auto Policy**: 
+     - Skip approval, proceed directly to Course Builder
+   - **Manual Policy**:
+     - Create approval record in `path_approvals` table (status: "pending")
+     - Send notification/email to decision maker with learning path details
+     - Wait for decision maker response
+     - If approved: Update approval record, proceed to Course Builder
+     - If rejected: Update approval record with feedback, store feedback for corrections
+
+4. **Distribution Process**
+   - **To Course Builder**: Send complete learning path via REST API (only after approval if manual)
    - **To Learning Analytics**: Update with path data
    - **To Management Reports**: Update with path information
    - All calls include Learner AI service token for authentication
 
-3. **Error Handling**
+5. **Error Handling**
    - Retry logic for each microservice call
    - Mock data rollback if service unavailable
    - Logging of all distribution attempts
@@ -168,19 +186,29 @@ Frontend (Vercel) → Railway API → [Supabase | Gemini API | External Microser
 ### Architecture Layers
 
 **Application Layer:**
-- `DistributePathUseCase`
+- `RegisterCompanyUseCase` (receives company data from Directory)
+- `CheckApprovalPolicyUseCase` (checks if approval needed)
+- `RequestPathApprovalUseCase` (sends to decision maker)
+- `ProcessApprovalResponseUseCase` (handles approval/rejection)
+- `DistributePathUseCase` (sends to Course Builder after approval)
 - `UpdateAnalyticsUseCase`
 - `UpdateReportsUseCase`
 
 **Infrastructure Layer:**
+- `DirectoryClient` (receives company registration)
 - `CourseBuilderClient` (REST API client)
 - `LearningAnalyticsClient` (REST API client)
 - `ManagementReportsClient` (REST API client)
+- `NotificationService` (sends approval requests to decision makers)
+- `CompanyRepository` (stores company data)
+- `ApprovalRepository` (manages approval records)
 - `MockDataService` (fallback data)
 
 **API Layer:**
-- Internal service calls (not exposed as endpoints)
-- Called automatically after path generation
+- `POST /api/v1/companies/register` (receives company registration from Directory)
+- `POST /api/v1/approvals/:approvalId/approve` (decision maker approves)
+- `POST /api/v1/approvals/:approvalId/reject` (decision maker rejects with feedback)
+- Internal service calls for distribution (called after approval)
 
 ### Authentication
 

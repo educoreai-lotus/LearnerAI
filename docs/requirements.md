@@ -36,17 +36,37 @@ This document contains all requirements for the Learner AI Microservice, organiz
 
 ### Functional Requirements
 
-1. **Path Distribution to Course Builder**
-   - Transfer final, detailed learning path to Course Builder Microservice
-   - Include all necessary path metadata and structure
-   - Handle Course Builder service failures with mock data rollback
+1. **Company Registration & Approval Policy**
+   - Receive company registration data from Directory microservice when new company is registered
+   - Store company information including:
+     - `company_id`: Unique company identifier
+     - `company_name`: Company name
+     - `approval_policy`: Either "auto" or "manual"
+     - `decision_maker`: Object containing:
+       - `employee_id`: Decision maker's employee ID
+       - `name`: Decision maker's name
+       - `email`: Decision maker's email address
+   - Store company approval policies in database for lookup during path distribution
 
-2. **Analytics & Reporting Updates**
+2. **Path Distribution to Course Builder (with Approval Workflow)**
+   - **Auto Approval Policy**: 
+     - If company has `approval_policy: "auto"`, send learning path directly to Course Builder Microservice
+     - Include all necessary path metadata and structure
+   - **Manual Approval Policy**:
+     - If company has `approval_policy: "manual"`, send learning path to decision maker for approval first
+     - Send notification/email to decision maker with learning path details
+     - Wait for decision maker's approval before sending to Course Builder
+     - If approved: Send learning path to Course Builder
+     - If rejected: Receive feedback from decision maker with correction requirements
+     - Store approval status and feedback in database
+     - Handle Course Builder service failures with mock data rollback
+
+3. **Analytics & Reporting Updates**
    - Update Learning Analytics microservice with generated path data
    - Update Management Reports microservice with path information
    - Ensure data consistency across all services
 
-3. **Microservice Communication**
+4. **Microservice Communication**
    - Each microservice identified by tokens
    - Include Learner AI service token in all outgoing API calls
    - Validate tokens from incoming requests from other microservices
