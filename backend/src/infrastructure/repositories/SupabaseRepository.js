@@ -20,9 +20,9 @@ export class SupabaseRepository {
    */
   async getLearningPathById(learningPathId) {
     const { data, error } = await this.client
-      .from('learning_paths')
+      .from('courses')
       .select('*')
-      .eq('id', learningPathId)
+      .eq('course_id', learningPathId)
       .single();
 
     if (error) {
@@ -42,10 +42,10 @@ export class SupabaseRepository {
    */
   async getLearningPathsByUser(userId) {
     const { data, error } = await this.client
-      .from('learning_paths')
+      .from('courses')
       .select('*')
       .eq('user_id', userId)
-      .order('generated_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
       throw new Error(`Failed to get learning paths: ${error.message}`);
@@ -58,29 +58,29 @@ export class SupabaseRepository {
    * Save learning path to database
    */
   async saveLearningPath(learningPath) {
-    // Store complete path data in JSONB format
+    // Store complete path data in JSONB format (courses table uses learning_path column)
     const pathData = {
       pathSteps: learningPath.pathSteps,
       pathTitle: learningPath.pathTitle,
       totalDurationHours: learningPath.totalDurationHours,
       learningModules: learningPath.pathMetadata?.learning_modules || null,
-      metadata: learningPath.pathMetadata
+      metadata: learningPath.pathMetadata,
+      companyId: learningPath.companyId,
+      courseId: learningPath.courseId,
+      status: learningPath.status
     };
 
     const { data, error } = await this.client
-      .from('learning_paths')
+      .from('courses')
       .upsert({
-        id: learningPath.id,
+        course_id: learningPath.id,
         user_id: learningPath.userId,
-        company_id: learningPath.companyId,
-        course_id: learningPath.courseId,
-        gap_id: learningPath.courseId, // Using courseId as gap_id for now
-        path_data: pathData,
-        status: learningPath.status === 'completed' ? 'active' : 'active',
+        learning_path: pathData,
+        approved: learningPath.status === 'completed',
         created_at: learningPath.createdAt,
-        updated_at: learningPath.updatedAt
+        last_modified_at: learningPath.updatedAt
       }, {
-        onConflict: 'id'
+        onConflict: 'course_id'
       })
       .select()
       .single();
@@ -97,9 +97,9 @@ export class SupabaseRepository {
    */
   async getLearningPath(id) {
     const { data, error } = await this.client
-      .from('learning_paths')
+      .from('courses')
       .select('*')
-      .eq('id', id)
+      .eq('course_id', id)
       .single();
 
     if (error) {
@@ -128,12 +128,30 @@ export class SupabaseRepository {
 
   /**
    * Get learning paths for a company
+   * Note: courses table doesn't have company_id, so we need to join with learners table
    */
   async getLearningPathsByCompany(companyId) {
+    // First get all learners for this company
+    const { data: learners, error: learnersError } = await this.client
+      .from('learners')
+      .select('user_id')
+      .eq('company_id', companyId);
+
+    if (learnersError) {
+      throw new Error(`Failed to get learners: ${learnersError.message}`);
+    }
+
+    if (!learners || learners.length === 0) {
+      return [];
+    }
+
+    const userIds = learners.map(l => l.user_id);
+
+    // Then get all courses for these users
     const { data, error } = await this.client
-      .from('learning_paths')
+      .from('courses')
       .select('*')
-      .eq('company_id', companyId)
+      .in('user_id', userIds)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -145,21 +163,22 @@ export class SupabaseRepository {
 
   /**
    * Map database record to LearningPath entity
+   * Maps from courses table structure to LearningPath entity
    */
   _mapToLearningPath(record) {
-    const pathData = record.path_data || {};
+    const pathData = record.learning_path || {};
     return new LearningPath({
-      id: record.id,
+      id: record.course_id,
       userId: record.user_id,
-      companyId: record.company_id,
-      courseId: record.course_id,
+      companyId: pathData.companyId || null, // May be stored in learning_path JSONB
+      courseId: pathData.courseId || record.course_id,
       pathSteps: pathData.pathSteps || [],
       pathTitle: pathData.pathTitle || null,
       totalDurationHours: pathData.totalDurationHours || null,
       pathMetadata: pathData.metadata || pathData,
-      status: record.status === 'active' ? 'completed' : record.status,
+      status: record.approved ? 'completed' : (pathData.status || 'pending'),
       createdAt: record.created_at,
-      updatedAt: record.updated_at
+      updatedAt: record.last_modified_at || record.created_at
     });
   }
 }
