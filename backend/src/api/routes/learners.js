@@ -9,6 +9,26 @@ export function createLearnersRouter(dependencies) {
   const { learnerRepository } = dependencies;
 
   /**
+   * GET /api/v1/learners
+   * Get all learners
+   */
+  router.get('/', async (req, res) => {
+    try {
+      const learners = await learnerRepository.getAllLearners();
+      res.json({
+        count: learners.length,
+        learners
+      });
+    } catch (error) {
+      console.error('Error fetching learners:', error);
+      res.status(500).json({
+        error: 'Failed to fetch learners',
+        message: error.message
+      });
+    }
+  });
+
+  /**
    * POST /api/v1/learners
    * Create a new learner
    */

@@ -41,10 +41,10 @@ class ApiService {
   }
 
   // Learning Paths
-  async generateLearningPath(userId, courseId, skillGaps, companyId) {
+  async generateLearningPath(userId, competencyTargetName, skillGaps, companyId) {
     return this.request('/learning-paths/generate', {
       method: 'POST',
-      body: { userId, courseId, skillGaps, companyId },
+      body: { userId, competencyTargetName, courseId: competencyTargetName, skillGaps, companyId }, // Legacy support
     });
   }
 
@@ -103,8 +103,8 @@ class ApiService {
     return this.request(`/suggestions/${userId}`);
   }
 
-  async getCourseSuggestions(userId, courseId) {
-    return this.request(`/suggestions/${userId}/${courseId}`);
+  async getCourseSuggestions(userId, competencyTargetName) {
+    return this.request(`/suggestions/${userId}/${competencyTargetName}`);
   }
 
   async updateSuggestionStatus(suggestionId, status) {

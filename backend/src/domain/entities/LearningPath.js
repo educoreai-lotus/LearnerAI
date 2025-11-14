@@ -8,10 +8,12 @@ export class LearningPath {
     userId,
     companyId,
     courseId,
+    competencyTargetName, // New field: competency_target_name (primary key of courses table)
     pathSteps = [],
     pathTitle = null,
     totalDurationHours = null,
     pathMetadata = null,
+    learning_path, // Direct access to learning_path JSONB
     status = 'pending',
     createdAt,
     updatedAt
@@ -20,10 +22,12 @@ export class LearningPath {
     this.userId = userId;
     this.companyId = companyId;
     this.courseId = courseId;
+    this.competencyTargetName = competencyTargetName || id; // Use id if not provided
     this.pathSteps = pathSteps; // Array of step objects or learning_modules
     this.pathTitle = pathTitle; // Title of the learning path
     this.totalDurationHours = totalDurationHours; // Total estimated duration
     this.pathMetadata = pathMetadata; // Full path metadata (for module-based format)
+    this.learning_path = learning_path; // Direct access to learning_path JSONB from database
     this.status = status; // pending, processing, completed, failed
     this.createdAt = createdAt || new Date().toISOString();
     this.updatedAt = updatedAt || new Date().toISOString();

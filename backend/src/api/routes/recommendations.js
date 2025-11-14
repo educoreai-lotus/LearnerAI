@@ -9,12 +9,32 @@ export function createRecommendationsRouter(dependencies) {
   const { recommendationRepository } = dependencies;
 
   /**
+   * GET /api/v1/recommendations
+   * Get all recommendations
+   */
+  router.get('/', async (req, res) => {
+    try {
+      const recommendations = await recommendationRepository.getAllRecommendations();
+      res.json({
+        count: recommendations.length,
+        recommendations
+      });
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      res.status(500).json({
+        error: 'Failed to fetch recommendations',
+        message: error.message
+      });
+    }
+  });
+
+  /**
    * POST /api/v1/recommendations
    * Create a new recommendation
    */
   router.post('/', async (req, res) => {
     try {
-      const { recommendation_id, user_id, base_course_id, suggested_courses, sent_to_rag } = req.body;
+      const { recommendation_id, user_id, base_course_name, base_course_id, suggested_courses, sent_to_rag } = req.body;
 
       // Validate required fields
       if (!user_id || !suggested_courses) {
@@ -27,7 +47,7 @@ export function createRecommendationsRouter(dependencies) {
       const recommendation = await recommendationRepository.createRecommendation({
         recommendation_id,
         user_id,
-        base_course_id,
+        base_course_name: base_course_name || base_course_id, // Support both
         suggested_courses,
         sent_to_rag: sent_to_rag !== undefined ? sent_to_rag : false
       });
@@ -95,16 +115,16 @@ export function createRecommendationsRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/recommendations/course/:baseCourseId
-   * Get recommendations by base_course_id
+   * GET /api/v1/recommendations/course/:baseCourseName
+   * Get recommendations by base_course_name
    */
-  router.get('/course/:baseCourseId', async (req, res) => {
+  router.get('/course/:baseCourseName', async (req, res) => {
     try {
-      const { baseCourseId } = req.params;
-      const recommendations = await recommendationRepository.getRecommendationsByBaseCourse(baseCourseId);
+      const { baseCourseName } = req.params;
+      const recommendations = await recommendationRepository.getRecommendationsByBaseCourse(baseCourseName);
 
       res.json({
-        base_course_id: baseCourseId,
+        base_course_name: baseCourseName,
         count: recommendations.length,
         recommendations
       });

@@ -42,7 +42,7 @@ export default function CompanyDashboard() {
         }
         userMap[userId].paths.push(path);
         userMap[userId].pathCount++;
-        userMap[userId].courseCount = new Set(userMap[userId].paths.map(p => p.courseId || p.course_id)).size;
+        userMap[userId].courseCount = new Set(userMap[userId].paths.map(p => p.competencyTargetName || p.courseId || p.course_id)).size;
       });
 
       setUsers(Object.values(userMap));
@@ -133,7 +133,7 @@ export default function CompanyDashboard() {
                       {path.pathTitle || `Path ${index + 1}`}
                     </h3>
                     <p className="text-sm text-text-secondary mb-4">
-                      Course: {path.courseId || path.course_id} • Status: {path.status || 'active'}
+                      Course: {path.competencyTargetName || path.courseId || path.course_id} • Status: {path.status || 'active'}
                     </p>
                     {path.pathData && path.pathData.learning_modules && (
                       <div className="space-y-4">

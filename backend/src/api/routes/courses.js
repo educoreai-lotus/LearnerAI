@@ -9,23 +9,43 @@ export function createCoursesRouter(dependencies) {
   const { courseRepository } = dependencies;
 
   /**
+   * GET /api/v1/courses
+   * Get all courses
+   */
+  router.get('/', async (req, res) => {
+    try {
+      const courses = await courseRepository.getAllCourses();
+      res.json({
+        count: courses.length,
+        courses
+      });
+    } catch (error) {
+      console.error('Error fetching courses:', error);
+      res.status(500).json({
+        error: 'Failed to fetch courses',
+        message: error.message
+      });
+    }
+  });
+
+  /**
    * POST /api/v1/courses
    * Create a new course
    */
   router.post('/', async (req, res) => {
     try {
-      const { course_id, user_id, learning_path, approved } = req.body;
+      const { competency_target_name, course_id, user_id, learning_path, approved } = req.body;
 
       // Validate required fields
-      if (!user_id || !learning_path) {
+      if (!user_id || !learning_path || (!competency_target_name && !course_id)) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'user_id and learning_path are required'
+          message: 'user_id, learning_path, and competency_target_name are required'
         });
       }
 
       const course = await courseRepository.createCourse({
-        course_id,
+        competency_target_name: competency_target_name || course_id, // Support both
         user_id,
         learning_path,
         approved: approved !== undefined ? approved : false
@@ -45,18 +65,18 @@ export function createCoursesRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/courses/:courseId
-   * Get course by course_id
+   * GET /api/v1/courses/:competencyTargetName
+   * Get course by competency_target_name
    */
-  router.get('/:courseId', async (req, res) => {
+  router.get('/:competencyTargetName', async (req, res) => {
     try {
-      const { courseId } = req.params;
-      const course = await courseRepository.getCourseById(courseId);
+      const { competencyTargetName } = req.params;
+      const course = await courseRepository.getCourseById(competencyTargetName);
 
       if (!course) {
         return res.status(404).json({
           error: 'Course not found',
-          message: `No course found with course_id: ${courseId}`
+          message: `No course found with competency_target_name: ${competencyTargetName}`
         });
       }
 
@@ -119,15 +139,15 @@ export function createCoursesRouter(dependencies) {
   });
 
   /**
-   * PUT /api/v1/courses/:courseId
+   * PUT /api/v1/courses/:competencyTargetName
    * Update course
    */
-  router.put('/:courseId', async (req, res) => {
+  router.put('/:competencyTargetName', async (req, res) => {
     try {
-      const { courseId } = req.params;
+      const { competencyTargetName } = req.params;
       const updates = req.body;
 
-      const course = await courseRepository.updateCourse(courseId, updates);
+      const course = await courseRepository.updateCourse(competencyTargetName, updates);
 
       res.json({
         message: 'Course updated successfully',
@@ -143,13 +163,13 @@ export function createCoursesRouter(dependencies) {
   });
 
   /**
-   * DELETE /api/v1/courses/:courseId
+   * DELETE /api/v1/courses/:competencyTargetName
    * Delete course
    */
-  router.delete('/:courseId', async (req, res) => {
+  router.delete('/:competencyTargetName', async (req, res) => {
     try {
-      const { courseId } = req.params;
-      await courseRepository.deleteCourse(courseId);
+      const { competencyTargetName } = req.params;
+      await courseRepository.deleteCourse(competencyTargetName);
 
       res.json({
         message: 'Course deleted successfully'

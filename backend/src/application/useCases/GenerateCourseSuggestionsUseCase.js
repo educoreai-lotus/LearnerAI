@@ -39,7 +39,8 @@ export class GenerateCourseSuggestionsUseCase {
       id: uuidv4(),
       userId: userId,
       companyId: completionDetails.companyId || null,
-      courseId: completedCourseId,
+      competencyTargetName: completedCourseId,
+      courseId: completedCourseId, // Legacy support
       type: 'course-suggestion',
       status: 'pending'
     });
@@ -81,7 +82,8 @@ export class GenerateCourseSuggestionsUseCase {
         try {
           const paths = await this.learningPathRepository.getLearningPathsByUser(userId);
           learningPathHistory = paths.map(path => ({
-            courseId: path.courseId,
+            competencyTargetName: path.competencyTargetName || path.courseId,
+            courseId: path.competencyTargetName || path.courseId, // Legacy support
             pathTitle: path.pathTitle,
             status: path.status,
             generatedAt: path.generatedAt
@@ -93,7 +95,8 @@ export class GenerateCourseSuggestionsUseCase {
 
       // Prepare completion details
       const completedCourseDetails = {
-        courseId: completedCourseId,
+        competencyTargetName: completedCourseId,
+        courseId: completedCourseId, // Legacy support
         completionDate: completionDate,
         ...completionDetails
       };

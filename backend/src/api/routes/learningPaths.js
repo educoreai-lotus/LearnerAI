@@ -16,7 +16,8 @@ export function createLearningPathsRouter(dependencies) {
     repository,
     jobRepository,
     promptLoader,
-    cacheRepository = null // Optional - old schema feature
+    cacheRepository = null, // Optional - old schema feature
+    skillsGapRepository // Add for fetching updated skills_raw_data
   } = dependencies;
 
   const generatePathUseCase = new GenerateLearningPathUseCase({
@@ -25,7 +26,8 @@ export function createLearningPathsRouter(dependencies) {
     repository,
     jobRepository,
     promptLoader,
-    cacheRepository
+    cacheRepository,
+    skillsGapRepository
   });
 
   /**
@@ -34,21 +36,24 @@ export function createLearningPathsRouter(dependencies) {
    */
   router.post('/generate', async (req, res) => {
     try {
-      const { userId, companyId, courseId, microSkills, nanoSkills } = req.body;
+      const { userId, companyId, competencyTargetName, courseId, microSkills, nanoSkills } = req.body;
 
       // Validate required fields
-      if (!userId || !companyId || !courseId) {
+      if (!userId || !companyId || (!competencyTargetName && !courseId)) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'userId, companyId, and courseId are required'
+          message: 'userId, companyId, and competencyTargetName (or courseId) are required'
         });
       }
+
+      const competencyName = competencyTargetName || courseId;
 
       // Create skills gap entity
       const skillsGap = new SkillsGap({
         userId,
         companyId,
-        courseId,
+        competencyTargetName: competencyName,
+        courseId: competencyName, // Legacy support
         microSkills: microSkills || [],
         nanoSkills: nanoSkills || []
       });

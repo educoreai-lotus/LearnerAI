@@ -6,14 +6,16 @@ export class SkillsGap {
   constructor({
     userId,
     companyId,
-    courseId,
+    competencyTargetName,
+    courseId, // Legacy support
     microSkills = [],
     nanoSkills = [],
     receivedAt
   }) {
     this.userId = userId;
     this.companyId = companyId;
-    this.courseId = courseId;
+    this.competencyTargetName = competencyTargetName || courseId;
+    this.courseId = competencyTargetName || courseId; // Legacy support
     this.microSkills = microSkills; // Array of micro skill objects
     this.nanoSkills = nanoSkills; // Array of nano skill objects
     this.receivedAt = receivedAt || new Date().toISOString();
@@ -42,7 +44,8 @@ export class SkillsGap {
     return {
       userId: this.userId,
       companyId: this.companyId,
-      courseId: this.courseId,
+      competencyTargetName: this.competencyTargetName,
+      courseId: this.courseId, // Legacy support
       microSkills: this.microSkills,
       nanoSkills: this.nanoSkills,
       receivedAt: this.receivedAt

@@ -16,7 +16,8 @@ export class GenerateLearningPathUseCase {
     cacheRepository,
     checkApprovalPolicyUseCase,
     requestPathApprovalUseCase,
-    distributePathUseCase
+    distributePathUseCase,
+    skillsGapRepository // Add skills gap repository to fetch updated data
   }) {
     this.geminiClient = geminiClient;
     this.skillsEngineClient = skillsEngineClient;
@@ -27,6 +28,7 @@ export class GenerateLearningPathUseCase {
     this.checkApprovalPolicyUseCase = checkApprovalPolicyUseCase;
     this.requestPathApprovalUseCase = requestPathApprovalUseCase;
     this.distributePathUseCase = distributePathUseCase;
+    this.skillsGapRepository = skillsGapRepository;
   }
 
   /**
@@ -35,16 +37,19 @@ export class GenerateLearningPathUseCase {
    */
   async execute(skillsGap) {
     // Validate skills gap
-    if (!skillsGap.userId || !skillsGap.companyId || !skillsGap.courseId) {
-      throw new Error('Skills gap must have userId, companyId, and courseId');
+    if (!skillsGap.userId || !skillsGap.companyId || (!skillsGap.competencyTargetName && !skillsGap.courseId)) {
+      throw new Error('Skills gap must have userId, companyId, and competencyTargetName (or courseId)');
     }
+
+    const competencyTargetName = skillsGap.competencyTargetName || skillsGap.courseId;
 
     // Create job
     const job = new Job({
       id: uuidv4(),
       userId: skillsGap.userId,
       companyId: skillsGap.companyId,
-      courseId: skillsGap.courseId,
+      competencyTargetName: competencyTargetName,
+      courseId: competencyTargetName, // Legacy support
       type: 'path-generation',
       status: 'pending'
     });
@@ -78,9 +83,29 @@ export class GenerateLearningPathUseCase {
         progress: 10
       });
 
+      // Fetch the latest skills_raw_data from database (after Skills Engine update)
+      let skillsRawData = null;
+      if (this.skillsGapRepository) {
+        try {
+          // Get the most recent skills gap for this user and competency
+          const gaps = await this.skillsGapRepository.getSkillsGapsByUser(skillsGap.userId);
+          const competencyTargetName = skillsGap.competencyTargetName || skillsGap.courseId;
+          const relevantGap = gaps.find(g => (g.competency_target_name || g.course_id) === competencyTargetName) || gaps[0];
+          
+          if (relevantGap && relevantGap.skills_raw_data) {
+            skillsRawData = relevantGap.skills_raw_data;
+            console.log(`✅ Using updated skills_raw_data from database for user ${skillsGap.userId}`);
+          }
+        } catch (error) {
+          console.warn(`⚠️  Could not fetch skills_raw_data from database: ${error.message}`);
+          // Fallback to request data
+        }
+      }
+
       // Prompt 1: Skill Expansion
+      // Use updated skills_raw_data from database if available, otherwise use request data
       const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
-      const prompt1Input = this._formatSkillsGapForPrompt(skillsGap);
+      const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
       const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
       const prompt1Result = await this.geminiClient.executePrompt(fullPrompt1, '', {
         timeout: 60000, // 60 seconds for skill expansion
@@ -237,14 +262,31 @@ export class GenerateLearningPathUseCase {
 
   /**
    * Format skills gap for Prompt 1
+   * Uses updated skills_raw_data from database if available, otherwise falls back to request data
    */
-  _formatSkillsGapForPrompt(skillsGap) {
+  _formatSkillsGapForPrompt(skillsGap, skillsRawData = null) {
+    const competencyTargetName = skillsGap.competencyTargetName || skillsGap.courseId;
+    
+    // If we have updated skills_raw_data from database, use that
+    if (skillsRawData) {
+      return JSON.stringify({
+        skills_raw_data: skillsRawData,
+        context: {
+          userId: skillsGap.userId,
+          competencyTargetName: competencyTargetName,
+          courseId: competencyTargetName // Legacy support
+        }
+      }, null, 2);
+    }
+    
+    // Fallback to request data (for backward compatibility)
     return JSON.stringify({
-      microSkills: skillsGap.microSkills,
-      nanoSkills: skillsGap.nanoSkills,
+      microSkills: skillsGap.microSkills || [],
+      nanoSkills: skillsGap.nanoSkills || [],
       context: {
         userId: skillsGap.userId,
-        courseId: skillsGap.courseId
+        competencyTargetName: competencyTargetName,
+        courseId: competencyTargetName // Legacy support
       }
     }, null, 2);
   }

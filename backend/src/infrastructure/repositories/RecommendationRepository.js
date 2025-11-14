@@ -23,7 +23,7 @@ export class RecommendationRepository {
       .insert({
         recommendation_id: recommendationData.recommendation_id || undefined,
         user_id: recommendationData.user_id,
-        base_course_id: recommendationData.base_course_id || null,
+        base_course_name: recommendationData.base_course_name || recommendationData.base_course_id || null,
         suggested_courses: recommendationData.suggested_courses,
         sent_to_rag: recommendationData.sent_to_rag || false
       })
@@ -35,6 +35,23 @@ export class RecommendationRepository {
     }
 
     return this._mapToRecommendation(data);
+  }
+
+  /**
+   * Get all recommendations
+   * @returns {Promise<Array<Object>>}
+   */
+  async getAllRecommendations() {
+    const { data, error } = await this.client
+      .from('recommendations')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to get recommendations: ${error.message}`);
+    }
+
+    return data.map(item => this._mapToRecommendation(item));
   }
 
   /**
@@ -79,15 +96,15 @@ export class RecommendationRepository {
   }
 
   /**
-   * Get recommendations by base_course_id
-   * @param {string} baseCourseId
+   * Get recommendations by base_course_name
+   * @param {string} baseCourseName
    * @returns {Promise<Array<Object>>}
    */
-  async getRecommendationsByBaseCourse(baseCourseId) {
+  async getRecommendationsByBaseCourse(baseCourseName) {
     const { data, error } = await this.client
       .from('recommendations')
       .select('*')
-      .eq('base_course_id', baseCourseId)
+      .eq('base_course_name', baseCourseName)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -124,7 +141,8 @@ export class RecommendationRepository {
    */
   async updateRecommendation(recommendationId, updates) {
     const updateData = {};
-    if (updates.base_course_id !== undefined) updateData.base_course_id = updates.base_course_id;
+    if (updates.base_course_name !== undefined) updateData.base_course_name = updates.base_course_name;
+    if (updates.base_course_id !== undefined) updateData.base_course_name = updates.base_course_id; // Legacy support
     if (updates.suggested_courses !== undefined) updateData.suggested_courses = updates.suggested_courses;
     if (updates.sent_to_rag !== undefined) updateData.sent_to_rag = updates.sent_to_rag;
 
@@ -167,7 +185,8 @@ export class RecommendationRepository {
     return {
       recommendation_id: record.recommendation_id,
       user_id: record.user_id,
-      base_course_id: record.base_course_id,
+      base_course_name: record.base_course_name,
+      base_course_id: record.base_course_name, // Legacy support
       suggested_courses: record.suggested_courses,
       sent_to_rag: record.sent_to_rag,
       created_at: record.created_at,

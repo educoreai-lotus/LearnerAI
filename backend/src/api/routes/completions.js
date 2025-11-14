@@ -15,20 +15,23 @@ export function createCompletionsRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { userId, courseId, passed, completionDetails } = req.body;
+      const { userId, competencyTargetName, courseId, passed, completionDetails } = req.body;
 
       // Validate required fields
-      if (!userId || !courseId || passed === undefined) {
+      if (!userId || (!competencyTargetName && !courseId) || passed === undefined) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'userId, courseId, and passed are required'
+          message: 'userId, competencyTargetName (or courseId), and passed are required'
         });
       }
+
+      const competencyName = competencyTargetName || courseId;
 
       // Process completion
       const result = await detectCompletionUseCase.execute({
         userId,
-        courseId,
+        competencyTargetName: competencyName,
+        courseId: competencyName, // Legacy support
         passed,
         completionDetails: completionDetails || {}
       });

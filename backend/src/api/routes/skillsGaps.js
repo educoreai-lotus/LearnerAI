@@ -5,33 +5,84 @@ const router = express.Router();
 /**
  * Initialize routes with dependencies
  */
+import { ProcessSkillsGapUpdateUseCase } from '../../application/useCases/ProcessSkillsGapUpdateUseCase.js';
+
 export function createSkillsGapsRouter(dependencies) {
-  const { skillsGapRepository } = dependencies;
+  const { 
+    skillsGapRepository,
+    learnerRepository,
+    companyRepository
+  } = dependencies;
+
+  // Initialize use case for Skills Engine gap updates
+  const processGapUpdateUseCase = companyRepository
+    ? new ProcessSkillsGapUpdateUseCase({
+        skillsGapRepository,
+        learnerRepository,
+        companyRepository
+      })
+    : null;
 
   /**
    * POST /api/v1/skills-gaps
-   * Create a new skills gap
+   * Create or update skills gap (called by Skills Engine microservice)
+   * 
+   * Expected body from Skills Engine:
+   * {
+   *   user_id: "uuid",
+   *   user_name: "string",
+   *   company_id: "uuid",
+   *   company_name: "string",
+   *   competency_name: "string", // Maps to competency_target_name in database
+   *   status: "pass" | "fail",
+   *   gap: { ... } // JSONB with micro/nano skills
+   * }
    */
   router.post('/', async (req, res) => {
     try {
       const {
-        gap_id,
         user_id,
+        user_name,
         company_id,
         company_name,
-        user_name,
+        competency_name,
+        competency_target_name,
+        course_id, // Legacy support
+        status,
+        gap, // JSONB gap data with micro/nano skills
+        // Legacy fields (for backward compatibility)
+        gap_id,
         skills_raw_data,
         test_status,
-        course_id,
         decision_maker_id,
         decision_maker_policy
       } = req.body;
 
+      // Check if this is a Skills Engine update (has 'gap' field)
+      if (gap && processGapUpdateUseCase) {
+        // Use the new flow: Process Skills Engine gap update
+        const skillsGap = await processGapUpdateUseCase.execute({
+          user_id,
+          user_name,
+          company_id,
+          company_name,
+          competency_name: competency_name || competency_target_name || course_id, // Support all variants
+          status,
+          gap
+        });
+
+        return res.status(200).json({
+          message: 'Skills gap processed successfully',
+          skillsGap
+        });
+      }
+
+      // Legacy flow: Direct creation (for backward compatibility)
       // Validate required fields
       if (!user_id || !company_id || !company_name || !user_name || !skills_raw_data) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'user_id, company_id, company_name, user_name, and skills_raw_data are required'
+          message: 'user_id, company_id, company_name, user_name, and skills_raw_data (or gap) are required'
         });
       }
 
@@ -57,9 +108,9 @@ export function createSkillsGapsRouter(dependencies) {
         company_id,
         company_name,
         user_name,
-        skills_raw_data,
-        test_status,
-        course_id,
+        skills_raw_data: skills_raw_data || gap,
+        exam_status: test_status || (status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null),
+        competency_target_name: competency_name || competency_target_name || course_id, // Support all variants
         decision_maker_id,
         decision_maker_policy
       });
@@ -69,9 +120,29 @@ export function createSkillsGapsRouter(dependencies) {
         skillsGap
       });
     } catch (error) {
-      console.error('Error creating skills gap:', error);
+      console.error('Error processing skills gap:', error);
       res.status(500).json({
-        error: 'Failed to create skills gap',
+        error: 'Failed to process skills gap',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/skills-gaps
+   * Get all skills gaps
+   */
+  router.get('/', async (req, res) => {
+    try {
+      const skillsGaps = await skillsGapRepository.getAllSkillsGaps();
+      res.json({
+        count: skillsGaps.length,
+        skillsGaps
+      });
+    } catch (error) {
+      console.error('Error fetching skills gaps:', error);
+      res.status(500).json({
+        error: 'Failed to fetch skills gaps',
         message: error.message
       });
     }
@@ -150,16 +221,16 @@ export function createSkillsGapsRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/skills-gaps/course/:courseId
-   * Get all skills gaps by course_id
+   * GET /api/v1/skills-gaps/competency/:competencyTargetName
+   * Get all skills gaps by competency_target_name
    */
-  router.get('/course/:courseId', async (req, res) => {
+  router.get('/competency/:competencyTargetName', async (req, res) => {
     try {
-      const { courseId } = req.params;
-      const skillsGaps = await skillsGapRepository.getSkillsGapsByCourse(courseId);
+      const { competencyTargetName } = req.params;
+      const skillsGaps = await skillsGapRepository.getSkillsGapsByCompetency(competencyTargetName);
 
       res.json({
-        course_id: courseId,
+        competency_target_name: competencyTargetName,
         count: skillsGaps.length,
         skillsGaps
       });

@@ -18,12 +18,11 @@ import { CourseRepository } from './src/infrastructure/repositories/CourseReposi
 import { SkillsGapRepository } from './src/infrastructure/repositories/SkillsGapRepository.js';
 import { SkillsExpansionRepository } from './src/infrastructure/repositories/SkillsExpansionRepository.js';
 import { RecommendationRepository } from './src/infrastructure/repositories/RecommendationRepository.js';
+import { CompanyRepository } from './src/infrastructure/repositories/CompanyRepository.js';
 import { PromptLoader } from './src/infrastructure/prompts/PromptLoader.js';
 import { NotificationService } from './src/infrastructure/services/NotificationService.js';
 
 // Use Cases
-import { CheckApprovalPolicyUseCase } from './src/application/useCases/CheckApprovalPolicyUseCase.js';
-import { RequestPathApprovalUseCase } from './src/application/useCases/RequestPathApprovalUseCase.js';
 import { DistributePathUseCase } from './src/application/useCases/DistributePathUseCase.js';
 import { DetectCompletionUseCase } from './src/application/useCases/DetectCompletionUseCase.js';
 import { GenerateCourseSuggestionsUseCase } from './src/application/useCases/GenerateCourseSuggestionsUseCase.js';
@@ -32,7 +31,6 @@ import { GenerateCourseSuggestionsUseCase } from './src/application/useCases/Gen
 import { createLearningPathsRouter } from './src/api/routes/learningPaths.js';
 import { createJobsRouter } from './src/api/routes/jobs.js';
 import { createCompaniesRouter } from './src/api/routes/companies.js';
-import { createApprovalsRouter } from './src/api/routes/approvals.js';
 import { createCompletionsRouter } from './src/api/routes/completions.js';
 import { createSuggestionsRouter } from './src/api/routes/suggestions.js';
 import { createAssetsRouter } from './src/api/routes/assets.js';
@@ -41,6 +39,7 @@ import { createCoursesRouter } from './src/api/routes/courses.js';
 import { createSkillsGapsRouter } from './src/api/routes/skillsGaps.js';
 import { createSkillsExpansionsRouter } from './src/api/routes/skillsExpansions.js';
 import { createRecommendationsRouter } from './src/api/routes/recommendations.js';
+import { createSeedRouter } from './src/api/routes/seed.js';
 
 // Load environment variables
 dotenv.config();
@@ -96,6 +95,10 @@ try {
     process.env.SUPABASE_URL,
     process.env.SUPABASE_KEY
   );
+  const companyRepository = new CompanyRepository(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+  );
 
   // Initialize microservice clients
   const courseBuilderClient = new CourseBuilderClient({
@@ -137,7 +140,8 @@ try {
     courseBuilderClient,
     analyticsClient,
     reportsClient,
-    repository
+    repository,
+    skillsGapRepository
   });
 
   // Initialize Feature 3 use cases
@@ -166,6 +170,7 @@ try {
     skillsGapRepository,
     skillsExpansionRepository,
     recommendationRepository,
+    companyRepository,
     courseBuilderClient,
     analyticsClient,
     reportsClient,
@@ -176,7 +181,9 @@ try {
     generateCourseSuggestionsUseCase,
     checkApprovalPolicyUseCase,
     requestPathApprovalUseCase,
-    distributePathUseCase
+    distributePathUseCase,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseKey: process.env.SUPABASE_KEY
   };
 
   console.log('✅ Dependencies initialized successfully');
@@ -189,7 +196,9 @@ try {
     skillsEngineClient: null,
     repository: null,
     jobRepository: null,
-    promptLoader: null
+    promptLoader: null,
+    supabaseUrl: process.env.SUPABASE_URL,
+    supabaseKey: process.env.SUPABASE_KEY
   };
 }
 
@@ -224,7 +233,8 @@ app.get('/api', (req, res) => {
       courses: '/api/v1/courses',
       skillsGaps: '/api/v1/skills-gaps',
       skillsExpansions: '/api/v1/skills-expansions',
-      recommendations: '/api/v1/recommendations'
+      recommendations: '/api/v1/recommendations',
+      seed: '/api/seed'
     }
   });
 });
@@ -234,7 +244,6 @@ if (dependencies.repository && dependencies.jobRepository) {
   app.use('/api/v1/learning-paths', createLearningPathsRouter(dependencies));
   app.use('/api/v1/jobs', createJobsRouter(dependencies));
   app.use('/api/v1/companies', createCompaniesRouter(dependencies));
-  app.use('/api/v1/approvals', createApprovalsRouter(dependencies));
   app.use('/api/v1/completions', createCompletionsRouter(dependencies));
   app.use('/api/v1/suggestions', createSuggestionsRouter(dependencies));
   app.use('/api/assets', createAssetsRouter());
@@ -245,6 +254,9 @@ if (dependencies.repository && dependencies.jobRepository) {
   app.use('/api/v1/skills-gaps', createSkillsGapsRouter(dependencies));
   app.use('/api/v1/skills-expansions', createSkillsExpansionsRouter(dependencies));
   app.use('/api/v1/recommendations', createRecommendationsRouter(dependencies));
+  
+  // Seed endpoints (for testing)
+  app.use('/api/seed', createSeedRouter(dependencies));
   
   console.log('✅ API routes registered');
 } else {
@@ -262,14 +274,14 @@ app.get('/', (req, res) => {
       learningPaths: '/api/v1/learning-paths',
       jobs: '/api/v1/jobs',
       companies: '/api/v1/companies',
-      approvals: '/api/v1/approvals',
       completions: '/api/v1/completions',
       suggestions: '/api/v1/suggestions',
       learners: '/api/v1/learners',
       courses: '/api/v1/courses',
       skillsGaps: '/api/v1/skills-gaps',
       skillsExpansions: '/api/v1/skills-expansions',
-      recommendations: '/api/v1/recommendations'
+      recommendations: '/api/v1/recommendations',
+      seed: '/api/seed'
     }
   });
 });

@@ -42,21 +42,23 @@ export function createSuggestionsRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/suggestions/:userId/:courseId
+   * GET /api/v1/suggestions/:userId/:competencyTargetName
    * Get suggestions for a specific completed course
+   * Note: competencyTargetName parameter (legacy: courseId)
    */
-  router.get('/:userId/:courseId', async (req, res) => {
+  router.get('/:userId/:competencyTargetName', async (req, res) => {
     try {
-      const { userId, courseId } = req.params;
+      const { userId, competencyTargetName } = req.params;
 
       const suggestions = await suggestionsRepository.getSuggestionsByUser(userId);
       const courseSuggestions = suggestions.filter(
-        s => s.completedCourseId === courseId
+        s => s.completedCourseId === competencyTargetName
       );
 
       res.json({
         userId,
-        courseId,
+        competencyTargetName,
+        courseId: competencyTargetName, // Legacy support
         suggestions: courseSuggestions,
         count: courseSuggestions.length
       });

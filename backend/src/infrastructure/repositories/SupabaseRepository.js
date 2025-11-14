@@ -19,10 +19,11 @@ export class SupabaseRepository {
    * @returns {Promise<LearningPath|null>}
    */
   async getLearningPathById(learningPathId) {
+    // Note: learningPathId is actually competency_target_name (primary key of courses table)
     const { data, error } = await this.client
       .from('courses')
       .select('*')
-      .eq('course_id', learningPathId)
+      .eq('competency_target_name', learningPathId)
       .single();
 
     if (error) {
@@ -73,14 +74,14 @@ export class SupabaseRepository {
     const { data, error } = await this.client
       .from('courses')
       .upsert({
-        course_id: learningPath.id,
+        competency_target_name: learningPath.competencyTargetName || learningPath.id, // Primary key
         user_id: learningPath.userId,
         learning_path: pathData,
         approved: learningPath.status === 'completed',
         created_at: learningPath.createdAt,
         last_modified_at: learningPath.updatedAt
       }, {
-        onConflict: 'course_id'
+        onConflict: 'competency_target_name'
       })
       .select()
       .single();
@@ -92,39 +93,6 @@ export class SupabaseRepository {
     return this._mapToLearningPath(data);
   }
 
-  /**
-   * Get learning path by ID
-   */
-  async getLearningPath(id) {
-    const { data, error } = await this.client
-      .from('courses')
-      .select('*')
-      .eq('course_id', id)
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to get learning path: ${error.message}`);
-    }
-
-    return data ? this._mapToLearningPath(data) : null;
-  }
-
-  /**
-   * Get all learning paths for a user
-   */
-  async getLearningPathsByUser(userId) {
-    const { data, error } = await this.client
-      .from('learning_paths')
-      .select('*')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
-
-    if (error) {
-      throw new Error(`Failed to get learning paths: ${error.message}`);
-    }
-
-    return data.map(item => this._mapToLearningPath(item));
-  }
 
   /**
    * Get learning paths for a company
@@ -168,14 +136,16 @@ export class SupabaseRepository {
   _mapToLearningPath(record) {
     const pathData = record.learning_path || {};
     return new LearningPath({
-      id: record.course_id,
+      id: record.competency_target_name, // Primary key is competency_target_name
       userId: record.user_id,
       companyId: pathData.companyId || null, // May be stored in learning_path JSONB
-      courseId: pathData.courseId || record.course_id,
+      courseId: record.competency_target_name, // Use competency_target_name as courseId
+      competencyTargetName: record.competency_target_name, // Add this field
       pathSteps: pathData.pathSteps || [],
       pathTitle: pathData.pathTitle || null,
       totalDurationHours: pathData.totalDurationHours || null,
       pathMetadata: pathData.metadata || pathData,
+      learning_path: record.learning_path, // Direct access to learning_path JSONB
       status: record.approved ? 'completed' : (pathData.status || 'pending'),
       createdAt: record.created_at,
       updatedAt: record.last_modified_at || record.created_at

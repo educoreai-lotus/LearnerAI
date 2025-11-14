@@ -21,7 +21,7 @@ export class CourseRepository {
     const { data, error } = await this.client
       .from('courses')
       .insert({
-        course_id: courseData.course_id || undefined,
+        competency_target_name: courseData.competency_target_name || courseData.course_id || undefined,
         user_id: courseData.user_id,
         learning_path: courseData.learning_path,
         approved: courseData.approved || false
@@ -37,15 +37,32 @@ export class CourseRepository {
   }
 
   /**
-   * Get course by course_id
-   * @param {string} courseId
-   * @returns {Promise<Object|null>}
+   * Get all courses
+   * @returns {Promise<Array<Object>>}
    */
-  async getCourseById(courseId) {
+  async getAllCourses() {
     const { data, error } = await this.client
       .from('courses')
       .select('*')
-      .eq('course_id', courseId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to get courses: ${error.message}`);
+    }
+
+    return data.map(item => this._mapToCourse(item));
+  }
+
+  /**
+   * Get course by competency_target_name
+   * @param {string} competencyTargetName
+   * @returns {Promise<Object|null>}
+   */
+  async getCourseById(competencyTargetName) {
+    const { data, error } = await this.client
+      .from('courses')
+      .select('*')
+      .eq('competency_target_name', competencyTargetName)
       .single();
 
     if (error) {
@@ -98,11 +115,11 @@ export class CourseRepository {
 
   /**
    * Update course
-   * @param {string} courseId
+   * @param {string} competencyTargetName
    * @param {Object} updates
    * @returns {Promise<Object>}
    */
-  async updateCourse(courseId, updates) {
+  async updateCourse(competencyTargetName, updates) {
     const updateData = {};
     if (updates.learning_path !== undefined) updateData.learning_path = updates.learning_path;
     if (updates.approved !== undefined) updateData.approved = updates.approved;
@@ -110,7 +127,7 @@ export class CourseRepository {
     const { data, error } = await this.client
       .from('courses')
       .update(updateData)
-      .eq('course_id', courseId)
+      .eq('competency_target_name', competencyTargetName)
       .select()
       .single();
 
@@ -123,14 +140,14 @@ export class CourseRepository {
 
   /**
    * Delete course
-   * @param {string} courseId
+   * @param {string} competencyTargetName
    * @returns {Promise<boolean>}
    */
-  async deleteCourse(courseId) {
+  async deleteCourse(competencyTargetName) {
     const { error } = await this.client
       .from('courses')
       .delete()
-      .eq('course_id', courseId);
+      .eq('competency_target_name', competencyTargetName);
 
     if (error) {
       throw new Error(`Failed to delete course: ${error.message}`);
@@ -144,7 +161,8 @@ export class CourseRepository {
    */
   _mapToCourse(record) {
     return {
-      course_id: record.course_id,
+      competency_target_name: record.competency_target_name,
+      course_id: record.competency_target_name, // Legacy support
       user_id: record.user_id,
       learning_path: record.learning_path,
       approved: record.approved,

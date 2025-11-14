@@ -4,11 +4,11 @@
     "tasks": [
       {
         "task_description": "[USER-DECISION] Set up repository structure with frontend/, backend/, ai/, docs/, database/, and dataBase/ directories",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Configure local and production environments (skip staging for now)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Set up centralized, role-based access control (RBAC) system for secrets management",
@@ -16,7 +16,7 @@
       },
       {
         "task_description": "Create .env.example files and .gitignore to protect sensitive information",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "[USER-DECISION] Set up GitHub Actions to automatically run tests on every push, with manual deployments to Vercel and Railway",
@@ -24,271 +24,191 @@
       },
       {
         "task_description": "[USER-DECISION] Create dataBase/ folder at root level for AI-specific data storage (embeddings, training datasets)",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "Configure Vite build tool for React frontend",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "Set up Express.js backend structure for Railway deployment",
-        "completed": false
+        "completed": true
       },
       {
         "task_description": "Configure Supabase connection and database setup",
-        "completed": false
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 2: Requirements Gathering",
-    "tasks": [
-      {
-        "task_description": "[USER-DECISION] Implement Feature 1: Adaptive Learning Path Generation (3 prompts: Skill Expansion, Competency Identification, Path Creation)",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Implement Feature 2: Path Distribution to Course Builder and Analytics Updates",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement Company Approval Workflow: Receive company registration from Directory microservice, store approval policy (auto/manual) and decision maker info, route learning paths through approval process if manual, send to Course Builder only after approval",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement Feature 3: Course Completion Detection and Next Course Suggestions via RAG",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Integrate Gemini API for all AI prompts (free tier)",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Implement mock data rollback system for microservice failures",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Set up Cache Table in Supabase for Micro/Nano Skill divisions with upsert operations",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement token-based authentication for microservice communication",
-        "completed": false
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 3: Feature Design & Planning",
-    "tasks": [
-      {
-        "task_description": "[USER-DECISION] Build Company Dashboard with search/filter and full learning path display per user per course",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Build User View with course dropdown/search and step-by-step timeline learning path display",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement UI using Tailwind config with emeraldbrand colors, gradients, and shared UI design system",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Create Header component matching corporate design standard, branded for LearnerAI",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement Light/Dark mode theming with full support",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Set up logo fetching from Railway API using RAILWAY_ASSET_KEY",
-        "completed": false
-      },
-      {
-        "task_description": "Create reusable UI components: PrimaryButton, Card, DashboardCard, UserCard, LearningPathTimeline, StepCard",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement adaptive UI based on AI's personalized insights",
-        "completed": false
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 4: System Architecture Design",
-    "tasks": [
-      {
-        "task_description": "[USER-DECISION] Implement Onion Architecture: Domain Layer, Application Layer, Infrastructure Layer, API Layer",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Ensure all frontend requests go through Railway API (never directly to Supabase)",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Set up prompt storage in ai/prompts/ directory with Git version control",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Implement prompt version registry system (database or config file) for active version tracking",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement asynchronous job processing system with job status tracking in Supabase",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Create job status endpoints for frontend polling (GET /api/jobs/:jobId/status)",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Implement progress indicators for long-running processes with stage updates",
         "completed": true
       }
     ]
   },
   {
-    "phase_name": "Phase 5: Implementation (TDD)",
+    "phase_name": "Phase 2: Core Features Implementation",
     "tasks": [
       {
-        "task_description": "[USER-DECISION] Write tests for all three main features before implementation (TDD approach)",
-        "completed": false
-      },
-      {
-        "task_description": "Write tests for Feature 1: Adaptive Learning Path Generation (TDD approach)",
+        "task_description": "Implement Feature 1: Adaptive Learning Path Generation with 3-prompt flow",
         "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Use AI-powered tools to generate basic tests with human expert review",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Store AI-specific data in Supabase alongside regular data, organized clearly",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement data versioning and auditability for cache table and learning paths",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Create unified AI service module that orchestrates all prompts (Prompt 1, 2, 3, suggestion)",
+        "task_description": "Integrate Gemini API (gemini-2.5-flash model)",
         "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Implement strict data validation before sending data to Gemini API",
+        "task_description": "Implement asynchronous job processing with status tracking",
         "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Manually build core UI components using design system for consistency",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Leverage AI-assisted tools for rapid prototyping and boilerplate code generation",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement API versioning (e.g., /api/v1/learning-paths/generate)",
+        "task_description": "Create job status endpoints for frontend polling",
         "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Combine automatic retries with specific error codes for frontend error handling",
-        "completed": false
+        "task_description": "Implement Feature 2: Company Registration and Approval Workflow",
+        "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Implement fully automatic deployment of AI prompts via GitHub Actions and Railway CI/CD",
-        "completed": false
+        "task_description": "Implement Feature 3: Course Completion Detection and Next Course Suggestions via RAG",
+        "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Implement detailed tracing: execution time per prompt, token usage, cost tracking",
-        "completed": false
+        "task_description": "Create microservice clients (CourseBuilder, Analytics, Reports, RAG)",
+        "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Implement automated checks to monitor prompt efficiency (token usage, execution time)",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Implement two-step fallback: simpler fallback prompt first, then mock data system",
-        "completed": false
+        "task_description": "Implement learning path distribution to microservices",
+        "completed": true
       }
     ]
   },
   {
-    "phase_name": "Phase 6: CI/CD & DevOps Automation",
+    "phase_name": "Phase 3: Database Schema & Migrations",
     "tasks": [
       {
-        "task_description": "[USER-DECISION] Require manual approval for prompt version deployment to production",
-        "completed": false
+        "task_description": "[USER-REFINEMENT] Rebuild database schema with new tables: learners, companies, skills_gap, skills_expansions, courses, recommendations",
+        "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Include mandatory automated testing of prompts before deployment (validate output formats)",
-        "completed": false
+        "task_description": "[USER-REFINEMENT] Use competency_target_name as primary key for courses table",
+        "completed": true
       },
       {
-        "task_description": "Set up GitHub Actions workflow for frontend and backend test execution",
-        "completed": false
+        "task_description": "[USER-REFINEMENT] Add companies table with decision_maker_policy and decision_maker JSONB",
+        "completed": true
       },
       {
-        "task_description": "Configure Railway deployment pipeline with environment variables",
-        "completed": false
+        "task_description": "Create migration files (init_schema_migration.sql)",
+        "completed": true
       },
       {
-        "task_description": "Configure Vercel deployment with environment variables",
-        "completed": false
+        "task_description": "Create sample backup data file (20251112_sample_backup.sql)",
+        "completed": true
       }
     ]
   },
   {
-    "phase_name": "Phase 7: Documentation & Knowledge Transfer",
+    "phase_name": "Phase 4: API Endpoints & Repositories",
     "tasks": [
       {
-        "task_description": "[USER-DECISION] Use AI doc-assistants to help draft documentation content",
-        "completed": false
+        "task_description": "Create repositories for all new tables (LearnerRepository, CompanyRepository, SkillsGapRepository, etc.)",
+        "completed": true
       },
       {
-        "task_description": "[USER-DECISION] Create comprehensive documentation: API docs, setup guides, architecture decisions, troubleshooting guides, developer onboarding",
-        "completed": false
+        "task_description": "Create API routes for CRUD operations on all tables",
+        "completed": true
       },
       {
-        "task_description": "Generate API documentation for all REST endpoints",
-        "completed": false
+        "task_description": "[USER-REFINEMENT] Implement ProcessSkillsGapUpdateUseCase for Skills Engine integration",
+        "completed": true
       },
       {
-        "task_description": "Create developer setup and onboarding guide",
-        "completed": false
+        "task_description": "[USER-REFINEMENT] Implement ProcessCompanyUpdateUseCase for Directory microservice integration",
+        "completed": true
       },
       {
-        "task_description": "Document architecture decisions and design patterns",
-        "completed": false
+        "task_description": "Update DistributePathUseCase to include skills gap data for Learning Analytics",
+        "completed": true
       }
     ]
   },
   {
-    "phase_name": "Phase 8: Cybersecurity",
+    "phase_name": "Phase 5: Frontend UI Development",
     "tasks": [
       {
-        "task_description": "[USER-DECISION] Implement API validation for prompt injection detection",
+        "task_description": "Set up Tailwind CSS with custom theme configuration",
+        "completed": true
+      },
+      {
+        "task_description": "Create reusable UI components (Header, Card, Button, UserCard, LearningPathTimeline, LoadingSpinner)",
+        "completed": true
+      },
+      {
+        "task_description": "Implement Company Dashboard page",
+        "completed": true
+      },
+      {
+        "task_description": "Implement User View page with learning path timeline",
+        "completed": true
+      },
+      {
+        "task_description": "Implement light/dark mode theming",
+        "completed": true
+      },
+      {
+        "task_description": "Integrate logo service for dynamic logo loading",
+        "completed": true
+      }
+    ]
+  },
+  {
+    "phase_name": "Phase 6: Integration & Refinements",
+    "tasks": [
+      {
+        "task_description": "[USER-REFINEMENT] Update all code to use competency_target_name instead of course_id",
+        "completed": true
+      },
+      {
+        "task_description": "[USER-REFINEMENT] Update Skills Engine flow to use competency_name mapping to competency_target_name",
+        "completed": true
+      },
+      {
+        "task_description": "[USER-REFINEMENT] Document that gap from Skills Engine contains lowest layer (micro + nano skills)",
+        "completed": true
+      },
+      {
+        "task_description": "[USER-REFINEMENT] Update Course Builder payload to include: user_id, user_name, company_id, company_name, competency_target_name, learning_path",
+        "completed": true
+      },
+      {
+        "task_description": "Create documentation files (COURSE_BUILDER_JSON.md, LEARNING_ANALYTICS_JSON.md, SKILLS_ENGINE_FLOW_UPDATED.md)",
+        "completed": true
+      }
+    ]
+  },
+  {
+    "phase_name": "Phase 7: Deployment & Testing",
+    "tasks": [
+      {
+        "task_description": "Deploy backend to Railway",
         "completed": false
       },
       {
-        "task_description": "[USER-DECISION] Implement API key rotation for Gemini API access",
+        "task_description": "Deploy frontend to Vercel",
         "completed": false
       },
       {
-        "task_description": "[USER-DECISION] Implement rate limiting for Gemini API access control",
+        "task_description": "Set up environment variables in production",
         "completed": false
       },
       {
-        "task_description": "Implement input sanitization for all user inputs",
+        "task_description": "Run database migrations in production",
         "completed": false
       },
       {
-        "task_description": "Set up security logging and monitoring",
+        "task_description": "Test end-to-end flow with Skills Engine integration",
         "completed": false
       },
       {
-        "task_description": "Implement token validation middleware for all API endpoints",
+        "task_description": "Test microservice communication (Course Builder, Learning Analytics, Reports)",
         "completed": false
       }
     ]
   }
 ]
+

@@ -11,7 +11,9 @@ import api from '../services/api';
  * Displays learner's courses and learning paths
  */
 export default function UserView() {
-  const [userId] = useState('user-123'); // TODO: Get from auth/context
+  // Using Alice's user ID from mock data: a1b2c3d4-e5f6-4789-a012-345678901234
+  // You can also use: b2c3d4e5-f6a7-8901-2345-678901234567 (Wajdan) or c3d4e5f6-a7b8-9012-3456-789012345678 (Bob)
+  const [userId] = useState('a1b2c3d4-e5f6-4789-a012-345678901234'); // Alice Johnson from mock data
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [learningPath, setLearningPath] = useState(null);
@@ -30,14 +32,14 @@ export default function UserView() {
       // Extract unique courses
       const courseSet = new Set();
       paths.forEach(path => {
-        const courseId = path.courseId || path.course_id;
-        if (courseId) courseSet.add(courseId);
+        const competencyName = path.competencyTargetName || path.courseId || path.course_id;
+        if (competencyName) courseSet.add(competencyName);
       });
       
       setCourses(Array.from(courseSet).map(id => ({ id, name: `Course ${id}` })));
       
       if (paths.length > 0 && !selectedCourse) {
-        const firstCourse = paths[0].courseId || paths[0].course_id;
+        const firstCourse = paths[0].competencyTargetName || paths[0].courseId || paths[0].course_id;
         if (firstCourse) {
           setSelectedCourse(firstCourse);
           loadLearningPath(firstCourse, paths);
@@ -50,7 +52,7 @@ export default function UserView() {
     }
   };
 
-  const loadLearningPath = async (courseId, existingPaths = null) => {
+  const loadLearningPath = async (competencyTargetName, existingPaths = null) => {
     try {
       setPathLoading(true);
       let paths = existingPaths;
@@ -59,12 +61,24 @@ export default function UserView() {
         paths = await api.getLearningPaths(userId);
       }
       
-      const path = paths.find(p => (p.courseId || p.course_id) === courseId);
+      // Find path by competencyTargetName (which is the same as the path id in courses table)
+      const path = paths.find(p => {
+        const pId = p.competencyTargetName || p.courseId || p.course_id || p.id;
+        return pId === competencyTargetName;
+      });
       
-      if (path && path.pathData) {
+      console.log('Found path for competency:', competencyTargetName, path); // Debug log
+      
+      if (path) {
+        // Handle LearningPath entity format (from SupabaseRepository)
+        const pathData = path.pathMetadata || path.pathData || path.learning_path || {};
         setLearningPath({
-          ...path,
-          modules: path.pathData.learning_modules || [],
+          id: path.id || path.competencyTargetName || path.course_id || competencyTargetName,
+          pathTitle: path.pathTitle || pathData.pathTitle || 'Learning Path',
+          totalDurationHours: path.totalDurationHours || pathData.totalDurationHours,
+          pathSteps: path.pathSteps || pathData.pathSteps || [],
+          modules: pathData.learning_modules || pathData.learningModules || [],
+          pathData: pathData
         });
       } else {
         setLearningPath(null);
@@ -77,9 +91,9 @@ export default function UserView() {
     }
   };
 
-  const handleCourseChange = (courseId) => {
-    setSelectedCourse(courseId);
-    loadLearningPath(courseId);
+  const handleCourseChange = (competencyTargetName) => {
+    setSelectedCourse(competencyTargetName);
+    loadLearningPath(competencyTargetName);
   };
 
   if (loading) {

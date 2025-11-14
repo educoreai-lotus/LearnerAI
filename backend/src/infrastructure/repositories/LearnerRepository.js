@@ -24,9 +24,8 @@ export class LearnerRepository {
         user_id: learnerData.user_id || undefined,
         company_id: learnerData.company_id,
         company_name: learnerData.company_name,
-        user_name: learnerData.user_name,
-        decision_maker_policy: learnerData.decision_maker_policy,
-        decision_maker_id: learnerData.decision_maker_id || null
+        user_name: learnerData.user_name
+        // Note: decision_maker_policy and decision_maker_id are in companies table, not learners
       })
       .select()
       .single();
@@ -36,6 +35,23 @@ export class LearnerRepository {
     }
 
     return this._mapToLearner(data);
+  }
+
+  /**
+   * Get all learners
+   * @returns {Promise<Array<Object>>}
+   */
+  async getAllLearners() {
+    const { data, error } = await this.client
+      .from('learners')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to get learners: ${error.message}`);
+    }
+
+    return data.map(item => this._mapToLearner(item));
   }
 
   /**
@@ -86,14 +102,14 @@ export class LearnerRepository {
    * @returns {Promise<Object>}
    */
   async updateLearner(userId, updates) {
+    const updateData = {};
+    if (updates.company_name !== undefined) updateData.company_name = updates.company_name;
+    if (updates.user_name !== undefined) updateData.user_name = updates.user_name;
+    // Note: decision_maker_policy and decision_maker_id removed from learners table
+    
     const { data, error } = await this.client
       .from('learners')
-      .update({
-        company_name: updates.company_name,
-        user_name: updates.user_name,
-        decision_maker_policy: updates.decision_maker_policy,
-        decision_maker_id: updates.decision_maker_id
-      })
+      .update(updateData)
       .eq('user_id', userId)
       .select()
       .single();
@@ -132,8 +148,7 @@ export class LearnerRepository {
       company_id: record.company_id,
       company_name: record.company_name,
       user_name: record.user_name,
-      decision_maker_policy: record.decision_maker_policy,
-      decision_maker_id: record.decision_maker_id,
+      // Note: decision_maker_policy and decision_maker_id are in companies table, not learners
       created_at: record.created_at,
       last_modified_at: record.last_modified_at
     };

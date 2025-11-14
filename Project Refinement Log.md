@@ -191,6 +191,96 @@
     "decision_context": "Company Approval Workflow for Learning Paths",
     "user_answer": "When a new company is registered, Directory microservice sends company info (company_id, company_name, approval_policy: 'auto' or 'manual', decision_maker: {employee_id, name, email}). If approval_policy is 'auto', send learning path directly to Course Builder. If 'manual', send learning path to decision maker for approval first. Only send to Course Builder after approval. If rejected, decision maker sends feedback for corrections.",
     "tags": ["USER-DECISION", "FEATURE-2", "APPROVAL-WORKFLOW", "COMPANY-POLICY", "COURSE-BUILDER"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Database Schema - Learning Paths Storage",
+    "user_answer": "Do not create separate learning_paths table. Use existing courses table to store learning paths. The courses table has competency_target_name as PRIMARY KEY (TEXT), user_id (UUID FK), learning_path JSONB column which stores the complete learning path structure, approved (BOOLEAN). SupabaseRepository updated to query courses table by competency_target_name instead of course_id. Map LearningPath entity to courses table structure (competency_target_name PK, user_id, learning_path JSONB, approved).",
+    "tags": ["USER-REFINEMENT", "DATABASE", "SCHEMA", "LEARNING-PATHS", "COURSES-TABLE", "COMPETENCY"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Database Schema - Jobs Table",
+    "user_answer": "Add jobs table to track background job processing status for async operations. Table includes: id (UUID), user_id (UUID FK to learners), company_id (UUID, nullable), competency_target_name (TEXT, nullable), type, status, progress, current_stage, result (JSONB), error, created_at, updated_at. Foreign key constraint on user_id and competency_target_name (references courses table).",
+    "tags": ["USER-REFINEMENT", "DATABASE", "SCHEMA", "JOBS", "ASYNC", "BACKGROUND-JOBS", "COMPETENCY"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Cache Strategy - Using skills_gap Table",
+    "user_answer": "Do not create separate cache_skills table. Use skills_raw_data JSONB column in skills_gap table as the cache for Micro and Nano Skill divisions. When new gap is received from Skills Engine (user_id, user_name, company_id, company_name, competency_name, status, gap), find existing skills_gap record by user_id + competency_target_name, extract skill IDs from new gap, filter existing skills_raw_data to keep only skills that are in the new gap, remove skills not in new gap. Update skills_gap record with filtered data. This provides simpler schema, data consistency, and automatic cleanup via CASCADE.",
+    "tags": ["USER-REFINEMENT", "CACHE", "DATABASE", "SKILLS-GAP", "JSONB", "CACHE-STRATEGY"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Repository Methods - Cache Update Logic",
+    "user_answer": "Add methods to SkillsGapRepository: getSkillsGapByUserAndCompetency() to find existing gap by user_id + competency_target_name, updateSkillsGapCache() to filter and update skills_raw_data, _extractSkillIds() to extract skill IDs from gap structure, _filterSkillsByIds() to remove skills not in new gap. These methods implement the cache update logic when new gaps arrive from Skills Engine. Updated to use competency_target_name instead of course_id.",
+    "tags": ["USER-REFINEMENT", "REPOSITORY", "CACHE", "SKILLS-GAP", "METHODS", "COMPETENCY"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Code Cleanup - Remove Unnecessary Files",
+    "user_answer": "Remove unnecessary migration files and documentation: QUICK_FIX.md, QUICK_SQL_FIX.md, DEPLOY_QUICK_START.md, DEPLOY_CHECKLIST.md, DEPLOY_NOW.md, VERIFICATION_REPORT.md, ROADMAP_ANALYSIS.md, NEXT_STEPS.md, and duplicate migration files. Keep only essential files: init_schema_migration.sql, DEPLOYMENT_GUIDE.md, DEPLOY_EXISTING.md, and core documentation.",
+    "tags": ["USER-REFINEMENT", "CLEANUP", "FILE-MANAGEMENT", "MAINTENANCE"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Database Schema Verification",
+    "user_answer": "Verify Supabase schema matches codebase requirements. All 6 tables verified: learners, courses, skills_gap, skills_expansions, recommendations, jobs. All repositories match table structures. Foreign keys properly configured. Indexes created for performance. Triggers set up for automatic timestamp updates. Schema is correct and ready for deployment.",
+    "tags": ["USER-REFINEMENT", "DATABASE", "VERIFICATION", "SCHEMA", "QUALITY-ASSURANCE"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Database Schema Rebuild - New Schema Structure",
+    "user_answer": "Complete database schema rebuild. New tables: learners (user_id PK, company_id FK, company_name, user_name), companies (company_id PK, company_name, decision_maker_policy, decision_maker JSONB), skills_gap (gap_id PK, user_id FK, company_id FK, competency_target_name, skills_raw_data JSONB, exam_status), skills_expansions (expansion_id PK, prompt_1_output, prompt_2_output), courses (competency_target_name PK, user_id FK, learning_path JSONB, approved), recommendations (recommendation_id PK, user_id FK, base_course_name FK, suggested_courses JSONB), jobs (id PK, user_id FK, type, status, progress). All foreign keys properly configured with CASCADE/SET NULL. Triggers for last_modified_at auto-update.",
+    "tags": ["USER-REFINEMENT", "DATABASE", "SCHEMA", "REBUILD", "TABLES", "FOREIGN-KEYS"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Skills Engine Integration - Field Names",
+    "user_answer": "Skills Engine POSTs: user_id, user_name, company_id, company_name, competency_name (maps to competency_target_name in database), status, gap (JSONB). Use competency_target_name instead of course_id throughout codebase. Use exam_status instead of test_status. Check skills_gap table by user_id + competency_target_name. Filter skills_raw_data to keep only skills in new gap, delete skills not present.",
+    "tags": ["USER-REFINEMENT", "SKILLS-ENGINE", "FIELD-NAMES", "COMPETENCY", "EXAM-STATUS"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Directory Microservice - Companies Table",
+    "user_answer": "Directory microservice sends company data when new company joins or updates: company_id, company_name, approval_policy (auto/manual), decision_maker (employee_id, employee_name, employee_email). Store in companies table. When creating new learner, get decision_maker_policy and decision_maker_id from companies table (not from Directory API). Companies table is single source of truth for company data.",
+    "tags": ["USER-REFINEMENT", "DIRECTORY", "COMPANIES", "MICROSERVICE", "DATA-FLOW"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "ProcessSkillsGapUpdateUseCase - Skills Engine Updates",
+    "user_answer": "New use case: ProcessSkillsGapUpdateUseCase handles Skills Engine gap updates. Flow: 1) Check skills_gap table (user_id + competency_target_name), 2) If exists: update skills_raw_data (filter skills), 3) If not exists: create new skills_gap row, 4) Check learners table, 5) If not exists: create learner (get company details from companies table). Filters skills_raw_data to keep only skills in new gap, removes skills not in new gap.",
+    "tags": ["USER-REFINEMENT", "USE-CASE", "SKILLS-ENGINE", "PROCESSING", "GAP-UPDATE"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "ProcessCompanyUpdateUseCase - Directory Updates",
+    "user_answer": "New use case: ProcessCompanyUpdateUseCase handles Directory company registration/updates. Flow: 1) Upsert to companies table (create or update), 2) Update all existing learners with this company_id (sync company_name, decision_maker_policy, decision_maker_id). Ensures all learners stay in sync when company data changes.",
+    "tags": ["USER-REFINEMENT", "USE-CASE", "DIRECTORY", "COMPANY-UPDATE", "SYNC"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Learning Analytics JSON Payload - Additional Fields",
+    "user_answer": "Learning Analytics requires additional fields in JSON payload: gap_id (UUID from skills_gap.gap_id), skills_raw_data (JSONB from skills_gap.skills_raw_data), test_status (pass/fail from skills_gap.exam_status). DistributePathUseCase updated to fetch skills gap data and include these fields when sending to Learning Analytics. Complete payload: user_id, user_name, company_id, company_name, competency_target_name, gap_id, skills_raw_data, test_status, learning_path.",
+    "tags": ["USER-REFINEMENT", "LEARNING-ANALYTICS", "JSON", "PAYLOAD", "GAP-DATA"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Repository Updates - Competency-Based Queries",
+    "user_answer": "Updated repositories to use competency_target_name: SkillsGapRepository.getSkillsGapByUserAndCompetency(), SupabaseRepository queries courses table by competency_target_name (primary key), CourseRepository uses competency_target_name. LearningPath entity includes competencyTargetName field. All code updated to use competency_target_name instead of course_id.",
+    "tags": ["USER-REFINEMENT", "REPOSITORY", "COMPETENCY", "QUERIES", "SCHEMA-UPDATE"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Learning Path Distribution - Skills Gap Data",
+    "user_answer": "DistributePathUseCase updated to fetch skills gap data when sending to Learning Analytics. Fetches skills_gap by user_id + competency_target_name, includes gap_id, skills_raw_data, test_status in analytics payload. Course Builder receives same structure. Ensures Learning Analytics has complete context including original gap data.",
+    "tags": ["USER-REFINEMENT", "DISTRIBUTION", "LEARNING-ANALYTICS", "SKILLS-GAP", "PAYLOAD"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Skills Engine Gap Data - Lowest Layer Hierarchy",
+    "user_answer": "The gap field received from Skills Engine contains the lowest layer in the skills gap hierarchy, consisting of micro and nano skills. This gap data is saved directly to skills_raw_data JSONB column in the skills_gap table. The same skills_raw_data (with micro + nano skills) is sent to Learning Analytics when the learning path is ready. This ensures Learning Analytics receives the granular skill-level data needed for analysis.",
+    "tags": ["USER-REFINEMENT", "SKILLS-ENGINE", "GAP-DATA", "SKILLS-HIERARCHY", "MICRO-SKILLS", "NANO-SKILLS", "LEARNING-ANALYTICS"]
   }
 ]
 ```
