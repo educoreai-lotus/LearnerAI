@@ -281,6 +281,60 @@
     "decision_context": "Skills Engine Gap Data - Lowest Layer Hierarchy",
     "user_answer": "The gap field received from Skills Engine contains the lowest layer in the skills gap hierarchy, consisting of micro and nano skills. This gap data is saved directly to skills_raw_data JSONB column in the skills_gap table. The same skills_raw_data (with micro + nano skills) is sent to Learning Analytics when the learning path is ready. This ensures Learning Analytics receives the granular skill-level data needed for analysis.",
     "tags": ["USER-REFINEMENT", "SKILLS-ENGINE", "GAP-DATA", "SKILLS-HIERARCHY", "MICRO-SKILLS", "NANO-SKILLS", "LEARNING-ANALYTICS"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Skills Engine Gap Structure - Simplified Format",
+    "user_answer": "Skills Engine gap structure simplified: Remove level, priority, microSkills, and nanoSkills fields. Replace with missing_skills_map object where keys are competency names and values are arrays of skill IDs. The missing_skills_map can contain any number of competencies. Example: { 'Competency_Front_End_Development': ['MGS_React_Hooks_Advanced', 'MGS_Flexbox_Grid_System', 'MGS_Async_Await_Handling'] }. This structure is saved directly to skills_raw_data JSONB column.",
+    "tags": ["USER-REFINEMENT", "SKILLS-ENGINE", "GAP-STRUCTURE", "MISSING-SKILLS-MAP", "JSONB"]
+  },
+  {
+    "phase": "Phase 2: Requirements Gathering",
+    "decision_context": "Skills Engine Integration - Exam Status Field",
+    "user_answer": "Change status field to exam_status with values 'PASS' or 'FAIL' (instead of generic status). Skills Engine POSTs exam_status: 'PASS' | 'FAIL' along with user_id, user_name, company_id, company_name, competency_target_name, and missing_skills_map. The exam_status is stored in skills_gap.exam_status column and sent to Learning Analytics in the JSON payload.",
+    "tags": ["USER-REFINEMENT", "SKILLS-ENGINE", "EXAM-STATUS", "FIELD-NAMES", "STATUS"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Learning Path Structure - Full Detailed Format",
+    "user_answer": "Learning paths must follow LEARNING_ANALYTICS_JSON.md specification with full details. Structure includes: steps array (each step has: step number, title, duration string like '1 week', resources array, objectives array, estimatedTime string like '6 hours'), estimatedCompletion string, totalSteps number, createdAt and updatedAt ISO DateTime. Also maintain backward compatibility with pathSteps, learningModules, pathTitle, totalDurationHours for existing frontend code. All learning paths in mock data updated to include complete step details with resources and objectives.",
+    "tags": ["USER-REFINEMENT", "LEARNING-PATH", "STRUCTURE", "STEPS", "RESOURCES", "OBJECTIVES", "SPECIFICATION"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Database Seeding - Course Update Logic",
+    "user_answer": "Update seedDatabase.js to handle existing courses: If course already exists (by competency_target_name), update it with new learning_path data instead of skipping. Try createCourse first, if duplicate/unique constraint error, call updateCourse with new learning_path. This allows updating existing courses with new detailed learning paths without requiring database deletion.",
+    "tags": ["USER-REFINEMENT", "SEEDING", "DATABASE", "COURSE-UPDATE", "UPSERT"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Frontend - Full Learning Path Display",
+    "user_answer": "Update frontend to display complete learning path details: UserView and CompanyDashboard both use same LearningPathTimeline component. Display all step details: step number, title, duration, estimated time, description, learning objectives (with checkmark icon), learning resources (with book icon). Path header shows: title, total duration, estimated completion, total steps, approval status. Remove all 'Skills Covered' sections from learning path display. Company Dashboard shows exact same detailed view as User View.",
+    "tags": ["USER-REFINEMENT", "FRONTEND", "UI", "LEARNING-PATH", "DISPLAY", "COMPONENTS", "COMPANY-DASHBOARD"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Frontend - Company Dashboard Learning Path View",
+    "user_answer": "Company Dashboard must show the exact same detailed learning path view that learners see. Use same LearningPathTimeline component with same data processing logic as UserView. Extract steps from learning_path.steps array, map to modules for organized display, show all step details including objectives and resources. Ensure consistent experience across both views.",
+    "tags": ["USER-REFINEMENT", "FRONTEND", "COMPANY-DASHBOARD", "UI-CONSISTENCY", "LEARNING-PATH"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Frontend - Remove Skills Display",
+    "user_answer": "Remove all 'Skills Covered' sections from learning path display in frontend. No skills should be displayed to users in the learning path timeline. Remove getSkillName function and all skill-related UI elements from LearningPathTimeline component.",
+    "tags": ["USER-REFINEMENT", "FRONTEND", "UI", "SKILLS", "REMOVAL"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Frontend - User View Default Data",
+    "user_answer": "Update UserView to use Sara Neer's user ID (b2c3d4e5-f6a7-8901-2345-678901234567) as default. Sara has 3 learning paths: React Hooks, TypeScript Fundamentals, Node.js Backend Development. Frontend fetches courses using getCoursesByUser API endpoint. Course names displayed using pathTitle from learning_path data.",
+    "tags": ["USER-REFINEMENT", "FRONTEND", "USER-VIEW", "DEFAULT-DATA", "MOCK-DATA"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Frontend - Company Dashboard Path Selector",
+    "user_answer": "Company Dashboard path selector: For 5 or fewer paths, show tabs. For more than 5 paths, show dropdown selector with counter (e.g., '3 of 15'). Only one path visible at a time (no vertical stacking). Reset to first path when selecting a new user. Display path details using same LearningPathTimeline component as User View.",
+    "tags": ["USER-REFINEMENT", "FRONTEND", "COMPANY-DASHBOARD", "PATH-SELECTOR", "UI", "TABS", "DROPDOWN"]
   }
 ]
 ```

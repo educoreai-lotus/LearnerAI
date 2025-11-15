@@ -89,15 +89,27 @@ export async function seedDatabase(supabaseUrl, supabaseKey) {
     const createdCourses = [];
     for (const course of mockCourses) {
       try {
-        const created = await courseRepo.createCourse(course);
-        createdCourses.push(created);
-        console.log(`  ✅ Created course: ${course.competency_target_name || course.course_id}`);
-      } catch (error) {
-        if (error.message.includes('duplicate') || error.message.includes('unique')) {
-          console.log(`  ⚠️  Course already exists: ${course.competency_target_name || course.course_id}`);
-        } else {
-          console.error(`  ❌ Error creating course ${course.competency_target_name || course.course_id}:`, error.message);
+        const competencyName = course.competency_target_name || course.course_id;
+        // Try to create first
+        try {
+          const created = await courseRepo.createCourse(course);
+          createdCourses.push(created);
+          console.log(`  ✅ Created course: ${competencyName}`);
+        } catch (createError) {
+          // If course exists, update it with new learning path
+          if (createError.message.includes('duplicate') || createError.message.includes('unique') || createError.message.includes('violates unique constraint')) {
+            const updated = await courseRepo.updateCourse(competencyName, {
+              learning_path: course.learning_path,
+              approved: course.approved
+            });
+            createdCourses.push(updated);
+            console.log(`  🔄 Updated course: ${competencyName} (with new detailed learning path)`);
+          } else {
+            throw createError;
+          }
         }
+      } catch (error) {
+        console.error(`  ❌ Error creating/updating course ${course.competency_target_name || course.course_id}:`, error.message);
       }
     }
 

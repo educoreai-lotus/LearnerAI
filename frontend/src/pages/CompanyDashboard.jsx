@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Card from '../components/Card';
 import UserCard from '../components/UserCard';
+import LearningPathTimeline from '../components/LearningPathTimeline';
 import PrimaryButton from '../components/PrimaryButton';
 import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../services/api';
@@ -11,9 +12,11 @@ import api from '../services/api';
  * Displays all users in a company with their learning paths
  */
 export default function CompanyDashboard() {
-  const [companyId] = useState('test-company-auto-001'); // TODO: Get from auth/context
+  // Using TechCorp Inc. company ID from mock data
+  const [companyId] = useState('c1d2e3f4-5678-9012-3456-789012345678'); // TechCorp Inc.
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
+  const [selectedPathIndex, setSelectedPathIndex] = useState(0);
   const [learningPaths, setLearningPaths] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
@@ -25,33 +28,63 @@ export default function CompanyDashboard() {
   const loadCompanyData = async () => {
     try {
       setLoading(true);
-      const paths = await api.getCompanyLearningPaths(companyId);
       
-      // Group paths by user
-      const userMap = {};
-      paths.forEach(path => {
-        const userId = path.userId || path.user_id;
-        if (!userMap[userId]) {
-          userMap[userId] = {
-            userId,
-            name: `User ${userId}`,
-            courseCount: 0,
-            pathCount: 0,
-            paths: [],
-          };
-        }
-        userMap[userId].paths.push(path);
-        userMap[userId].pathCount++;
-        userMap[userId].courseCount = new Set(userMap[userId].paths.map(p => p.competencyTargetName || p.courseId || p.course_id)).size;
-      });
+      // Fetch learners for the company
+      const learnersResponse = await api.getLearnersByCompany(companyId);
+      const learners = learnersResponse.learners || [];
+      
+      // Fetch courses (which contain learning paths) for each user
+      const pathMap = {};
+      const userMap = await Promise.all(
+        learners.map(async (learner) => {
+          const userId = learner.user_id || learner.userId;
+          try {
+            // Fetch courses for this user
+            const coursesResponse = await api.getCoursesByUser(userId);
+            const courses = coursesResponse.courses || coursesResponse || [];
+            
+            // Transform courses to learning path format
+            const userPaths = courses.map(course => ({
+              userId: course.user_id || userId,
+              user_id: course.user_id || userId,
+              competencyTargetName: course.competency_target_name || course.course_id,
+              courseId: course.competency_target_name || course.course_id,
+              course_id: course.competency_target_name || course.course_id,
+              pathTitle: course.learning_path?.pathTitle || course.learning_path?.path_title || course.competency_target_name,
+              pathData: course.learning_path,
+              learning_path: course.learning_path,
+              status: course.learning_path?.status || 'active',
+              totalDurationHours: course.learning_path?.totalDurationHours || course.learning_path?.total_duration_hours,
+              approved: course.approved
+            }));
+            
+            pathMap[userId] = userPaths;
+            
+            return {
+              userId,
+              name: learner.user_name || learner.userName || `User ${userId}`,
+              companyName: learner.company_name || learner.companyName,
+              courseCount: new Set(userPaths.map(p => p.competencyTargetName || p.courseId || p.course_id)).size,
+              pathCount: userPaths.length,
+              paths: userPaths,
+            };
+          } catch (error) {
+            console.warn(`Failed to load courses for user ${userId}:`, error);
+            pathMap[userId] = [];
+            return {
+              userId,
+              name: learner.user_name || learner.userName || `User ${userId}`,
+              companyName: learner.company_name || learner.companyName,
+              courseCount: 0,
+              pathCount: 0,
+              paths: [],
+            };
+          }
+        })
+      );
 
-      setUsers(Object.values(userMap));
-      setLearningPaths(paths.reduce((acc, path) => {
-        const userId = path.userId || path.user_id;
-        if (!acc[userId]) acc[userId] = [];
-        acc[userId].push(path);
-        return acc;
-      }, {}));
+      setUsers(userMap);
+      setLearningPaths(pathMap);
     } catch (error) {
       console.error('Failed to load company data:', error);
     } finally {
@@ -83,8 +116,12 @@ export default function CompanyDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-text-primary mb-2">Company Dashboard</h1>
-            <p className="text-text-secondary">View all users and their learning paths</p>
+            <h1 className="text-3xl font-bold text-text-primary mb-2">
+              {users.length > 0 && users[0].companyName ? `${users[0].companyName} Dashboard` : 'Company Dashboard'}
+            </h1>
+            <p className="text-text-secondary">
+              {users.length > 0 ? `Viewing ${users.length} user${users.length !== 1 ? 's' : ''} and their learning paths` : 'View all users and their learning paths'}
+            </p>
           </div>
 
           {/* Search Bar */}
@@ -109,7 +146,14 @@ export default function CompanyDashboard() {
               <UserCard
                 key={user.userId}
                 user={user}
-                onClick={() => setSelectedUser(selectedUser?.userId === user.userId ? null : user)}
+                onClick={() => {
+                  if (selectedUser?.userId === user.userId) {
+                    setSelectedUser(null);
+                  } else {
+                    setSelectedUser(user);
+                    setSelectedPathIndex(0); // Reset to first path when selecting a new user
+                  }
+                }}
               />
             ))}
           </div>
@@ -121,40 +165,207 @@ export default function CompanyDashboard() {
           )}
 
           {/* Selected User Learning Paths */}
-          {selectedUser && learningPaths[selectedUser.userId] && (
+          {selectedUser && learningPaths[selectedUser.userId] && learningPaths[selectedUser.userId].length > 0 && (
             <Card className="mt-8">
-              <h2 className="text-2xl font-bold text-text-primary mb-6">
-                Learning Paths for {selectedUser.name}
-              </h2>
-              <div className="space-y-6">
-                {learningPaths[selectedUser.userId].map((path, index) => (
-                  <div key={index} className="border-b border-emeraldbrand-200 dark:border-emeraldbrand-800 pb-6 last:border-0 last:pb-0">
-                    <h3 className="text-xl font-semibold text-text-primary mb-2">
-                      {path.pathTitle || `Path ${index + 1}`}
-                    </h3>
-                    <p className="text-sm text-text-secondary mb-4">
-                      Course: {path.competencyTargetName || path.courseId || path.course_id} • Status: {path.status || 'active'}
-                    </p>
-                    {path.pathData && path.pathData.learning_modules && (
-                      <div className="space-y-4">
-                        {path.pathData.learning_modules.map((module, i) => (
-                          <div key={i} className="bg-bg-secondary rounded-lg p-4">
-                            <h4 className="font-medium text-text-primary mb-2">
-                              {module.module_title || `Module ${i + 1}`}
-                            </h4>
-                            {module.learning_goals && (
-                              <ul className="list-disc list-inside text-sm text-text-secondary">
-                                {module.learning_goals.map((goal, j) => (
-                                  <li key={j}>{goal}</li>
-                                ))}
-                              </ul>
-                            )}
-                          </div>
-                        ))}
+              <div className="flex items-center justify-between mb-6">
+                <h2 className="text-2xl font-bold text-text-primary">
+                  Learning Paths for {selectedUser.name}
+                </h2>
+                <button
+                  onClick={() => setSelectedUser(null)}
+                  className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+                  type="button"
+                >
+                  Close
+                </button>
+              </div>
+
+              {/* Path Selector - Tabs for few paths, Dropdown for many */}
+              {learningPaths[selectedUser.userId].length > 1 && (
+                <div className="mb-6">
+                  {learningPaths[selectedUser.userId].length <= 5 ? (
+                    // Tabs for 5 or fewer paths
+                    <div className="border-b border-emeraldbrand-200 dark:border-emeraldbrand-800">
+                      <div className="flex space-x-1 overflow-x-auto">
+                        {learningPaths[selectedUser.userId].map((path, index) => {
+                          const learningPath = path.learning_path || path.pathData || {};
+                          const isActive = index === selectedPathIndex;
+                          
+                          return (
+                            <button
+                              key={index}
+                              onClick={() => setSelectedPathIndex(index)}
+                              className={`px-4 py-2 text-sm font-medium transition-all duration-300 ease-in-out whitespace-nowrap ${
+                                isActive
+                                  ? 'border-b-2 border-primary-cyan text-primary-cyan'
+                                  : 'text-text-secondary hover:text-text-primary hover:border-b-2 hover:border-gray-300 dark:hover:border-gray-600'
+                              }`}
+                              type="button"
+                            >
+                              {path.pathTitle || learningPath.pathTitle || learningPath.path_title || path.competencyTargetName || `Path ${index + 1}`}
+                            </button>
+                          );
+                        })}
                       </div>
-                    )}
+                    </div>
+                  ) : (
+                    // Dropdown for more than 5 paths
+                    <div className="flex items-center gap-3">
+                      <label htmlFor="path-selector" className="text-sm font-medium text-text-primary whitespace-nowrap">
+                        Select Learning Path:
+                      </label>
+                      <select
+                        id="path-selector"
+                        value={selectedPathIndex}
+                        onChange={(e) => setSelectedPathIndex(Number(e.target.value))}
+                        className="flex-1 px-4 py-2 rounded-md bg-bg-secondary border border-emeraldbrand-200 dark:border-emeraldbrand-800 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-cyan transition-all duration-300 ease-in-out"
+                      >
+                        {learningPaths[selectedUser.userId].map((path, index) => {
+                          const learningPath = path.learning_path || path.pathData || {};
+                          return (
+                            <option key={index} value={index}>
+                              {path.pathTitle || learningPath.pathTitle || learningPath.path_title || path.competencyTargetName || `Path ${index + 1}`}
+                            </option>
+                          );
+                        })}
+                      </select>
+                      <span className="text-sm text-text-secondary whitespace-nowrap">
+                        {selectedPathIndex + 1} of {learningPaths[selectedUser.userId].length}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Selected Path Details - Use same component as User View */}
+              {learningPaths[selectedUser.userId][selectedPathIndex] && (() => {
+                const path = learningPaths[selectedUser.userId][selectedPathIndex];
+                const learningPath = path.learning_path || path.pathData || {};
+                
+                // Parse learning_path if it's a string
+                let pathData = learningPath;
+                if (typeof pathData === 'string') {
+                  try {
+                    pathData = JSON.parse(pathData);
+                  } catch (e) {
+                    console.error('Failed to parse learning_path JSON:', e);
+                    pathData = {};
+                  }
+                }
+                
+                // Extract steps and modules (same logic as UserView)
+                const steps = pathData.steps || pathData.pathSteps || [];
+                let modules = pathData.learning_modules || pathData.learningModules || [];
+                
+                // Map steps to modules for display (same as UserView)
+                if (steps.length > 0) {
+                  if (modules.length > 0) {
+                    // Group steps by modules
+                    modules = modules.map((module, index) => {
+                      const stepsPerModule = Math.ceil(steps.length / modules.length);
+                      const startIndex = index * stepsPerModule;
+                      const endIndex = Math.min(startIndex + stepsPerModule, steps.length);
+                      const moduleSteps = steps.slice(startIndex, endIndex);
+                      
+                      return {
+                        ...module,
+                        module_order: index + 1,
+                        steps: moduleSteps.map(step => ({
+                          ...step,
+                          step: step.step || step.order || (startIndex + moduleSteps.indexOf(step) + 1),
+                          order: step.order || step.step || (startIndex + moduleSteps.indexOf(step) + 1)
+                        })),
+                        module_title: module.module_title || module.name,
+                        estimated_duration_hours: module.estimated_duration_hours || module.duration
+                      };
+                    });
+                  } else {
+                    // No modules, create modules from steps
+                    modules = steps.map((step, index) => ({
+                      name: step.title || `Step ${step.step || step.order || index + 1}`,
+                      module_title: step.title || `Step ${step.step || step.order || index + 1}`,
+                      duration: step.estimatedTime || step.duration,
+                      estimated_duration_hours: step.estimatedTime || step.duration,
+                      description: step.description,
+                      order: step.step || step.order || index + 1,
+                      module_order: step.step || step.order || index + 1,
+                      stepId: step.stepId || step.step_id,
+                      steps: [step]
+                    }));
+                  }
+                } else if (modules.length > 0) {
+                  modules = modules.map((module, index) => ({
+                    ...module,
+                    module_order: module.module_order || index + 1,
+                    module_title: module.module_title || module.name,
+                    estimated_duration_hours: module.estimated_duration_hours || module.duration
+                  }));
+                }
+                
+                // Create path object for LearningPathTimeline component
+                const pathForTimeline = {
+                  id: path.competencyTargetName || path.courseId || path.course_id,
+                  pathTitle: pathData.pathTitle || pathData.path_title || path.pathTitle || 'Learning Path',
+                  totalDurationHours: pathData.totalDurationHours || pathData.total_duration_hours,
+                  estimatedCompletion: pathData.estimatedCompletion,
+                  totalSteps: pathData.totalSteps || steps.length,
+                  pathSteps: steps,
+                  modules: modules,
+                  pathData: pathData,
+                  approved: path.approved
+                };
+                
+                return (
+                  <div>
+                    {/* Path Header - Same as User View */}
+                    <div className="mb-6 pb-4 border-b border-emeraldbrand-200 dark:border-emeraldbrand-800">
+                      <h3 className="text-2xl font-bold text-text-primary mb-2">
+                        {pathForTimeline.pathTitle || 'Learning Path'}
+                      </h3>
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                        <span>
+                          <strong>Course:</strong> {path.competencyTargetName || path.courseId || path.course_id}
+                        </span>
+                        {pathForTimeline.totalDurationHours && (
+                          <span>
+                            <strong>Total Duration:</strong> {pathForTimeline.totalDurationHours} hours
+                          </span>
+                        )}
+                        {pathForTimeline.estimatedCompletion && (
+                          <span>
+                            <strong>Estimated Completion:</strong> {pathForTimeline.estimatedCompletion}
+                          </span>
+                        )}
+                        {pathForTimeline.totalSteps && (
+                          <span>
+                            <strong>Total Steps:</strong> {pathForTimeline.totalSteps}
+                          </span>
+                        )}
+                        {path.approved !== undefined && (
+                          <span className={`px-2 py-1 rounded text-xs ${
+                            path.approved 
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
+                              : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                          }`}>
+                            {path.approved ? 'Approved' : 'Pending Approval'}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Use the same LearningPathTimeline component as User View */}
+                    <LearningPathTimeline path={pathForTimeline} />
                   </div>
-                ))}
+                );
+              })()}
+            </Card>
+          )}
+          
+          {/* Show message if user has no paths */}
+          {selectedUser && (!learningPaths[selectedUser.userId] || learningPaths[selectedUser.userId].length === 0) && (
+            <Card className="mt-8">
+              <div className="text-center py-8">
+                <p className="text-text-muted">No learning paths found for {selectedUser.name}</p>
               </div>
             </Card>
           )}

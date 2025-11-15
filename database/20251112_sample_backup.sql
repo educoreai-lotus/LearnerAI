@@ -18,7 +18,7 @@ INSERT INTO companies (company_id, company_name, decision_maker_policy, decision
 -- =====================================================
 INSERT INTO learners (user_id, company_id, company_name, user_name) VALUES
 ('660e8400-e29b-41d4-a716-446655440001', '550e8400-e29b-41d4-a716-446655440001', 'TechCorp Solutions', 'Alice Johnson'),
-('660e8400-e29b-41d4-a716-446655440002', '550e8400-e29b-41d4-a716-446655440002', 'DataFlow Inc', 'Wajdan Ahmed'),
+('660e8400-e29b-41d4-a716-446655440002', '550e8400-e29b-41d4-a716-446655440002', 'DataFlow Inc', 'Sara Neer'),
 ('660e8400-e29b-41d4-a716-446655440003', '550e8400-e29b-41d4-a716-446655440001', 'TechCorp Solutions', 'Bob Smith');
 
 -- =====================================================
@@ -29,7 +29,7 @@ INSERT INTO skills_gap (gap_id, user_id, company_id, company_name, user_name, sk
 '{"identifiedGaps": [{"skill": "JavaScript ES6+ Syntax", "level": "beginner", "priority": "high", "microSkills": [{"id": "micro-001", "name": "Arrow functions", "description": "Understanding arrow function syntax"}], "nanoSkills": [{"id": "nano-001", "name": "Basic arrow function", "description": "Write simple arrow functions"}]}], "assessmentDate": "2025-11-12", "assessmentMethod": "technical_test"}',
 'fail',
 'JavaScript Basics'),
-('770e8400-e29b-41d4-a716-446655440002', '660e8400-e29b-41d4-a716-446655440002', '550e8400-e29b-41d4-a716-446655440002', 'DataFlow Inc', 'Wajdan Ahmed',
+('770e8400-e29b-41d4-a716-446655440002', '660e8400-e29b-41d4-a716-446655440002', '550e8400-e29b-41d4-a716-446655440002', 'DataFlow Inc', 'Sara Neer',
 '{"identifiedGaps": [{"skill": "Advanced SQL Queries", "level": "intermediate", "priority": "high", "microSkills": [{"id": "micro-002", "name": "Window functions", "description": "Using window functions for analytics"}], "nanoSkills": [{"id": "nano-002", "name": "ROW_NUMBER() function", "description": "Implement ROW_NUMBER() in queries"}]}], "assessmentDate": "2025-11-12", "assessmentMethod": "technical_interview"}',
 'fail',
 'Advanced SQL'),
@@ -90,7 +90,7 @@ INSERT INTO jobs (id, user_id, company_id, competency_target_name, type, status,
 -- =====================================================
 -- Summary:
 -- - 3 companies (TechCorp, DataFlow, CloudTech)
--- - 3 learners (Alice, Wajdan, Bob)
+-- - 3 learners (Alice, Sara, Bob)
 -- - 3 skills gaps (linked to learners and courses)
 -- - 2 skills expansions
 -- - 3 courses (JavaScript Basics, Advanced SQL, React Fundamentals)
@@ -99,6 +99,6 @@ INSERT INTO jobs (id, user_id, company_id, competency_target_name, type, status,
 --
 -- Relationships demonstrated:
 -- - Alice → TechCorp → JavaScript Basics
--- - Wajdan → DataFlow → Advanced SQL
+-- - Sara → DataFlow → Advanced SQL
 -- - Bob → TechCorp → React Fundamentals
 

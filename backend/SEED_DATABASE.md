@@ -14,17 +14,17 @@ The backend includes a comprehensive mock data seeding system to test all databa
 
 ### 1. **Learners** (3 records)
 - Alice Johnson (TechCorp Inc., auto approval)
-- Wajdan Al-Mansouri (TechCorp Inc., manual approval)
+- Sara Neer (TechCorp Inc., manual approval)
 - Bob Smith (InnovateLabs, auto approval)
 
 ### 2. **Skills Gaps** (2 records)
 - JavaScript ES6+ Syntax gaps for Alice
-- React Hooks gaps for Wajdan
+- React Hooks gaps for Sara
 - Includes complete `skills_raw_data` JSONB structure with micro and nano skills
 
 ### 3. **Courses** (2 records)
 - JavaScript Modern Development Path for Alice
-- React Hooks Mastery for Wajdan
+- React Hooks Mastery for Sara
 - Includes complete `learning_path` JSONB structure
 
 ### 4. **Skills Expansions** (1 record)

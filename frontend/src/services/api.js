@@ -73,6 +73,20 @@ class ApiService {
     return this.request(`/companies/${companyId}`);
   }
 
+  // Learners
+  async getLearnersByCompany(companyId) {
+    return this.request(`/learners/company/${companyId}`);
+  }
+
+  async getAllLearners() {
+    return this.request('/learners');
+  }
+
+  // Courses
+  async getCoursesByUser(userId) {
+    return this.request(`/courses/user/${userId}`);
+  }
+
   // Approvals
   async approvePath(approvalId) {
     return this.request(`/approvals/${approvalId}/approve`, {
