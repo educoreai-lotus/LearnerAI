@@ -37,11 +37,11 @@ export class GenerateLearningPathUseCase {
    */
   async execute(skillsGap) {
     // Validate skills gap
-    if (!skillsGap.userId || !skillsGap.companyId || (!skillsGap.competencyTargetName && !skillsGap.courseId)) {
-      throw new Error('Skills gap must have userId, companyId, and competencyTargetName (or courseId)');
+    if (!skillsGap.userId || !skillsGap.companyId || !skillsGap.competencyTargetName) {
+      throw new Error('Skills gap must have userId, companyId, and competencyTargetName');
     }
 
-    const competencyTargetName = skillsGap.competencyTargetName || skillsGap.courseId;
+    const competencyTargetName = skillsGap.competencyTargetName;
 
     // Create job
     const job = new Job({
@@ -49,7 +49,6 @@ export class GenerateLearningPathUseCase {
       userId: skillsGap.userId,
       companyId: skillsGap.companyId,
       competencyTargetName: competencyTargetName,
-      courseId: competencyTargetName, // Legacy support
       type: 'path-generation',
       status: 'pending'
     });
@@ -89,8 +88,8 @@ export class GenerateLearningPathUseCase {
         try {
           // Get the most recent skills gap for this user and competency
           const gaps = await this.skillsGapRepository.getSkillsGapsByUser(skillsGap.userId);
-          const competencyTargetName = skillsGap.competencyTargetName || skillsGap.courseId;
-          const relevantGap = gaps.find(g => (g.competency_target_name || g.course_id) === competencyTargetName) || gaps[0];
+          const competencyTargetName = skillsGap.competencyTargetName;
+          const relevantGap = gaps.find(g => g.competency_target_name === competencyTargetName) || gaps[0];
           
           if (relevantGap && relevantGap.skills_raw_data) {
             skillsRawData = relevantGap.skills_raw_data;
@@ -185,7 +184,7 @@ export class GenerateLearningPathUseCase {
         id: uuidv4(),
         userId: skillsGap.userId,
         companyId: skillsGap.companyId,
-        courseId: skillsGap.courseId,
+        competencyTargetName: competencyTargetName,
         pathSteps: pathData.learning_modules || pathData.pathSteps || [],
         pathTitle: pathData.path_title,
         totalDurationHours: pathData.total_estimated_duration_hours,
@@ -265,7 +264,7 @@ export class GenerateLearningPathUseCase {
    * Uses updated skills_raw_data from database if available, otherwise falls back to request data
    */
   _formatSkillsGapForPrompt(skillsGap, skillsRawData = null) {
-    const competencyTargetName = skillsGap.competencyTargetName || skillsGap.courseId;
+    const competencyTargetName = skillsGap.competencyTargetName;
     
     // If we have updated skills_raw_data from database, use that
     if (skillsRawData) {
@@ -273,8 +272,7 @@ export class GenerateLearningPathUseCase {
         skills_raw_data: skillsRawData,
         context: {
           userId: skillsGap.userId,
-          competencyTargetName: competencyTargetName,
-          courseId: competencyTargetName // Legacy support
+          competencyTargetName: competencyTargetName
         }
       }, null, 2);
     }
@@ -285,8 +283,7 @@ export class GenerateLearningPathUseCase {
       nanoSkills: skillsGap.nanoSkills || [],
       context: {
         userId: skillsGap.userId,
-        competencyTargetName: competencyTargetName,
-        courseId: competencyTargetName // Legacy support
+        competencyTargetName: competencyTargetName
       }
     }, null, 2);
   }

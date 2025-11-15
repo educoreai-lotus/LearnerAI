@@ -23,7 +23,7 @@ export class RecommendationRepository {
       .insert({
         recommendation_id: recommendationData.recommendation_id || undefined,
         user_id: recommendationData.user_id,
-        base_course_name: recommendationData.base_course_name || recommendationData.base_course_id || null,
+        base_course_name: recommendationData.base_course_name || null,
         suggested_courses: recommendationData.suggested_courses,
         sent_to_rag: recommendationData.sent_to_rag || false
       })
@@ -142,7 +142,6 @@ export class RecommendationRepository {
   async updateRecommendation(recommendationId, updates) {
     const updateData = {};
     if (updates.base_course_name !== undefined) updateData.base_course_name = updates.base_course_name;
-    if (updates.base_course_id !== undefined) updateData.base_course_name = updates.base_course_id; // Legacy support
     if (updates.suggested_courses !== undefined) updateData.suggested_courses = updates.suggested_courses;
     if (updates.sent_to_rag !== undefined) updateData.sent_to_rag = updates.sent_to_rag;
 
@@ -186,7 +185,6 @@ export class RecommendationRepository {
       recommendation_id: record.recommendation_id,
       user_id: record.user_id,
       base_course_name: record.base_course_name,
-      base_course_id: record.base_course_name, // Legacy support
       suggested_courses: record.suggested_courses,
       sent_to_rag: record.sent_to_rag,
       created_at: record.created_at,

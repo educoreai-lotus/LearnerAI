@@ -8,7 +8,6 @@ export class Job {
     userId,
     companyId,
     competencyTargetName,
-    courseId, // Legacy support
     type, // 'path-generation', 'course-suggestion', etc.
     status = 'pending', // pending, processing, completed, failed
     progress = 0, // 0-100
@@ -21,8 +20,7 @@ export class Job {
     this.id = id;
     this.userId = userId;
     this.companyId = companyId;
-    this.competencyTargetName = competencyTargetName || courseId;
-    this.courseId = competencyTargetName || courseId; // Legacy support
+    this.competencyTargetName = competencyTargetName;
     this.type = type;
     this.status = status;
     this.progress = progress;
@@ -86,7 +84,6 @@ export class Job {
       userId: this.userId,
       companyId: this.companyId,
       competencyTargetName: this.competencyTargetName,
-      courseId: this.courseId, // Legacy support
       type: this.type,
       status: this.status,
       progress: this.progress,

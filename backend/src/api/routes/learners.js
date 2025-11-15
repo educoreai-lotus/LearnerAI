@@ -34,21 +34,13 @@ export function createLearnersRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { user_id, company_id, company_name, user_name, decision_maker_policy, decision_maker_id } = req.body;
+      const { user_id, company_id, company_name, user_name } = req.body;
 
       // Validate required fields
-      if (!company_id || !company_name || !user_name || !decision_maker_policy) {
+      if (!company_id || !company_name || !user_name) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'company_id, company_name, user_name, and decision_maker_policy are required'
-        });
-      }
-
-      // Validate decision_maker_policy
-      if (!['auto', 'manual'].includes(decision_maker_policy)) {
-        return res.status(400).json({
-          error: 'Invalid decision_maker_policy',
-          message: 'decision_maker_policy must be "auto" or "manual"'
+          message: 'company_id, company_name, and user_name are required'
         });
       }
 
@@ -56,9 +48,7 @@ export function createLearnersRouter(dependencies) {
         user_id,
         company_id,
         company_name,
-        user_name,
-        decision_maker_policy,
-        decision_maker_id
+        user_name
       });
 
       res.status(201).json({
@@ -132,15 +122,11 @@ export function createLearnersRouter(dependencies) {
       const { userId } = req.params;
       const updates = req.body;
 
-      // Validate decision_maker_policy if provided
-      if (updates.decision_maker_policy && !['auto', 'manual'].includes(updates.decision_maker_policy)) {
-        return res.status(400).json({
-          error: 'Invalid decision_maker_policy',
-          message: 'decision_maker_policy must be "auto" or "manual"'
-        });
-      }
+      // Note: decision_maker_policy and decision_maker_id are in companies table, not learners
+      // Remove them from updates if present
+      const { decision_maker_policy, decision_maker_id, ...learnerUpdates } = updates;
 
-      const learner = await learnerRepository.updateLearner(userId, updates);
+      const learner = await learnerRepository.updateLearner(userId, learnerUpdates);
 
       res.json({
         message: 'Learner updated successfully',

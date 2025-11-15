@@ -47,13 +47,12 @@ export function createSkillsGapsRouter(dependencies) {
         company_name,
         competency_name,
         competency_target_name,
-        course_id, // Legacy support
         status,
         gap, // JSONB gap data with micro/nano skills
         // Legacy fields (for backward compatibility)
         gap_id,
         skills_raw_data,
-        test_status,
+        exam_status,
         decision_maker_id,
         decision_maker_policy
       } = req.body;
@@ -66,7 +65,7 @@ export function createSkillsGapsRouter(dependencies) {
           user_name,
           company_id,
           company_name,
-          competency_name: competency_name || competency_target_name || course_id, // Support all variants
+          competency_name: competency_name || competency_target_name,
           status,
           gap
         });
@@ -86,11 +85,11 @@ export function createSkillsGapsRouter(dependencies) {
         });
       }
 
-      // Validate test_status if provided
-      if (test_status && !['pass', 'fail'].includes(test_status)) {
+      // Validate exam_status if provided
+      if (exam_status && !['pass', 'fail'].includes(exam_status)) {
         return res.status(400).json({
-          error: 'Invalid test_status',
-          message: 'test_status must be "pass" or "fail"'
+          error: 'Invalid exam_status',
+          message: 'exam_status must be "pass" or "fail"'
         });
       }
 
@@ -109,8 +108,8 @@ export function createSkillsGapsRouter(dependencies) {
         company_name,
         user_name,
         skills_raw_data: skills_raw_data || gap,
-        exam_status: test_status || (status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null),
-        competency_target_name: competency_name || competency_target_name || course_id, // Support all variants
+        exam_status: exam_status || (status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null),
+        competency_target_name: competency_name || competency_target_name,
         decision_maker_id,
         decision_maker_policy
       });
@@ -244,24 +243,24 @@ export function createSkillsGapsRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/skills-gaps/test-status/:status
-   * Get skills gaps by test_status (pass/fail)
+   * GET /api/v1/skills-gaps/exam-status/:status
+   * Get skills gaps by exam_status (pass/fail)
    */
-  router.get('/test-status/:status', async (req, res) => {
+  router.get('/exam-status/:status', async (req, res) => {
     try {
       const { status } = req.params;
 
       if (!['pass', 'fail'].includes(status)) {
         return res.status(400).json({
-          error: 'Invalid test_status',
-          message: 'test_status must be "pass" or "fail"'
+          error: 'Invalid exam_status',
+          message: 'exam_status must be "pass" or "fail"'
         });
       }
 
-      const skillsGaps = await skillsGapRepository.getSkillsGapsByTestStatus(status);
+      const skillsGaps = await skillsGapRepository.getSkillsGapsByExamStatus(status);
 
       res.json({
-        test_status: status,
+        exam_status: status,
         count: skillsGaps.length,
         skillsGaps
       });
@@ -283,11 +282,11 @@ export function createSkillsGapsRouter(dependencies) {
       const { gapId } = req.params;
       const updates = req.body;
 
-      // Validate test_status if provided
-      if (updates.test_status && !['pass', 'fail'].includes(updates.test_status)) {
+      // Validate exam_status if provided
+      if (updates.exam_status && !['pass', 'fail'].includes(updates.exam_status)) {
         return res.status(400).json({
-          error: 'Invalid test_status',
-          message: 'test_status must be "pass" or "fail"'
+          error: 'Invalid exam_status',
+          message: 'exam_status must be "pass" or "fail"'
         });
       }
 

@@ -44,7 +44,7 @@ class ApiService {
   async generateLearningPath(userId, competencyTargetName, skillGaps, companyId) {
     return this.request('/learning-paths/generate', {
       method: 'POST',
-      body: { userId, competencyTargetName, courseId: competencyTargetName, skillGaps, companyId }, // Legacy support
+      body: { userId, competencyTargetName, skillGaps, companyId },
     });
   }
 

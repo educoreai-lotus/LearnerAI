@@ -88,35 +88,6 @@ describe('CourseRepository', () => {
       });
       expect(result.competency_target_name).toBe('JavaScript ES6+ Syntax');
     });
-
-    it('should support course_id as fallback', async () => {
-      const courseData = {
-        course_id: 'JavaScript ES6+ Syntax', // Legacy field
-        user_id: 'user-123',
-        learning_path: {},
-        approved: false
-      };
-
-      const mockRecord = {
-        competency_target_name: 'JavaScript ES6+ Syntax',
-        user_id: 'user-123',
-        learning_path: {},
-        approved: false,
-        created_at: '2025-01-01T00:00:00Z',
-        last_modified_at: '2025-01-01T00:00:00Z'
-      };
-
-      mockClient.single.mockResolvedValue({ data: mockRecord, error: null });
-
-      const result = await repository.createCourse(courseData);
-
-      expect(mockClient.insert).toHaveBeenCalledWith(
-        expect.objectContaining({
-          competency_target_name: 'JavaScript ES6+ Syntax'
-        })
-      );
-      expect(result.competency_target_name).toBe('JavaScript ES6+ Syntax');
-    });
   });
 
   describe('getCourseById', () => {

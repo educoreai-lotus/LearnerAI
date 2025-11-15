@@ -13,19 +13,16 @@ export class DetectCompletionUseCase {
    * @param {Object} completionData
    * @param {string} completionData.userId - User ID
    * @param {string} completionData.competencyTargetName - Completed competency name
-   * @param {string} completionData.courseId - Legacy support (completed course ID)
    * @param {boolean} completionData.passed - Whether the course was passed
    * @param {Object} completionData.completionDetails - Additional completion details
    * @returns {Promise<Object>} Result with job ID for async suggestion generation
    */
   async execute(completionData) {
-    const { userId, competencyTargetName, courseId, passed, completionDetails = {} } = completionData;
-
-    const competencyName = competencyTargetName || courseId;
+    const { userId, competencyTargetName, passed, completionDetails = {} } = completionData;
 
     // Validate required fields
-    if (!userId || !competencyName) {
-      throw new Error('userId and competencyTargetName (or courseId) are required');
+    if (!userId || !competencyTargetName) {
+      throw new Error('userId and competencyTargetName are required');
     }
 
     // Only process successful completions
@@ -34,15 +31,14 @@ export class DetectCompletionUseCase {
         processed: false,
         message: 'Course not passed - no suggestions generated',
         userId,
-        competencyTargetName: competencyName,
-        courseId: competencyName // Legacy support
+        competencyTargetName
       };
     }
 
     // Generate course suggestions asynchronously
     const result = await this.generateCourseSuggestionsUseCase.execute({
       userId,
-      completedCourseId: competencyName,
+      competencyTargetName,
       completionDate: new Date().toISOString(),
       completionDetails
     });
@@ -51,8 +47,7 @@ export class DetectCompletionUseCase {
       processed: true,
       message: 'Course completion detected - suggestions generation started',
       userId,
-      competencyTargetName: competencyName,
-      courseId: competencyName, // Legacy support
+      competencyTargetName,
       jobId: result.jobId,
       status: result.status
     };

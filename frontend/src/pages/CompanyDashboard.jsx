@@ -47,9 +47,7 @@ export default function CompanyDashboard() {
             const userPaths = courses.map(course => ({
               userId: course.user_id || userId,
               user_id: course.user_id || userId,
-              competencyTargetName: course.competency_target_name || course.course_id,
-              courseId: course.competency_target_name || course.course_id,
-              course_id: course.competency_target_name || course.course_id,
+              competencyTargetName: course.competency_target_name || course.competencyTargetName,
               pathTitle: course.learning_path?.pathTitle || course.learning_path?.path_title || course.competency_target_name,
               pathData: course.learning_path,
               learning_path: course.learning_path,
@@ -64,7 +62,7 @@ export default function CompanyDashboard() {
               userId,
               name: learner.user_name || learner.userName || `User ${userId}`,
               companyName: learner.company_name || learner.companyName,
-              courseCount: new Set(userPaths.map(p => p.competencyTargetName || p.courseId || p.course_id)).size,
+              courseCount: new Set(userPaths.map(p => p.competencyTargetName)).size,
               pathCount: userPaths.length,
               paths: userPaths,
             };
@@ -304,7 +302,7 @@ export default function CompanyDashboard() {
                 
                 // Create path object for LearningPathTimeline component
                 const pathForTimeline = {
-                  id: path.competencyTargetName || path.courseId || path.course_id,
+                  id: path.competencyTargetName,
                   pathTitle: pathData.pathTitle || pathData.path_title || path.pathTitle || 'Learning Path',
                   totalDurationHours: pathData.totalDurationHours || pathData.total_duration_hours,
                   estimatedCompletion: pathData.estimatedCompletion,
@@ -324,7 +322,7 @@ export default function CompanyDashboard() {
                       </h3>
                       <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
                         <span>
-                          <strong>Course:</strong> {path.competencyTargetName || path.courseId || path.course_id}
+                          <strong>Course:</strong> {path.competencyTargetName}
                         </span>
                         {pathForTimeline.totalDurationHours && (
                           <span>

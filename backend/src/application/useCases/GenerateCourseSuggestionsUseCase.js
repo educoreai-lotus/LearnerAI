@@ -27,11 +27,11 @@ export class GenerateCourseSuggestionsUseCase {
    * This is the synchronous entry point
    */
   async execute(completionData) {
-    const { userId, completedCourseId, completionDate, completionDetails = {} } = completionData;
+    const { userId, competencyTargetName, completionDate, completionDetails = {} } = completionData;
 
     // Validate required fields
-    if (!userId || !completedCourseId) {
-      throw new Error('userId and completedCourseId are required');
+    if (!userId || !competencyTargetName) {
+      throw new Error('userId and competencyTargetName are required');
     }
 
     // Create job
@@ -39,8 +39,7 @@ export class GenerateCourseSuggestionsUseCase {
       id: uuidv4(),
       userId: userId,
       companyId: completionDetails.companyId || null,
-      competencyTargetName: completedCourseId,
-      courseId: completedCourseId, // Legacy support
+      competencyTargetName,
       type: 'course-suggestion',
       status: 'pending'
     });
@@ -67,7 +66,7 @@ export class GenerateCourseSuggestionsUseCase {
    */
   async processJob(job, completionData) {
     try {
-      const { userId, completedCourseId, completionDate, completionDetails = {} } = completionData;
+      const { userId, competencyTargetName, completionDate, completionDetails = {} } = completionData;
 
       // Update job to processing
       await this.jobRepository.updateJob(job.id, {
@@ -82,8 +81,7 @@ export class GenerateCourseSuggestionsUseCase {
         try {
           const paths = await this.learningPathRepository.getLearningPathsByUser(userId);
           learningPathHistory = paths.map(path => ({
-            competencyTargetName: path.competencyTargetName || path.courseId,
-            courseId: path.competencyTargetName || path.courseId, // Legacy support
+            competencyTargetName: path.competencyTargetName,
             pathTitle: path.pathTitle,
             status: path.status,
             generatedAt: path.generatedAt
@@ -95,8 +93,7 @@ export class GenerateCourseSuggestionsUseCase {
 
       // Prepare completion details
       const completedCourseDetails = {
-        competencyTargetName: completedCourseId,
-        courseId: completedCourseId, // Legacy support
+        competencyTargetName,
         completionDate: completionDate,
         ...completionDetails
       };
@@ -105,7 +102,7 @@ export class GenerateCourseSuggestionsUseCase {
       const prompt4 = await this.promptLoader.loadPrompt('prompt4-course-suggestions');
       const fullPrompt4 = prompt4
         .replace('{userId}', userId)
-        .replace('{completedCourseId}', completedCourseId)
+        .replace('{completedCourseId}', competencyTargetName)
         .replace('{completionDate}', completionDate)
         .replace('{completedCourseDetails}', JSON.stringify(completedCourseDetails, null, 2))
         .replace('{learningPathHistory}', learningPathHistory 
@@ -124,7 +121,7 @@ export class GenerateCourseSuggestionsUseCase {
       });
 
       // Parse suggestions from Prompt 4 result
-      const suggestions = this._parseSuggestions(prompt4Result, userId, completedCourseId);
+      const suggestions = this._parseSuggestions(prompt4Result, userId, competencyTargetName);
 
       // Send to RAG microservice for enhancement
       await this.jobRepository.updateJob(job.id, {
@@ -137,7 +134,7 @@ export class GenerateCourseSuggestionsUseCase {
         try {
           const ragResult = await this.ragClient.processCourseSuggestions(suggestions, {
             userId,
-            completedCourseId,
+            competencyTargetName,
             completionDate
           });
           enhancedSuggestions = ragResult.enhancedSuggestions || suggestions;
@@ -157,7 +154,7 @@ export class GenerateCourseSuggestionsUseCase {
       if (this.suggestionsRepository) {
         savedSuggestion = await this.suggestionsRepository.saveSuggestion({
           userId,
-          completedCourseId,
+          competencyTargetName,
           suggestionData: {
             originalSuggestions: suggestions,
             enhancedSuggestions: enhancedSuggestions,
@@ -171,7 +168,7 @@ export class GenerateCourseSuggestionsUseCase {
         savedSuggestion = {
           id: `temp_${Date.now()}`,
           userId,
-          completedCourseId,
+          competencyTargetName,
           suggestionData: {
             originalSuggestions: suggestions,
             enhancedSuggestions: enhancedSuggestions,
@@ -203,7 +200,7 @@ export class GenerateCourseSuggestionsUseCase {
    * Parse suggestions from Prompt 4 result
    * @private
    */
-  _parseSuggestions(promptResult, userId, completedCourseId) {
+  _parseSuggestions(promptResult, userId, competencyTargetName) {
     // Handle both JSON string and object responses
     let suggestions;
     if (typeof promptResult === 'string') {
@@ -230,7 +227,8 @@ export class GenerateCourseSuggestionsUseCase {
     return {
       request_id: suggestions.request_id || `SUGGESTION_${Date.now()}`,
       learner_id: suggestions.learner_id || userId,
-      completed_course_id: suggestions.completed_course_id || completedCourseId,
+      competency_target_name: competencyTargetName,
+      completed_course_id: competencyTargetName, // Legacy support for RAG microservice
       analysis_summary: suggestions.analysis_summary || '',
       suggested_courses: suggestions.suggested_courses,
       career_path_recommendations: suggestions.career_path_recommendations || {},

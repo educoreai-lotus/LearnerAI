@@ -162,13 +162,13 @@ Here's a concrete example with sample data:
 - ✅ `user_id`, `user_name`, `company_id`, `company_name`
 - ✅ `competency_target_name`
 - ✅ `learning_path` (JSONB structure)
-- ❌ Does NOT receive: `gap_id`, `skills_raw_data`, `test_status`
+- ❌ Does NOT receive: `gap_id`, `skills_raw_data`, `exam_status`
 
 **Learning Analytics** receives:
 - ✅ `user_id`, `user_name`, `company_id`, `company_name`
 - ✅ `competency_target_name`
 - ✅ `learning_path` (JSONB structure)
-- ✅ **Plus**: `gap_id`, `skills_raw_data`, `test_status` (for analytics)
+- ✅ **Plus**: `gap_id`, `skills_raw_data`, `exam_status` (for analytics)
 
 ---
 

@@ -23,7 +23,7 @@ export class JobRepository {
         id: job.id,
         user_id: job.userId,
         company_id: job.companyId,
-        competency_target_name: job.competencyTargetName || job.courseId, // Support both
+        competency_target_name: job.competencyTargetName,
         type: job.type,
         status: job.status,
         progress: job.progress,
@@ -94,8 +94,7 @@ export class JobRepository {
       id: record.id,
       userId: record.user_id,
       companyId: record.company_id,
-      competencyTargetName: record.competency_target_name || record.course_id, // Support both
-      courseId: record.competency_target_name || record.course_id, // Legacy support
+      competencyTargetName: record.competency_target_name,
       type: record.type,
       status: record.status,
       progress: record.progress || 0,

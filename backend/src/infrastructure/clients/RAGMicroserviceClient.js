@@ -31,7 +31,8 @@ export class RAGMicroserviceClient {
       suggestions,
       completionData: {
         userId: completionData.userId,
-        completedCourseId: completionData.completedCourseId,
+        competencyTargetName: completionData.competencyTargetName,
+        completedCourseId: completionData.competencyTargetName, // Legacy support
         completionDate: completionData.completionDate
       }
     };
@@ -58,11 +59,11 @@ export class RAGMicroserviceClient {
   /**
    * Get enhanced course suggestions with RAG content
    * @param {string} userId - User ID
-   * @param {string} completedCourseId - Completed course ID
+   * @param {string} competencyTargetName - Completed competency name
    * @returns {Promise<Object>} Enhanced suggestions
    */
-  async getEnhancedSuggestions(userId, completedCourseId) {
-    const url = `${this.baseUrl}/api/v1/suggestions/${userId}/${completedCourseId}`;
+  async getEnhancedSuggestions(userId, competencyTargetName) {
+    const url = `${this.baseUrl}/api/v1/suggestions/${userId}/${competencyTargetName}`;
     
     try {
       const response = await this.httpClient.get(url, {

@@ -11,7 +11,7 @@ export class SkillsEngineClient {
 
   /**
    * Request skill breakdown for competencies
-   * @param {Array} competencies - Array of competency objects (may include queryTemplate/exampleQuery from Prompt 2)
+   * @param {Array} competencies - Array of competency names (strings) or objects with 'name' property
    * @returns {Promise<object>} Skill breakdown with micro/nano divisions
    */
   async requestSkillBreakdown(competencies, options = {}) {
@@ -25,34 +25,23 @@ export class SkillsEngineClient {
       return this._getMockSkillBreakdown(competencies);
     }
 
+    // Extract competency names - handle both string arrays and object arrays
+    const competencyNames = competencies.map(comp => {
+      if (typeof comp === 'string') {
+        return comp;
+      }
+      // If it's an object, extract the name
+      return comp.name || comp.competency_name || String(comp);
+    });
+
     let lastError;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // If competencies have exampleQuery from Prompt 2, use those queries
-        const requestBody = competencies.map(comp => {
-          if (comp.exampleQuery) {
-            // Use the standardized query from Prompt 2
-            return {
-              query: comp.exampleQuery,
-              competency_name: comp.name,
-              target_level: comp.targetLevel,
-              source_type: comp.sourceType
-            };
-          } else {
-            // Fallback to simple format
-            return {
-              competency_name: comp.name,
-              target_level: comp.targetLevel || 'Intermediate',
-              description: comp.description || ''
-            };
-          }
-        });
-
+        // Send simple array of competency names (strings)
         const response = await this.httpClient.post(
           `${this.baseUrl}/api/skills/breakdown`,
           {
-            competencies: requestBody,
-            query_template: competencies[0]?.queryTemplate || null
+            competencies: competencyNames
           },
           {
             headers: {
@@ -85,7 +74,11 @@ export class SkillsEngineClient {
   _getMockSkillBreakdown(competencies) {
     const breakdown = {};
     competencies.forEach((comp, index) => {
-      const compName = comp.name || comp.competency_name || `Competency ${index + 1}`;
+      // Extract competency name - handle both strings and objects
+      const compName = typeof comp === 'string' 
+        ? comp 
+        : (comp.name || comp.competency_name || `Competency ${index + 1}`);
+      
       breakdown[compName] = {
         microSkills: [
           { id: `micro-${index}-1`, name: `${compName} - Micro Skill 1` },
@@ -94,9 +87,7 @@ export class SkillsEngineClient {
         nanoSkills: [
           { id: `nano-${index}-1`, name: `${compName} - Nano Skill 1` },
           { id: `nano-${index}-2`, name: `${compName} - Nano Skill 2` }
-        ],
-        targetLevel: comp.targetLevel || comp.target_level || 'Intermediate',
-        sourceType: comp.sourceType || comp.source_type || 'Out-of-the-Box'
+        ]
       };
     });
     return breakdown;

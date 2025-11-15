@@ -34,7 +34,7 @@ export function createRecommendationsRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { recommendation_id, user_id, base_course_name, base_course_id, suggested_courses, sent_to_rag } = req.body;
+      const { recommendation_id, user_id, base_course_name, suggested_courses, sent_to_rag } = req.body;
 
       // Validate required fields
       if (!user_id || !suggested_courses) {
@@ -47,7 +47,7 @@ export function createRecommendationsRouter(dependencies) {
       const recommendation = await recommendationRepository.createRecommendation({
         recommendation_id,
         user_id,
-        base_course_name: base_course_name || base_course_id, // Support both
+        base_course_name,
         suggested_courses,
         sent_to_rag: sent_to_rag !== undefined ? sent_to_rag : false
       });

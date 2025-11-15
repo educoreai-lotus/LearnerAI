@@ -20,8 +20,7 @@ http://localhost:5000/api/v1
     "company_id": "uuid (required)",
     "company_name": "string (required)",
     "user_name": "string (required)",
-    "decision_maker_policy": "auto|manual (required)",
-    "decision_maker_id": "uuid (optional)"
+    // Note: decision_maker_policy and decision_maker_id are stored in companies table, not learners
   }
   ```
 
@@ -47,7 +46,7 @@ http://localhost:5000/api/v1
 - **Body:**
   ```json
   {
-    "course_id": "uuid (optional)",
+    "competency_target_name": "string (required, primary key)",
     "user_id": "uuid (required)",
     "learning_path": "jsonb (required)",
     "approved": "boolean (optional, default: false)"
@@ -55,7 +54,7 @@ http://localhost:5000/api/v1
   ```
 
 #### Get Course by ID
-- **GET** `/api/v1/courses/:courseId`
+- **GET** `/api/v1/courses/:competencyTargetName`
 
 #### Get Courses by User
 - **GET** `/api/v1/courses/user/:userId`
@@ -64,11 +63,11 @@ http://localhost:5000/api/v1
 - **GET** `/api/v1/courses/approved/:status` (true/false)
 
 #### Update Course
-- **PUT** `/api/v1/courses/:courseId`
+- **PUT** `/api/v1/courses/:competencyTargetName`
 - **Body:** Partial update object
 
 #### Delete Course
-- **DELETE** `/api/v1/courses/:courseId`
+- **DELETE** `/api/v1/courses/:competencyTargetName`
 
 ---
 
@@ -85,10 +84,8 @@ http://localhost:5000/api/v1
     "company_name": "string (required)",
     "user_name": "string (required)",
     "skills_raw_data": "jsonb (required)",
-    "test_status": "pass|fail (optional)",
-    "course_id": "uuid (optional)",
-    "decision_maker_id": "uuid (optional)",
-    "decision_maker_policy": "auto|manual (optional)"
+    "exam_status": "pass|fail (optional)",
+    "competency_target_name": "string (required)"
   }
   ```
 
@@ -101,11 +98,11 @@ http://localhost:5000/api/v1
 #### Get Skills Gaps by Company
 - **GET** `/api/v1/skills-gaps/company/:companyId`
 
-#### Get Skills Gaps by Course
-- **GET** `/api/v1/skills-gaps/course/:courseId`
+#### Get Skills Gaps by Competency
+- **GET** `/api/v1/skills-gaps/competency/:competencyTargetName`
 
-#### Get Skills Gaps by Test Status
-- **GET** `/api/v1/skills-gaps/test-status/:status` (pass/fail)
+#### Get Skills Gaps by Exam Status
+- **GET** `/api/v1/skills-gaps/exam-status/:status` (pass/fail)
 
 #### Update Skills Gap
 - **PUT** `/api/v1/skills-gaps/:gapId`
@@ -156,7 +153,7 @@ http://localhost:5000/api/v1
   {
     "recommendation_id": "uuid (optional)",
     "user_id": "uuid (required)",
-    "base_course_id": "uuid (optional)",
+    "base_course_name": "string (optional)",
     "suggested_courses": "jsonb (required)",
     "sent_to_rag": "boolean (optional, default: false)"
   }
@@ -169,7 +166,7 @@ http://localhost:5000/api/v1
 - **GET** `/api/v1/recommendations/user/:userId`
 
 #### Get Recommendations by Base Course
-- **GET** `/api/v1/recommendations/course/:baseCourseId`
+- **GET** `/api/v1/recommendations/course/:baseCourseName`
 
 #### Get Recommendations by RAG Status
 - **GET** `/api/v1/recommendations/rag/:status` (true/false)
@@ -235,7 +232,7 @@ curl -X POST http://localhost:5000/api/v1/skills-gaps \
         }
       ]
     },
-    "test_status": "fail"
+    "exam_status": "fail"
   }'
 ```
 

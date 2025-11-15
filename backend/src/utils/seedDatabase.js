@@ -89,7 +89,7 @@ export async function seedDatabase(supabaseUrl, supabaseKey) {
     const createdCourses = [];
     for (const course of mockCourses) {
       try {
-        const competencyName = course.competency_target_name || course.course_id;
+        const competencyName = course.competency_target_name;
         // Try to create first
         try {
           const created = await courseRepo.createCourse(course);
@@ -109,7 +109,7 @@ export async function seedDatabase(supabaseUrl, supabaseKey) {
           }
         }
       } catch (error) {
-        console.error(`  ❌ Error creating/updating course ${course.competency_target_name || course.course_id}:`, error.message);
+        console.error(`  ❌ Error creating/updating course ${course.competency_target_name}:`, error.message);
       }
     }
 
@@ -156,8 +156,7 @@ export async function seedDatabase(supabaseUrl, supabaseKey) {
           id: jobData.id,
           userId: jobData.user_id,
           companyId: jobData.company_id,
-          competencyTargetName: jobData.competency_target_name || jobData.course_id,
-          courseId: jobData.competency_target_name || jobData.course_id, // Legacy support
+          competencyTargetName: jobData.competency_target_name,
           type: jobData.type,
           status: jobData.status,
           progress: jobData.progress,
@@ -248,10 +247,10 @@ export async function clearSeededData(supabaseUrl, supabaseKey) {
 
     for (const course of mockCourses) {
       try {
-        await courseRepo.deleteCourse(course.competency_target_name || course.course_id);
-        console.log(`  ✅ Deleted course: ${course.competency_target_name || course.course_id}`);
+        await courseRepo.deleteCourse(course.competency_target_name);
+        console.log(`  ✅ Deleted course: ${course.competency_target_name}`);
       } catch (error) {
-        console.log(`  ⚠️  Could not delete course ${course.competency_target_name || course.course_id}`);
+        console.log(`  ⚠️  Could not delete course ${course.competency_target_name}`);
       }
     }
 

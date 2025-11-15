@@ -4,7 +4,7 @@ INPUT DATA (Course Completion Information):
 
 Learner Information:
 - User ID: {userId}
-- Completed Course ID: {completedCourseId}
+- Completed Competency: {completedCourseId} (competency_target_name)
 - Course Completion Date: {completionDate}
 
 Completed Course Details:

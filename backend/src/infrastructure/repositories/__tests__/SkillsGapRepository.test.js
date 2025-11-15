@@ -161,7 +161,7 @@ describe('SkillsGapRepository', () => {
 
       const result = await repository.createSkillsGap(gapData);
 
-      // The mapping uses || which converts null to undefined if test_status doesn't exist
+      // The mapping returns null if exam_status doesn't exist
       // So we check for null or undefined
       expect(result.exam_status === null || result.exam_status === undefined).toBe(true);
       expect(result.competency_target_name === null || result.competency_target_name === undefined).toBe(true);

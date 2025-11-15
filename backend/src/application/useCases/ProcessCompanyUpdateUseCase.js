@@ -53,15 +53,15 @@ export class ProcessCompanyUpdateUseCase {
     console.log(`✅ Company ${company_name} (${company_id}) ${company.created_at ? 'created' : 'updated'}`);
 
     // Step 2: Update all existing learners with this company_id
-    // Sync their decision_maker_policy and decision_maker_id
+    // Sync their company_name (decision_maker_policy is in companies table, not learners)
     try {
       const learners = await this.learnerRepository.getLearnersByCompany(company_id);
       
       for (const learner of learners) {
         await this.learnerRepository.updateLearner(learner.user_id, {
-          company_name, // Update company name in case it changed
-          decision_maker_policy: approval_policy,
-          decision_maker_id: decision_maker?.employee_id || null
+          company_name // Update company name in case it changed
+          // Note: decision_maker_policy and decision_maker_id are in companies table, not learners
+          // Learners reference companies via company_id foreign key
         });
       }
 

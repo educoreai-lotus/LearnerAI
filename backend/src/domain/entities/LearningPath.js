@@ -7,8 +7,7 @@ export class LearningPath {
     id,
     userId,
     companyId,
-    courseId,
-    competencyTargetName, // New field: competency_target_name (primary key of courses table)
+    competencyTargetName, // competency_target_name (primary key of courses table)
     pathSteps = [],
     pathTitle = null,
     totalDurationHours = null,
@@ -21,7 +20,6 @@ export class LearningPath {
     this.id = id;
     this.userId = userId;
     this.companyId = companyId;
-    this.courseId = courseId;
     this.competencyTargetName = competencyTargetName || id; // Use id if not provided
     this.pathSteps = pathSteps; // Array of step objects or learning_modules
     this.pathTitle = pathTitle; // Title of the learning path
@@ -69,7 +67,7 @@ export class LearningPath {
       id: this.id,
       userId: this.userId,
       companyId: this.companyId,
-      courseId: this.courseId,
+      competencyTargetName: this.competencyTargetName,
       pathSteps: this.pathSteps,
       pathTitle: this.pathTitle,
       totalDurationHours: this.totalDurationHours,

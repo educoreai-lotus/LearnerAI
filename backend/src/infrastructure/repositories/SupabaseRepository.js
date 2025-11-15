@@ -67,7 +67,7 @@ export class SupabaseRepository {
       learningModules: learningPath.pathMetadata?.learning_modules || null,
       metadata: learningPath.pathMetadata,
       companyId: learningPath.companyId,
-      courseId: learningPath.courseId,
+      competencyTargetName: learningPath.competencyTargetName,
       status: learningPath.status
     };
 
@@ -139,8 +139,7 @@ export class SupabaseRepository {
       id: record.competency_target_name, // Primary key is competency_target_name
       userId: record.user_id,
       companyId: pathData.companyId || null, // May be stored in learning_path JSONB
-      courseId: record.competency_target_name, // Use competency_target_name as courseId
-      competencyTargetName: record.competency_target_name, // Add this field
+      competencyTargetName: record.competency_target_name,
       pathSteps: pathData.pathSteps || [],
       pathTitle: pathData.pathTitle || null,
       totalDurationHours: pathData.totalDurationHours || null,

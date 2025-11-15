@@ -18,7 +18,7 @@ describe('SkillsGaps Router', () => {
       getSkillsGapsByUser: jest.fn(),
       getSkillsGapsByCompany: jest.fn(),
       getSkillsGapsByCompetency: jest.fn(),
-      getSkillsGapsByTestStatus: jest.fn(),
+      getSkillsGapsByExamStatus: jest.fn(),
       updateSkillsGap: jest.fn(),
       deleteSkillsGap: jest.fn()
     };
@@ -53,7 +53,7 @@ describe('SkillsGaps Router', () => {
         skills_raw_data: {
           'Competency_JavaScript': ['MGS_Skill_1', 'MGS_Skill_2']
         },
-        test_status: 'FAIL',
+        exam_status: 'FAIL',
         competency_target_name: 'JavaScript ES6+ Syntax'
       };
 
@@ -91,14 +91,14 @@ describe('SkillsGaps Router', () => {
       );
     });
 
-    it('should return 400 for invalid test_status', async () => {
+    it('should return 400 for invalid exam_status', async () => {
       const gapData = {
         user_id: 'user-123',
         user_name: 'John Doe',
         company_id: 'company-456',
         company_name: 'Test Company',
         skills_raw_data: {},
-        test_status: 'invalid'
+        exam_status: 'invalid'
       };
 
       const { res } = await testRoute(router, 'post', '/', { body: gapData });
@@ -106,7 +106,7 @@ describe('SkillsGaps Router', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Invalid test_status'
+          error: 'Invalid exam_status'
         })
       );
     });
@@ -241,9 +241,9 @@ describe('SkillsGaps Router', () => {
       expect(mockSkillsGapRepository.updateSkillsGap).toHaveBeenCalledWith('gap-123', updates);
     });
 
-    it('should return 400 for invalid test_status', async () => {
+    it('should return 400 for invalid exam_status', async () => {
       const updates = {
-        test_status: 'invalid'
+        exam_status: 'invalid'
       };
 
       const { res } = await testRoute(router, 'put', '/:gapId', {
@@ -254,7 +254,7 @@ describe('SkillsGaps Router', () => {
       expect(res.status).toHaveBeenCalledWith(400);
       expect(res.json).toHaveBeenCalledWith(
         expect.objectContaining({
-          error: 'Invalid test_status'
+          error: 'Invalid exam_status'
         })
       );
     });

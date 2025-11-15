@@ -34,10 +34,10 @@ export function createCoursesRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { competency_target_name, course_id, user_id, learning_path, approved } = req.body;
+      const { competency_target_name, user_id, learning_path, approved } = req.body;
 
       // Validate required fields
-      if (!user_id || !learning_path || (!competency_target_name && !course_id)) {
+      if (!user_id || !learning_path || !competency_target_name) {
         return res.status(400).json({
           error: 'Missing required fields',
           message: 'user_id, learning_path, and competency_target_name are required'
@@ -45,7 +45,7 @@ export function createCoursesRouter(dependencies) {
       }
 
       const course = await courseRepository.createCourse({
-        competency_target_name: competency_target_name || course_id, // Support both
+        competency_target_name,
         user_id,
         learning_path,
         approved: approved !== undefined ? approved : false

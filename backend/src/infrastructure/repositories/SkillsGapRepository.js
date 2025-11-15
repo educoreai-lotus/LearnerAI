@@ -146,15 +146,15 @@ export class SkillsGapRepository {
   }
 
   /**
-   * Get skills gaps by test_status
-   * @param {string} testStatus
+   * Get skills gaps by exam_status
+   * @param {string} examStatus
    * @returns {Promise<Array<Object>>}
    */
-  async getSkillsGapsByTestStatus(testStatus) {
+  async getSkillsGapsByExamStatus(examStatus) {
     const { data, error } = await this.client
       .from('skills_gap')
       .select('*')
-      .eq('test_status', testStatus)
+      .eq('exam_status', examStatus)
       .order('created_at', { ascending: false });
 
     if (error) {
@@ -177,9 +177,6 @@ export class SkillsGapRepository {
     if (updates.competency_target_name !== undefined) updateData.competency_target_name = updates.competency_target_name;
     if (updates.company_name !== undefined) updateData.company_name = updates.company_name;
     if (updates.user_name !== undefined) updateData.user_name = updates.user_name;
-    // Legacy support
-    if (updates.test_status !== undefined) updateData.exam_status = updates.test_status;
-    if (updates.course_id !== undefined) updateData.competency_target_name = updates.course_id;
 
     const { data, error } = await this.client
       .from('skills_gap')
@@ -356,8 +353,8 @@ export class SkillsGapRepository {
       company_name: record.company_name,
       user_name: record.user_name,
       skills_raw_data: record.skills_raw_data,
-      exam_status: record.exam_status || record.test_status, // Support both
-      competency_target_name: record.competency_target_name || record.course_id, // Support both
+      exam_status: record.exam_status,
+      competency_target_name: record.competency_target_name,
       created_at: record.created_at,
       last_modified_at: record.last_modified_at
     };

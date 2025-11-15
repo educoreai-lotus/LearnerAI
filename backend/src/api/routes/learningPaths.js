@@ -36,24 +36,21 @@ export function createLearningPathsRouter(dependencies) {
    */
   router.post('/generate', async (req, res) => {
     try {
-      const { userId, companyId, competencyTargetName, courseId, microSkills, nanoSkills } = req.body;
+      const { userId, companyId, competencyTargetName, microSkills, nanoSkills } = req.body;
 
       // Validate required fields
-      if (!userId || !companyId || (!competencyTargetName && !courseId)) {
+      if (!userId || !companyId || !competencyTargetName) {
         return res.status(400).json({
           error: 'Missing required fields',
-          message: 'userId, companyId, and competencyTargetName (or courseId) are required'
+          message: 'userId, companyId, and competencyTargetName are required'
         });
       }
-
-      const competencyName = competencyTargetName || courseId;
 
       // Create skills gap entity
       const skillsGap = new SkillsGap({
         userId,
         companyId,
-        competencyTargetName: competencyName,
-        courseId: competencyName, // Legacy support
+        competencyTargetName,
         microSkills: microSkills || [],
         nanoSkills: nanoSkills || []
       });

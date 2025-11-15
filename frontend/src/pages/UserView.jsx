@@ -33,7 +33,7 @@ export default function UserView() {
       // Extract unique courses with better names
       const courseMap = new Map();
       coursesData.forEach(course => {
-        const competencyName = course.competency_target_name || course.competencyTargetName || course.course_id;
+        const competencyName = course.competency_target_name || course.competencyTargetName;
         if (competencyName) {
           const pathData = course.learning_path || course.pathData || {};
           const pathTitle = pathData.pathTitle || pathData.path_title || course.pathTitle || competencyName;
@@ -50,7 +50,7 @@ export default function UserView() {
       setCourses(Array.from(courseMap.values()));
       
       if (coursesData.length > 0 && !selectedCourse) {
-        const firstCourse = coursesData[0].competency_target_name || coursesData[0].competencyTargetName || coursesData[0].course_id;
+        const firstCourse = coursesData[0].competency_target_name || coursesData[0].competencyTargetName;
         if (firstCourse) {
           setSelectedCourse(firstCourse);
           loadLearningPath(firstCourse, coursesData);
@@ -75,7 +75,7 @@ export default function UserView() {
       
       // Find course by competencyTargetName
       const course = courses.find(c => {
-        const cId = c.competency_target_name || c.competencyTargetName || c.course_id;
+        const cId = c.competency_target_name || c.competencyTargetName;
         return cId === competencyTargetName;
       });
       

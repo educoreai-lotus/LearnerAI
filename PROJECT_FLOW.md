@@ -105,30 +105,54 @@ This document describes all flows in the LearnerAI system - from user interactio
 ### Scenario 3: Skills Gap Detected → Learning Path Generated
 
 ```
-1. Skills Engine Microservice detects gap
-   └─> Skills Engine POSTs to: POST /api/v1/learning-paths/generate
+1. Skills Engine Microservice detects gap (after exam)
+   └─> Skills Engine POSTs to: POST /api/v1/skills-gaps
        │
-       ├─> Body: { userId, companyId, courseId, microSkills, nanoSkills }
+       ├─> Body: { 
+       │     user_id, user_name, 
+       │     company_id, company_name,
+       │     competency_target_name,
+       │     exam_status: "PASS" | "FAIL",
+       │     gap: { "Competency_Name": ["MGS_Skill_ID_1", ...] }
+       │   }
+       │
+       └─> Backend processes gap update
+           ├─> Check if skills_gap exists (user_id + competency_target_name)
+           ├─> If exists: Update skills_raw_data (filter skills)
+           ├─> If not exists: Create new skills_gap row
+           ├─> Check if learner exists
+           └─> If not exists: Create learner (get company from companies table)
+
+2. Learning Path Generation (triggered separately)
+   └─> POST /api/v1/learning-paths/generate
+       │
+       ├─> Body: { userId, companyId, competencyTargetName }
        │
        └─> Backend validates request
            └─> Creates job (status: "pending")
                └─> Returns jobId immediately (202 Accepted)
                    └─> Starts background processing
+                       ├─> Fetches skills_gap from database
+                       ├─> Prompt 1 → Prompt 2 → Skills Engine (breakdown) → Prompt 3
+                       └─> Saves learning path to courses table
 
-2. Frontend polls for status (optional - if user is viewing)
+3. Frontend polls for status (optional - if user is viewing)
    └─> GET /api/v1/jobs/:jobId
        └─> Backend returns current status
            └─> Frontend shows progress
                └─> Polls every 2-3 seconds
 
-3. Job completes
+4. Job completes
    └─> Status: "completed"
        └─> Frontend fetches learning path (when user views it)
-           └─> GET /api/v1/learning-paths/:userId
+           └─> GET /api/v1/courses/user/:userId
                └─> Displays complete path
 ```
 
-**Note:** The POST request is made by **Skills Engine microservice**, not by you or the frontend directly.
+**Note:** 
+- Skills Engine POSTs to `/api/v1/skills-gaps` to update the gap (Communication Type 1)
+- Learning path generation is triggered separately via `/api/v1/learning-paths/generate`
+- Uses `competency_target_name` (not `courseId`)
 
 ---
 
@@ -174,11 +198,12 @@ Job Processor starts:
 │   ├─> Extract competencies
 │   └─> Update job: progress=50%
 │
-├─> Skills Engine Integration (~5-10s)
+├─> Skills Engine Integration (~5-10s) - Communication Type 2
 │   │
-│   ├─> Send competencies to Skills Engine
-│   ├─> Request Micro/Nano skill breakdown
-│   ├─> Receive structured breakdown
+│   ├─> Extract competency names from Prompt 2 output
+│   ├─> Send simple array: ["Competency_Name_1", "Competency_Name_2"]
+│   ├─> POST {SKILLS_ENGINE_URL}/api/skills/breakdown
+│   ├─> Receive breakdown: { "Competency_Name": { microSkills: [...], nanoSkills: [...] } }
 │   └─> Update job: progress=70%
 │
 └─> PROMPT 3: Path Creation (~60-90s)
@@ -204,20 +229,46 @@ Frontend polls: GET /api/v1/jobs/:jobId
 
 ### Detailed Step-by-Step
 
-**1. Request Received (from Skills Engine Microservice)**
+**1. Skills Gap Update (from Skills Engine Microservice - Type 1)**
 ```javascript
-// Skills Engine microservice makes this POST request:
+// Skills Engine POSTs gap update:
+POST /api/v1/skills-gaps
+Headers: {
+  Authorization: "Bearer <LEARNER_AI_SERVICE_TOKEN>",
+  Content-Type: "application/json"
+}
+Body: {
+  user_id: "uuid",
+  user_name: "string",
+  company_id: "uuid",
+  company_name: "string",
+  competency_target_name: "string",
+  exam_status: "PASS" | "FAIL",
+  gap: {
+    "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"],
+    "Competency_Name_2": ["MGS_Skill_ID_3"]
+  }
+}
+
+Response (200 OK):
+{
+  message: "Skills gap processed successfully",
+  skillsGap: {...}
+}
+```
+
+**2. Learning Path Generation Request**
+```javascript
+// Can be called by Skills Engine or Frontend:
 POST /api/v1/learning-paths/generate
 Headers: {
-  Authorization: "Bearer <service_token>",
+  Authorization: "Bearer <token>",
   Content-Type: "application/json"
 }
 Body: {
   userId: "uuid",
   companyId: "uuid",
-  courseId: "uuid",
-  microSkills: [...],
-  nanoSkills: [...]
+  competencyTargetName: "string"  // Not courseId!
 }
 
 Response (202 Accepted):
@@ -227,39 +278,42 @@ Response (202 Accepted):
 }
 ```
 
-**Who calls this?**
-- ✅ **Skills Engine Microservice** - Primary caller (when it detects a skills gap)
-- ⚠️ **Frontend** - Can also call it (for manual generation), but typically Skills Engine does it automatically
+**Who calls these?**
+- ✅ **Skills Engine** - POSTs to `/api/v1/skills-gaps` after each exam (Communication Type 1)
+- ✅ **Skills Engine or Frontend** - Can trigger `/api/v1/learning-paths/generate` after gap is updated
 
-**2. Job Creation**
+**3. Job Creation**
 - Creates `Job` entity with:
   - `id`: UUID
-  - `userId`, `companyId`, `courseId`
+  - `userId`, `companyId`, `competency_target_name`
   - `type`: "path-generation"
   - `status`: "pending"
 - Saves to `ai_execution_logs` table (or jobs table)
 
-**3. Prompt 1: Skill Expansion**
+**4. Prompt 1: Skill Expansion**
+- Fetches skills_gap from database (by user_id + competency_target_name)
+- Gets skills_raw_data (contains missing_skills_map from Skills Engine)
 - Loads `ai/prompts/prompt1-skill-expansion.txt`
-- Formats with skills gap data
+- Formats prompt with skills_raw_data from database
 - Calls Gemini API with timeout: 60s
 - Parses JSON response for expanded skills
 - Updates job: `progress=30%`, `stage="skill-expansion"`
 
-**4. Prompt 2: Competency Identification**
+**5. Prompt 2: Competency Identification**
 - Loads `ai/prompts/prompt2-competency-identification.txt`
 - Formats with Prompt 1 output
 - Calls Gemini API with timeout: 60s
 - Extracts competencies list
 - Updates job: `progress=50%`, `stage="competency-identification"`
 
-**5. Skills Engine Integration**
-- Sends competencies to Skills Engine microservice
-- Requests Micro/Nano skill breakdown
-- Receives structured breakdown
+**5. Skills Engine Integration (Communication Type 2)**
+- Sends simple array of competency names to Skills Engine
+- Request: `POST {SKILLS_ENGINE_URL}/api/skills/breakdown`
+- Body: `{ competencies: ["Competency_Name_1", "Competency_Name_2"] }`
+- Receives breakdown with `microSkills` and `nanoSkills` only
 - Updates job: `progress=70%`, `stage="skill-breakdown"`
 
-**6. Prompt 3: Path Creation**
+**7. Prompt 3: Path Creation**
 - Loads `ai/prompts/prompt3-path-creation.txt`
 - Formats with:
   - Initial skills gap
@@ -268,15 +322,16 @@ Response (202 Accepted):
 - Parses learning path structure (modules, steps, duration)
 - Updates job: `progress=90%`, `stage="path-creation"`
 
-**7. Save Learning Path**
+**8. Save Learning Path**
 - Creates `LearningPath` entity
 - Saves to `courses` table with:
-  - `user_id`
+  - `competency_target_name` (PK, not course_id!)
+  - `user_id` (FK → learners)
   - `learning_path` (JSONB)
   - `approved`: false
 - Updates job: `status="completed"`, `progress=100%`
 
-**8. Frontend Polling**
+**9. Frontend Polling**
 - Frontend polls `GET /api/v1/jobs/:jobId` every 2-3 seconds
 - When status = "completed", fetches learning path
 - Displays in timeline component
@@ -565,16 +620,18 @@ Response: {
             ├─> gap_id (PK)
             ├─> user_id (FK → learners)
             ├─> company_id
-            ├─> skills_raw_data (JSONB)
-            ├─> test_status
-            └─> course_id (FK → courses, nullable)
+            ├─> company_name
+            ├─> user_name
+            ├─> competency_target_name (not course_id!)
+            ├─> skills_raw_data (JSONB) - contains missing_skills_map
+            └─> exam_status ("PASS" | "FAIL", not test_status)
 
 3. Learning Path Generation
    ────────────────────────
    Background process completes
         │
         └─> Save to courses table
-            ├─> course_id (PK)
+            ├─> competency_target_name (PK, not course_id!)
             ├─> user_id (FK → learners)
             ├─> learning_path (JSONB)
             └─> approved (boolean)
@@ -831,12 +888,18 @@ Step 2: Skills Gap Detected
 POST /api/v1/skills-gaps
 {
   user_id: "uuid-1",
+  user_name: "Alice",
   company_id: "uuid",
-  skills_raw_data: {...},
-  test_status: "fail"
+  company_name: "TechCorp",
+  competency_target_name: "JavaScript Basics",
+  exam_status: "FAIL",
+  gap: {
+    "Competency_JavaScript": ["MGS_Skill_1", "MGS_Skill_2"]
+  }
 }
     │
     └─> Saved to skills_gap table
+        ├─> skills_raw_data contains gap (missing_skills_map)
         └─> Returns: { gap_id: "uuid-2", ... }
 
 Step 3: Generate Learning Path
@@ -845,15 +908,19 @@ POST /api/v1/learning-paths/generate
 {
   userId: "uuid-1",
   companyId: "uuid",
-  courseId: "uuid-3"
+  competencyTargetName: "JavaScript Basics"  // Not courseId!
 }
     │
     ├─> Creates job (status: "pending")
     ├─> Returns: { jobId: "uuid-4" }
     │
     └─> Background processing:
-        ├─> Prompt 1 → Prompt 2 → Skills Engine → Prompt 3
-        └─> Saves to courses table
+        ├─> Fetches skills_gap from database (by user_id + competency_target_name)
+        ├─> Prompt 1: Expand skills gap
+        ├─> Prompt 2: Identify competencies
+        ├─> Skills Engine: Request breakdown (simple array of competency names)
+        ├─> Prompt 3: Create learning path
+        └─> Saves to courses table (competency_target_name as PK)
             └─> Updates job (status: "completed")
 
 Step 4: Frontend Displays Path

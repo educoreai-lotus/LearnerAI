@@ -60,7 +60,7 @@ try {
   const httpClient = new HttpClient();
   const skillsEngineClient = new SkillsEngineClient({
     baseUrl: process.env.SKILLS_ENGINE_URL || 'http://localhost:5001',
-    serviceToken: process.env.LEARNER_AI_SERVICE_TOKEN,
+    serviceToken: process.env.SKILLS_ENGINE_TOKEN,
     httpClient
   });
 

@@ -21,7 +21,7 @@ export class CourseRepository {
     const { data, error } = await this.client
       .from('courses')
       .insert({
-        competency_target_name: courseData.competency_target_name || courseData.course_id || undefined,
+        competency_target_name: courseData.competency_target_name,
         user_id: courseData.user_id,
         learning_path: courseData.learning_path,
         approved: courseData.approved || false
@@ -162,7 +162,6 @@ export class CourseRepository {
   _mapToCourse(record) {
     return {
       competency_target_name: record.competency_target_name,
-      course_id: record.competency_target_name, // Legacy support
       user_id: record.user_id,
       learning_path: record.learning_path,
       approved: record.approved,

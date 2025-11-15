@@ -67,9 +67,9 @@ export class DistributePathUseCase {
       results.errors.push({ service: 'courseBuilder', error: error.message });
     }
 
-    // Send to Analytics (with gap_id, skills_raw_data, test_status)
+    // Send to Analytics (with gap_id, skills_raw_data, exam_status)
     try {
-      // Fetch skills gap data to include gap_id, skills_raw_data, and test_status
+      // Fetch skills gap data to include gap_id, skills_raw_data, and exam_status
       if (!this.skillsGapRepository || !learningPath.userId || !competencyTargetName) {
         throw new Error('Missing required data: skillsGapRepository, userId, or competencyTargetName');
       }
@@ -92,7 +92,7 @@ export class DistributePathUseCase {
         competency_target_name: competencyTargetName,
         gap_id: skillsGap.gap_id,
         skills_raw_data: skillsGap.skills_raw_data,
-        test_status: skillsGap.exam_status || skillsGap.test_status,
+        exam_status: skillsGap.exam_status, // Use exam_status (matches database field)
         learning_path: learningPath.pathMetadata || learningPath.learning_path || learningPath.toJSON()
       };
       

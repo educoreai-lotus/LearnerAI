@@ -52,13 +52,12 @@ export function createSuggestionsRouter(dependencies) {
 
       const suggestions = await suggestionsRepository.getSuggestionsByUser(userId);
       const courseSuggestions = suggestions.filter(
-        s => s.completedCourseId === competencyTargetName
+        s => s.competencyTargetName === competencyTargetName || s.completedCourseId === competencyTargetName
       );
 
       res.json({
         userId,
         competencyTargetName,
-        courseId: competencyTargetName, // Legacy support
         suggestions: courseSuggestions,
         count: courseSuggestions.length
       });

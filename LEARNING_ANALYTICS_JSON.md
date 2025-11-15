@@ -136,7 +136,7 @@ X-Service-Token: {ANALYTICS_TOKEN}
 
 ```javascript
 // In your code when learning path is ready
-// You need to fetch the skills_gap data to include gap_id, skills_raw_data, and test_status
+// You need to fetch the skills_gap data to include gap_id, skills_raw_data, and exam_status
 const skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(
   learningPath.user_id,
   learningPath.competency_target_name

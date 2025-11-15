@@ -210,12 +210,12 @@ CompanyDashboard.jsx
   → SELECT * FROM courses WHERE user_id = ?
 ```
 
-### Getting Learning Paths:
+### Getting Courses (Learning Paths):
 ```
 UserView.jsx
-  → api.getLearningPaths(userId)
-  → GET /api/v1/learning-paths/:userId
-  → LearningPathRepository.getLearningPathsByUser(userId)
+  → api.getCoursesByUser(userId)
+  → GET /api/v1/courses/user/:userId
+  → CourseRepository.getCoursesByUser(userId)
   → SELECT * FROM courses WHERE user_id = ? (courses contain learning_path JSONB)
 ```
 
