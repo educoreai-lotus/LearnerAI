@@ -59,7 +59,8 @@ export class ProcessSkillsGapUpdateUseCase {
     if (!existingCompany) {
       // Step 2: Create company if it doesn't exist
       // Use default decision_maker_policy if not provided
-      await this.companyRepository.createCompany({
+      // Use upsertCompany which will create if not exists, update if exists
+      await this.companyRepository.upsertCompany({
         company_id,
         company_name,
         decision_maker_policy: 'auto', // Default policy
