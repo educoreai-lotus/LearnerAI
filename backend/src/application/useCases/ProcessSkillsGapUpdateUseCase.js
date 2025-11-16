@@ -3,11 +3,13 @@
  * Handles skills gap updates from Skills Engine microservice
  * 
  * Flow:
- * 1. Check if skills_gap exists (user_id + competency_target_name)
- * 2. If exists: Update skills_raw_data (filter out skills not in new gap)
- * 3. If not exists: Create new skills_gap record
- * 4. Check if learner exists
- * 5. If not exists: Create learner (company details from companies table)
+ * 1. Check if company exists (MUST be done FIRST - learners FK to companies)
+ * 2. If not exists: Create company with default policy
+ * 3. Check if learner exists (MUST be done BEFORE skills gap - skills_gap FK to learners)
+ * 4. If not exists: Create learner (company details from companies table)
+ * 5. Check if skills_gap exists (user_id + competency_target_name)
+ * 6. If exists: Update skills_raw_data (filter out skills not in new gap)
+ * 7. If not exists: Create new skills_gap record
  */
 export class ProcessSkillsGapUpdateUseCase {
   constructor({
@@ -50,44 +52,28 @@ export class ProcessSkillsGapUpdateUseCase {
       throw new Error('Missing required fields: user_id, user_name, company_id, company_name, competency_target_name, gap');
     }
 
-    // Step 1: Check if skills_gap exists (user_id + competency_target_name)
-    const existingGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competencyTargetName);
+    // Step 1: Check if company exists (MUST be done FIRST due to foreign key constraint)
+    // Learners table has FK to companies, so company must exist before learner
+    const existingCompany = await this.companyRepository.getCompanyById(company_id);
 
-    let skillsGap;
-
-    if (existingGap) {
-      // Step 2: Update existing skills_gap
-      // Filter skills_raw_data: keep only skills that are in the new gap
-      const filteredSkills = this._filterSkillsByNewGap(existingGap.skills_raw_data, gap);
-
-      skillsGap = await this.skillsGapRepository.updateSkillsGap(existingGap.gap_id, {
-        skills_raw_data: filteredSkills,
-        exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null,
-        company_name, // Update in case it changed
-        user_name // Update in case it changed
-      });
-
-      console.log(`✅ Updated existing skills gap for user ${user_id}, competency ${competencyTargetName}`);
-    } else {
-      // Step 3: Create new skills_gap
-      skillsGap = await this.skillsGapRepository.createSkillsGap({
-        user_id,
+    if (!existingCompany) {
+      // Step 2: Create company if it doesn't exist
+      // Use default decision_maker_policy if not provided
+      await this.companyRepository.createCompany({
         company_id,
         company_name,
-        user_name,
-        competency_target_name: competencyTargetName,
-        skills_raw_data: gap,
-        exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null
+        decision_maker_policy: 'auto', // Default policy
+        decision_maker: null
       });
 
-      console.log(`✅ Created new skills gap for user ${user_id}, competency ${competencyTargetName}`);
+      console.log(`✅ Created new company: ${company_name} (${company_id})`);
     }
 
-    // Step 4: Check if learner exists
+    // Step 3: Check if learner exists (MUST be done BEFORE skills gap due to FK constraint)
     const existingLearner = await this.learnerRepository.getLearnerById(user_id);
 
     if (!existingLearner) {
-      // Step 5: Create new learner
+      // Step 4: Create new learner BEFORE creating skills gap
       // Company details (decision_maker_policy, decision_maker_id) are in companies table
       // We don't need to fetch them here - they're accessed via company_id when needed
       
@@ -109,6 +95,40 @@ export class ProcessSkillsGapUpdateUseCase {
         });
         console.log(`✅ Updated learner: ${user_name} (${user_id})`);
       }
+    }
+
+    // Step 5: Check if skills_gap exists (user_id + competency_target_name)
+    // Now that learner exists, we can safely create/update skills gap
+    const existingGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competencyTargetName);
+
+    let skillsGap;
+
+    if (existingGap) {
+      // Step 6: Update existing skills_gap
+      // Filter skills_raw_data: keep only skills that are in the new gap
+      const filteredSkills = this._filterSkillsByNewGap(existingGap.skills_raw_data, gap);
+
+      skillsGap = await this.skillsGapRepository.updateSkillsGap(existingGap.gap_id, {
+        skills_raw_data: filteredSkills,
+        exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null,
+        company_name, // Update in case it changed
+        user_name // Update in case it changed
+      });
+
+      console.log(`✅ Updated existing skills gap for user ${user_id}, competency ${competencyTargetName}`);
+    } else {
+      // Step 7: Create new skills_gap (learner now exists, so FK constraint will pass)
+      skillsGap = await this.skillsGapRepository.createSkillsGap({
+        user_id,
+        company_id,
+        company_name,
+        user_name,
+        competency_target_name: competencyTargetName,
+        skills_raw_data: gap,
+        exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null
+      });
+
+      console.log(`✅ Created new skills gap for user ${user_id}, competency ${competencyTargetName}`);
     }
 
     return skillsGap;
