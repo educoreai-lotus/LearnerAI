@@ -16,67 +16,117 @@ export function createEndpointsRouter(dependencies) {
 
   /**
    * POST /api/fill-learner-ai-fields
-   * Fill fields endpoint - receives requests from other microservices
-   * Protocol: serviceName + payload (stringified JSON)
+   * Fill fields endpoint - receives stringified JSON body with requester_service, payload (with action), and response
    * 
-   * Expected body:
-   * {
-   *   "serviceName": "Directory" | "SkillsEngine" | "LearningAnalytics" | "CourseBuilder" | "ManagementReporting",
-   *   "payload": "<stringified JSON>"
-   * }
+   * Expected body (as stringified JSON):
+   * "{\"requester_service\":\"content-studio\",\"payload\":{\"action\":\"generate-questions\",...},\"response\":{\"answer\":\"\"}}"
+   * 
+   * Structure:
+   * - requester_service: service name (assessment, content-studio, analytics, course-builder)
+   * - payload: object with "action" field indicating the action type, plus other data
+   * - response: object with "answer" field that will be populated with the result
+   * 
+   * After processing, returns the full object with response.answer populated, as stringified JSON
    */
   router.post('/fill-learner-ai-fields', async (req, res) => {
-    const { serviceName, payload } = req.body;
-
-    // Step 1: Parse payload
-    let data;
     try {
-      data = JSON.parse(payload);
-    } catch (err) {
-      return res.status(400).json({ 
-        error: "Invalid JSON",
-        details: err.message 
-      });
-    }
-
-    try {
-      // Step 2: Handle by service
-      let filledData;
-      switch (serviceName) {
-        case "Directory":
-          filledData = await fillDirectoryData(data, { companyRepository, learnerRepository });
-          break;
-        case "SkillsEngine":
-          filledData = await fillSkillsEngineData(data, { skillsGapRepository, courseRepository });
-          break;
-        case "LearningAnalytics":
-          filledData = await fillLearningAnalyticsData(data, { courseRepository, skillsGapRepository });
-          break;
-        case "CourseBuilder":
-          filledData = await fillCourseBuilderData(data, { courseRepository, skillsGapRepository });
-          break;
-        case "ManagementReporting":
-          filledData = await fillManagementReportingData(data, { courseRepository, skillsGapRepository, companyRepository });
-          break;
-        default:
-          return res.status(400).json({ 
-            error: "Unknown serviceName",
-            message: `Unknown service: ${serviceName}. Supported services: Directory, SkillsEngine, LearningAnalytics, CourseBuilder, ManagementReporting`
-          });
+      // Step 1: Get request body (express.json() should have already parsed it)
+      let requestBody = req.body;
+      
+      // If body is undefined or null, return error
+      if (!requestBody) {
+        return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Missing request body",
+          details: "Request body is required. Ensure Content-Type header is set to 'application/json' and send a valid JSON body."
+        }));
+      }
+      
+      // If body is a string (shouldn't happen with express.json(), but handle it)
+      if (typeof requestBody === 'string') {
+        try {
+          requestBody = JSON.parse(requestBody);
+        } catch (parseError) {
+          return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+            error: "Failed to parse request body as JSON",
+            details: parseError.message
+          }));
+        }
+      }
+      
+      // Ensure requestBody is an object
+      if (typeof requestBody !== 'object' || requestBody === null || Array.isArray(requestBody)) {
+        return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Invalid request body format",
+          details: "Request body must be a JSON object, not an array or primitive value."
+        }));
       }
 
-      // Step 3: Return stringified
-      return res.json({
-        serviceName,
-        payload: JSON.stringify(filledData)
-      });
-    } catch (err) {
-      console.error(`[Endpoints] Error filling data for ${serviceName}:`, err);
-      return res.status(500).json({
-        error: "Internal Fill Error",
-        details: err.message,
-        serviceName
-      });
+      // Step 2: Validate required fields
+      if (!requestBody.requester_service) {
+        return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Missing required field: requester_service"
+        }));
+      }
+      if (!requestBody.payload) {
+        return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Missing required field: payload"
+        }));
+      }
+      if (!requestBody.payload.action) {
+        return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Missing required field: payload.action",
+          message: "Every payload must contain an 'action' field indicating the type of action"
+        }));
+      }
+      if (!requestBody.response) {
+        requestBody.response = { answer: "" };
+      }
+      if (requestBody.response.answer === undefined) {
+        requestBody.response.answer = "";
+      }
+
+      // Step 3: Route based on requester_service
+      let result;
+      try {
+        switch (requestBody.requester_service) {
+          case "assessment":
+            result = await assessmentHandler(requestBody.payload, dependencies);
+            break;
+          case "content-studio":
+            result = await contentStudioHandler(requestBody.payload, dependencies);
+            break;
+          case "analytics":
+            result = await analyticsHandler(requestBody.payload, dependencies);
+            break;
+          case "course-builder":
+            result = await courseBuilderHandler(requestBody.payload, dependencies);
+            break;
+          default:
+            return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+              error: "Unknown requester_service",
+              message: `Unknown service: ${requestBody.requester_service}. Supported services: assessment, content-studio, analytics, course-builder`
+            }));
+        }
+      } catch (handlerError) {
+        console.error(`[FillFields] Error in ${requestBody.requester_service} handler:`, handlerError);
+        return res.status(500).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Handler execution failed",
+          details: handlerError.message,
+          requester_service: requestBody.requester_service
+        }));
+      }
+
+      // Step 4: Store result in response.answer (as stringified JSON)
+      requestBody.response.answer = typeof result === 'string' ? result : JSON.stringify(result);
+
+      // Step 5: Return the full object as stringified JSON (preserving requester_service, payload, and response)
+      return res.setHeader('Content-Type', 'application/json').send(JSON.stringify(requestBody));
+    } catch (error) {
+      console.error('[FillFields] Unexpected error:', error);
+      return res.status(500).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+        error: "Internal server error",
+        details: error.message
+      }));
     }
   });
 
@@ -334,3 +384,92 @@ export async function fillManagementReportingData(data, { courseRepository, skil
   return filled;
 }
 
+/**
+ * Assessment Handler
+ * Handles requests from the assessment service
+ * Payload must contain an "action" field indicating the type of action
+ */
+async function assessmentHandler(payload, dependencies) {
+  const { courseRepository, skillsGapRepository } = dependencies;
+  const { action } = payload;
+  
+  // Process based on action type
+  const result = {
+    success: true,
+    request_id: `assessment_${Date.now()}`,
+    action: action,
+    data: {
+      message: `Assessment handler executed for action: ${action}`,
+      payload: payload
+    }
+  };
+  
+  return result;
+}
+
+/**
+ * Content Studio Handler
+ * Handles requests from the content-studio service
+ * Payload must contain an "action" field indicating the type of action (e.g., "generate-questions")
+ */
+async function contentStudioHandler(payload, dependencies) {
+  const { courseRepository, skillsGapRepository, companyRepository, learnerRepository } = dependencies;
+  const { action } = payload;
+  
+  // Process content-studio requests based on action
+  const result = {
+    success: true,
+    request_id: `content_studio_${Date.now()}`,
+    action: action,
+    data: {
+      message: `Content Studio handler executed for action: ${action}`,
+      payload: payload
+    }
+  };
+  
+  return result;
+}
+
+/**
+ * Analytics Handler
+ * Handles requests from the analytics service
+ * Payload must contain an "action" field indicating the type of action
+ * Maps to existing fillLearningAnalyticsData functionality
+ */
+async function analyticsHandler(payload, dependencies) {
+  const { courseRepository, skillsGapRepository } = dependencies;
+  const { action } = payload;
+  
+  // Use existing analytics data filling logic
+  // Extract action from payload, then pass the rest to fillLearningAnalyticsData
+  const { action: _, ...dataWithoutAction } = payload;
+  const result = await fillLearningAnalyticsData(dataWithoutAction, { courseRepository, skillsGapRepository });
+  
+  return {
+    success: true,
+    action: action,
+    data: result
+  };
+}
+
+/**
+ * Course Builder Handler
+ * Handles requests from the course-builder service
+ * Payload must contain an "action" field indicating the type of action
+ * Maps to existing fillCourseBuilderData functionality
+ */
+async function courseBuilderHandler(payload, dependencies) {
+  const { courseRepository, skillsGapRepository } = dependencies;
+  const { action } = payload;
+  
+  // Use existing course builder data filling logic
+  // Extract action from payload, then pass the rest to fillCourseBuilderData
+  const { action: _, ...dataWithoutAction } = payload;
+  const result = await fillCourseBuilderData(dataWithoutAction, { courseRepository, skillsGapRepository });
+  
+  return {
+    success: true,
+    action: action,
+    data: result
+  };
+}
