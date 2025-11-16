@@ -40,6 +40,14 @@ import { createSkillsGapsRouter } from './src/api/routes/skillsGaps.js';
 import { createSkillsExpansionsRouter } from './src/api/routes/skillsExpansions.js';
 import { createRecommendationsRouter } from './src/api/routes/recommendations.js';
 import { createSeedRouter } from './src/api/routes/seed.js';
+import { createEndpointsRouter } from './src/api/routes/endpoints.js';
+import { 
+  fillDirectoryData, 
+  fillSkillsEngineData, 
+  fillLearningAnalyticsData, 
+  fillCourseBuilderData, 
+  fillManagementReportingData 
+} from './src/api/routes/endpoints.js';
 
 // Load environment variables
 dotenv.config();
@@ -257,6 +265,72 @@ if (dependencies.repository && dependencies.jobRepository) {
   
   // Seed endpoints (for testing)
   app.use('/api/seed', createSeedRouter(dependencies));
+  
+  // Fill-fields endpoint (for microservices to request data from LearnerAI)
+  app.use('/api', createEndpointsRouter(dependencies));
+  
+  // Direct fill-fields endpoint (same as Content Studio pattern)
+  app.post("/api/fill-content-metrics", async (req, res) => {
+    const { serviceName, payload } = req.body;
+
+    // Step 1: Parse
+    let data;
+    try {
+      data = JSON.parse(payload);
+    } catch (err) {
+      return res.status(400).json({ error: "Invalid JSON" });
+    }
+
+    try {
+      // Step 2: Handle by service
+      switch (serviceName) {
+        case "Directory":
+          data = await fillDirectoryData(data, { 
+            companyRepository: dependencies.companyRepository, 
+            learnerRepository: dependencies.learnerRepository 
+          });
+          break;
+        case "SkillsEngine":
+          data = await fillSkillsEngineData(data, { 
+            skillsGapRepository: dependencies.skillsGapRepository, 
+            courseRepository: dependencies.courseRepository 
+          });
+          break;
+        case "LearningAnalytics":
+          data = await fillLearningAnalyticsData(data, { 
+            courseRepository: dependencies.courseRepository, 
+            skillsGapRepository: dependencies.skillsGapRepository 
+          });
+          break;
+        case "CourseBuilder":
+          data = await fillCourseBuilderData(data, { 
+            courseRepository: dependencies.courseRepository, 
+            skillsGapRepository: dependencies.skillsGapRepository 
+          });
+          break;
+        case "ManagementReporting":
+          data = await fillManagementReportingData(data, { 
+            courseRepository: dependencies.courseRepository, 
+            skillsGapRepository: dependencies.skillsGapRepository, 
+            companyRepository: dependencies.companyRepository 
+          });
+          break;
+        default:
+          return res.status(400).json({ error: "Unknown serviceName" });
+      }
+
+      // Step 3: Return stringified
+      return res.json({
+        serviceName,
+        payload: JSON.stringify(data)
+      });
+    } catch (err) {
+      return res.status(500).json({
+        error: "Internal Fill Error",
+        details: err.message
+      });
+    }
+  });
   
   console.log('✅ API routes registered');
 } else {

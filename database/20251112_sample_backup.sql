@@ -41,25 +41,25 @@ INSERT INTO skills_gap (gap_id, user_id, company_id, company_name, user_name, sk
 -- =====================================================
 -- 4. Skills Expansions
 -- =====================================================
-INSERT INTO skills_expansions (expansion_id, prompt_1_output, prompt_2_output) VALUES
-('880e8400-e29b-41d4-a716-446655440001',
+INSERT INTO skills_expansions (expansion_id, gap_id, user_id, prompt_1_output, prompt_2_output) VALUES
+('880e8400-e29b-41d4-a716-446655440001', '770e8400-e29b-41d4-a716-446655440001', '660e8400-e29b-41d4-a716-446655440001',
 '{"expandedSkills": ["TypeScript", "Async/Await", "Promises", "Modules"], "reasoning": "These skills complement JavaScript ES6+ and are essential for modern development"}',
 '{"competencies": [{"name": "TypeScript Fundamentals", "priority": "high"}, {"name": "Asynchronous Programming", "priority": "medium"}]}'),
-('880e8400-e29b-41d4-a716-446655440002',
+('880e8400-e29b-41d4-a716-446655440002', '770e8400-e29b-41d4-a716-446655440002', '660e8400-e29b-41d4-a716-446655440002',
 '{"expandedSkills": ["Database Optimization", "Query Performance", "Indexing Strategies"], "reasoning": "Advanced SQL requires understanding of performance optimization"}',
 '{"competencies": [{"name": "Database Performance", "priority": "high"}, {"name": "Query Optimization", "priority": "high"}]}');
 
 -- =====================================================
 -- 5. Courses
 -- =====================================================
-INSERT INTO courses (competency_target_name, user_id, learning_path, approved) VALUES
-('JavaScript Basics', '660e8400-e29b-41d4-a716-446655440001',
+INSERT INTO courses (competency_target_name, user_id, gap_id, learning_path, approved) VALUES
+('JavaScript Basics', '660e8400-e29b-41d4-a716-446655440001', '770e8400-e29b-41d4-a716-446655440001',
 '{"steps": [{"step": 1, "title": "Introduction to ES6", "duration": "2 weeks", "resources": ["ES6 Guide", "Practice Exercises"]}, {"step": 2, "title": "Arrow Functions", "duration": "1 week", "resources": ["Arrow Functions Tutorial"]}, {"step": 3, "title": "Destructuring", "duration": "1 week", "resources": ["Destructuring Guide"]}], "estimatedCompletion": "4 weeks"}',
 true),
-('Advanced SQL', '660e8400-e29b-41d4-a716-446655440002',
+('Advanced SQL', '660e8400-e29b-41d4-a716-446655440002', '770e8400-e29b-41d4-a716-446655440002',
 '{"steps": [{"step": 1, "title": "Window Functions Overview", "duration": "2 weeks", "resources": ["Window Functions Guide"]}, {"step": 2, "title": "ROW_NUMBER() and RANK()", "duration": "1 week", "resources": ["Ranking Functions Tutorial"]}, {"step": 3, "title": "Advanced Analytics", "duration": "2 weeks", "resources": ["SQL Analytics Guide"]}], "estimatedCompletion": "5 weeks"}',
 false),
-('React Fundamentals', '660e8400-e29b-41d4-a716-446655440003',
+('React Fundamentals', '660e8400-e29b-41d4-a716-446655440003', '770e8400-e29b-41d4-a716-446655440003',
 '{"steps": [{"step": 1, "title": "React Basics", "duration": "1 week", "resources": ["React Documentation"]}, {"step": 2, "title": "useState Hook", "duration": "1 week", "resources": ["Hooks Guide"]}, {"step": 3, "title": "Component Lifecycle", "duration": "1 week", "resources": ["Lifecycle Tutorial"]}], "estimatedCompletion": "3 weeks"}',
 true);
 

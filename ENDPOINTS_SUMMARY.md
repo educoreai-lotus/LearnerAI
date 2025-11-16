@@ -33,12 +33,21 @@ This document lists all endpoints for microservice communication as documented i
 - **Request Format:** Simple array of competency names: `["Competency_Name_1", "Competency_Name_2"]`
 
 ### 4. Learning Analytics Microservice
-**Endpoint:** `POST {ANALYTICS_URL}/api/v1/paths/update`
+
+**Communication Type 1: On-Demand (Incoming)**
+- **Endpoint (in LearnerAI):** `POST /api/fill-content-metrics`
+- **Status:** ✅ **IMPLEMENTED**
+- **Handler:** `fillLearningAnalyticsData()` in `backend/src/api/routes/endpoints.js`
+- **How:** Learning Analytics requests data for specific user by sending `user_id`
+- **Response:** Array of user data (without `learning_path` unless requested)
+
+**Communication Type 2: Batch Mode (Outgoing)**
+- **Endpoint (in Learning Analytics):** `POST {ANALYTICS_URL}/api/v1/paths/batch`
 - **Status:** ✅ **IMPLEMENTED**
 - **Client:** `AnalyticsClient` (`backend/src/infrastructure/clients/AnalyticsClient.js`)
-- **Method:** `updatePathAnalytics(pathData)`
-- **Used in:** `DistributePathUseCase`
-- **Payload Includes:** `user_id`, `user_name`, `company_id`, `company_name`, `competency_target_name`, `gap_id`, `skills_raw_data`, `exam_status`, `learning_path`
+- **Method:** `sendBatchAnalytics(batchData)`
+- **When:** Daily scheduled batch job (sends all users data)
+- **Payload:** Array of user data objects with `learning_path` included
 
 ### 5. Course Builder Microservice
 **Endpoint:** `POST {COURSE_BUILDER_URL}/api/v1/learning-paths`

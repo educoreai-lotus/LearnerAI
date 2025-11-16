@@ -1,67 +1,124 @@
 # Learning Analytics JSON Payload
 
-This document describes the exact JSON structure sent to the Learning Analytics microservice when a learning path is ready.
+This document describes the two communication modes between LearnerAI and Learning Analytics microservice.
 
 ---
 
-## 📤 Endpoint
+## 📋 Communication Modes
 
-**POST** `{ANALYTICS_URL}/api/v1/paths/update`
+Learning Analytics receives data from LearnerAI in **two ways**:
 
-**Headers:**
+1. **On-Demand Mode**: Learning Analytics requests data for a specific user by sending `user_id`
+2. **Batch Mode**: LearnerAI sends all data for all users every day (scheduled batch)
+
+---
+
+## 1️⃣ On-Demand Mode (Learning Analytics → LearnerAI)
+
+### **How It Works**
+
+Learning Analytics requests data for a specific user by calling LearnerAI's fill-fields endpoint.
+
+#### **Endpoint (in LearnerAI)**
 ```
+POST /api/fill-content-metrics
+```
+
+#### **Request from Learning Analytics**
+```json
+{
+  "serviceName": "LearningAnalytics",
+  "payload": "{\"user_id\":\"uuid\"}"
+}
+```
+
+#### **Response from LearnerAI**
+LearnerAI returns all learning paths for that user (without `learning_path` unless requested):
+
+```json
+{
+  "serviceName": "LearningAnalytics",
+  "payload": "[{\"user_id\":\"uuid\",\"user_name\":\"string\",\"company_id\":\"uuid\",\"company_name\":\"string\",\"competency_target_name\":\"string\",\"gap_id\":\"uuid\",\"skills_raw_data\":{...},\"exam_status\":\"PASS\"|\"FAIL\"},...]"
+}
+```
+
+**Note:** In on-demand mode, LearnerAI does NOT send `learning_path` unless Learning Analytics specifically requests it by including `competency_target_name` in the request.
+
+---
+
+## 2️⃣ Batch Mode (LearnerAI → Learning Analytics)
+
+### **How It Works**
+
+LearnerAI sends all data for all users every day in a scheduled batch.
+
+#### **Endpoint (in Learning Analytics)**
+```
+POST {ANALYTICS_URL}/api/v1/paths/batch
+```
+
+#### **Headers (from LearnerAI)**
+```http
 Content-Type: application/json
 Authorization: Bearer {ANALYTICS_TOKEN}
 X-Service-Token: {ANALYTICS_TOKEN}
 ```
 
----
-
-## 📋 JSON Body Structure (General Specification)
+#### **Request Body (from LearnerAI)**
+Array of user data objects:
 
 ```json
-{
-  "user_id": "string (UUID)",
-  "user_name": "string",
-  "company_id": "string (UUID)",
-  "company_name": "string",
-  "competency_target_name": "string",
-  "gap_id": "string (UUID)",
-  "skills_raw_data": {
-    "Competency_Name_1": [
-      "MGS_Skill_ID_1",
-      "MGS_Skill_ID_2",
-      "MGS_Skill_ID_3"
-    ],
-    "Competency_Name_2": [
-      "MGS_Skill_ID_4",
-      "MGS_Skill_ID_5"
-    ]
-    // ... can contain any number of competencies
+[
+  {
+    "user_id": "string (UUID)",
+    "user_name": "string",
+    "company_id": "string (UUID)",
+    "company_name": "string",
+    "competency_target_name": "string",
+    "gap_id": "string (UUID)",
+    "skills_raw_data": {
+      "Competency_Name_1": [
+        "MGS_Skill_ID_1",
+        "MGS_Skill_ID_2",
+        "MGS_Skill_ID_3"
+      ],
+      "Competency_Name_2": [
+        "MGS_Skill_ID_4",
+        "MGS_Skill_ID_5"
+      ]
+    },
+    "exam_status": "PASS" | "FAIL",
+    "learning_path": {
+      "steps": [
+        {
+          "step": "number",
+          "title": "string",
+          "duration": "string",
+          "resources": ["string"],
+          "objectives": ["string"],
+          "estimatedTime": "string"
+        }
+      ],
+      "estimatedCompletion": "string",
+      "totalSteps": "number",
+      "createdAt": "string (ISO DateTime)",
+      "updatedAt": "string (ISO DateTime)"
+    }
   },
-  "exam_status": "PASS" | "FAIL",
-  "learning_path": {
-    "steps": [
-      {
-        "step": "number",
-        "title": "string",
-        "duration": "string",
-        "resources": ["string"],
-        "objectives": ["string"],
-        "estimatedTime": "string"
-      }
-    ],
-    "estimatedCompletion": "string",
-    "totalSteps": "number",
-    "createdAt": "string (ISO DateTime)",
-    "updatedAt": "string (ISO DateTime)"
+  {
+    // ... more user data objects
   }
-}
+]
 ```
+
+#### **When LearnerAI Sends This**
+- ✅ **Scheduled daily batch** (e.g., every day at midnight)
+- ✅ Contains **all users** with their learning paths
+- ✅ Includes **complete data** with `learning_path` for each user
 
 ---
 
-## 🔑 Field Descriptions
+## 📋 JSON Body Structure (Single User Object)
 
 ### Root Level Fields (All Required)
 
@@ -75,7 +132,7 @@ X-Service-Token: {ANALYTICS_TOKEN}
 | `gap_id` | String (UUID) | ✅ Yes | Unique identifier for the skills gap record |
 | `skills_raw_data` | Object (JSONB) | ✅ Yes | Missing skills map structure (from skills_gap table, contains missing_skills_map) |
 | `exam_status` | String | ✅ Yes | Exam status: "PASS" or "FAIL" (from skills_gap.exam_status) |
-| `learning_path` | Object | ✅ Yes | Complete learning path structure (JSONB from database) |
+| `learning_path` | Object | ⚠️ **Optional** | Complete learning path structure (JSONB from database) - **Only sent in batch mode** |
 
 ### Skills Raw Data Object (`skills_raw_data`)
 
@@ -107,6 +164,8 @@ X-Service-Token: {ANALYTICS_TOKEN}
 
 ### Learning Path Object (`learning_path`)
 
+**Note:** `learning_path` is **only sent in batch mode**. In on-demand mode, LearnerAI does NOT send `learning_path` unless specifically requested.
+
 | Field | Type | Required | Description |
 |-------|------|---------|-------------|
 | `steps` | Array | ✅ Yes | Array of learning path step objects |
@@ -134,81 +193,129 @@ X-Service-Token: {ANALYTICS_TOKEN}
 
 ## 📝 Example Implementation
 
-```javascript
-// In your code when learning path is ready
-// You need to fetch the skills_gap data to include gap_id, skills_raw_data, and exam_status
-const skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(
-  learningPath.user_id,
-  learningPath.competency_target_name
-);
+### On-Demand Mode (Learning Analytics requests data)
 
-const analyticsPayload = {
-  user_id: learningPath.user_id,
-  user_name: learningPath.user_name,
-  company_id: learningPath.company_id,
-  company_name: learningPath.company_name,
-  competency_target_name: learningPath.competency_target_name,
-  gap_id: skillsGap.gap_id, // From skills_gap table
-  skills_raw_data: skillsGap.skills_raw_data, // From skills_gap table (contains missing_skills_map)
-  exam_status: skillsGap.exam_status, // From skills_gap table ("PASS" or "FAIL")
-  learning_path: learningPath.learning_path // JSONB from courses table
+```javascript
+// Learning Analytics calls LearnerAI's fill-fields endpoint
+// POST /api/fill-content-metrics
+// Body: { "serviceName": "LearningAnalytics", "payload": "{\"user_id\":\"uuid\"}" }
+
+// LearnerAI responds with user data (without learning_path)
+const response = {
+  serviceName: "LearningAnalytics",
+  payload: JSON.stringify([
+    {
+      user_id: "uuid",
+      user_name: "Alice Johnson",
+      company_id: "uuid",
+      company_name: "TechCorp Solutions",
+      competency_target_name: "JavaScript Basics",
+      gap_id: "uuid",
+      skills_raw_data: { ... },
+      exam_status: "FAIL"
+      // Note: learning_path is NOT included in on-demand mode
+    }
+  ])
 };
+```
+
+### Batch Mode (LearnerAI sends all data)
+
+```javascript
+// In your scheduled batch job (e.g., daily at midnight)
+const allUsersData = await getAllUsersAnalyticsData(); // Fetch all users with their learning paths
+
+const batchPayload = allUsersData.map(userData => ({
+  user_id: userData.user_id,
+  user_name: userData.user_name,
+  company_id: userData.company_id,
+  company_name: userData.company_name,
+  competency_target_name: userData.competency_target_name,
+  gap_id: userData.gap_id,
+  skills_raw_data: userData.skills_raw_data,
+  exam_status: userData.exam_status,
+  learning_path: userData.learning_path // Included in batch mode
+}));
 
 // Send to Learning Analytics
-await analyticsClient.updatePathAnalytics(analyticsPayload);
+await analyticsClient.sendBatchAnalytics(batchPayload);
 ```
 
 ---
 
-## 📄 Example JSON Payload
+## 📄 Example JSON Payload (Batch Mode)
 
-Here's a concrete example with sample data:
+Here's a concrete example with sample data for batch mode:
 
 ```json
-{
-  "user_id": "660e8400-e29b-41d4-a716-446655440001",
-  "user_name": "Alice Johnson",
-  "company_id": "550e8400-e29b-41d4-a716-446655440001",
-  "company_name": "TechCorp Solutions",
-  "competency_target_name": "JavaScript Basics",
-  "gap_id": "770e8400-e29b-41d4-a716-446655440001",
-  "skills_raw_data": {
-    "Competency_Front_End_Development": [
-      "MGS_React_Hooks_Advanced",
-      "MGS_Flexbox_Grid_System",
-      "MGS_Async_Await_Handling"
-    ],
-    "Competency_JavaScript_Fundamentals": [
-      "MGS_ES6_Syntax",
-      "MGS_Promise_Handling"
-    ]
+[
+  {
+    "user_id": "660e8400-e29b-41d4-a716-446655440001",
+    "user_name": "Alice Johnson",
+    "company_id": "550e8400-e29b-41d4-a716-446655440001",
+    "company_name": "TechCorp Solutions",
+    "competency_target_name": "JavaScript Basics",
+    "gap_id": "770e8400-e29b-41d4-a716-446655440001",
+    "skills_raw_data": {
+      "Competency_Front_End_Development": [
+        "MGS_React_Hooks_Advanced",
+        "MGS_Flexbox_Grid_System",
+        "MGS_Async_Await_Handling"
+      ],
+      "Competency_JavaScript_Fundamentals": [
+        "MGS_ES6_Syntax",
+        "MGS_Promise_Handling"
+      ]
+    },
+    "exam_status": "FAIL",
+    "learning_path": {
+      "steps": [
+        {
+          "step": 1,
+          "title": "Introduction to ES6",
+          "duration": "2 weeks",
+          "resources": ["ES6 Guide", "Practice Exercises"],
+          "objectives": ["Understand ES6 syntax", "Learn arrow functions"],
+          "estimatedTime": "10 hours"
+        },
+        {
+          "step": 2,
+          "title": "Arrow Functions",
+          "duration": "1 week",
+          "resources": ["Arrow Functions Tutorial"],
+          "objectives": ["Master arrow function syntax"],
+          "estimatedTime": "5 hours"
+        }
+      ],
+      "estimatedCompletion": "4 weeks",
+      "totalSteps": 2,
+      "createdAt": "2025-11-12T10:30:00Z",
+      "updatedAt": "2025-11-12T10:35:00Z"
+    }
   },
-  "exam_status": "FAIL",
-  "learning_path": {
-    "steps": [
-      {
-        "step": 1,
-        "title": "Introduction to ES6",
-        "duration": "2 weeks",
-        "resources": ["ES6 Guide", "Practice Exercises"],
-        "objectives": ["Understand ES6 syntax", "Learn arrow functions"],
-        "estimatedTime": "10 hours"
-      },
-      {
-        "step": 2,
-        "title": "Arrow Functions",
-        "duration": "1 week",
-        "resources": ["Arrow Functions Tutorial"],
-        "objectives": ["Master arrow function syntax"],
-        "estimatedTime": "5 hours"
-      }
-    ],
-    "estimatedCompletion": "4 weeks",
-    "totalSteps": 2,
-    "createdAt": "2025-11-12T10:30:00Z",
-    "updatedAt": "2025-11-12T10:35:00Z"
+  {
+    "user_id": "770e8400-e29b-41d4-a716-446655440002",
+    "user_name": "Bob Smith",
+    "company_id": "550e8400-e29b-41d4-a716-446655440001",
+    "company_name": "TechCorp Solutions",
+    "competency_target_name": "React Advanced",
+    "gap_id": "880e8400-e29b-41d4-a716-446655440002",
+    "skills_raw_data": {
+      "Competency_React_Advanced": [
+        "MGS_React_Context_API",
+        "MGS_React_Performance"
+      ]
+    },
+    "exam_status": "PASS",
+    "learning_path": {
+      "steps": [...],
+      "estimatedCompletion": "6 weeks",
+      "totalSteps": 5,
+      "createdAt": "2025-11-12T11:00:00Z",
+      "updatedAt": "2025-11-12T11:05:00Z"
+    }
   }
-}
+]
 ```
 
 ---
@@ -239,8 +346,7 @@ Course Builder receives the learning path entity (`learningPath.toJSON()`) which
 - ✅ `gap_id` - Must be valid UUID format (from skills_gap.gap_id)
 - ✅ `skills_raw_data` - Must be valid JSON object containing missing_skills_map (from skills_gap.skills_raw_data)
 - ✅ `exam_status` - Must be "PASS" or "FAIL" (from skills_gap.exam_status)
-- ✅ `learning_path` - Must be valid JSON object
-- ✅ `learning_path.steps` - Must be an array (can be empty)
+- ⚠️ `learning_path` - **Only required in batch mode** (optional in on-demand mode)
 
 ### Optional Fields:
 - ⚠️ `learning_path.estimatedCompletion` - Optional string
@@ -251,5 +357,13 @@ Course Builder receives the learning path entity (`learningPath.toJSON()`) which
 
 ---
 
-**This JSON structure ensures Learning Analytics can track and analyze learning paths effectively!** ✅
+## 🔄 Summary
 
+| Mode | Direction | Endpoint | Includes `learning_path`? | When? |
+|------|-----------|----------|---------------------------|-------|
+| **On-Demand** | Learning Analytics → LearnerAI | `POST /api/fill-content-metrics` | ❌ No (unless requested) | When Learning Analytics needs specific user data |
+| **Batch** | LearnerAI → Learning Analytics | `POST {ANALYTICS_URL}/api/v1/paths/batch` | ✅ Yes | Daily scheduled batch (all users) |
+
+---
+
+**This JSON structure ensures Learning Analytics can track and analyze learning paths effectively!** ✅

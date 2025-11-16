@@ -8,12 +8,24 @@ export class HttpClient {
   }
 
   async post(url, data, options = {}) {
+    // Check if Content-Type is already set (e.g., for form-urlencoded)
+    const contentType = options.headers?.['Content-Type'] || options.headers?.['content-type'];
+    let body;
+    
+    if (contentType === 'application/x-www-form-urlencoded') {
+      // If form-urlencoded, data should already be a string
+      body = typeof data === 'string' ? data : new URLSearchParams(data).toString();
+    } else {
+      // Default to JSON
+      body = JSON.stringify(data);
+    }
+    
     return this._request(url, {
       ...options,
       method: 'POST',
-      body: JSON.stringify(data),
+      body,
       headers: {
-        'Content-Type': 'application/json',
+        'Content-Type': contentType || 'application/json',
         ...options.headers
       }
     });

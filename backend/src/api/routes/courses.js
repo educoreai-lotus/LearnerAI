@@ -34,7 +34,7 @@ export function createCoursesRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { competency_target_name, user_id, learning_path, approved } = req.body;
+      const { competency_target_name, user_id, gap_id, learning_path, approved } = req.body;
 
       // Validate required fields
       if (!user_id || !learning_path || !competency_target_name) {
@@ -47,6 +47,7 @@ export function createCoursesRouter(dependencies) {
       const course = await courseRepository.createCourse({
         competency_target_name,
         user_id,
+        gap_id: gap_id || null,
         learning_path,
         approved: approved !== undefined ? approved : false
       });

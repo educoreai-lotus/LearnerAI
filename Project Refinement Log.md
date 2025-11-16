@@ -266,6 +266,12 @@
   },
   {
     "phase": "Phase 5: Implementation (TDD)",
+    "decision_context": "Learning Analytics Communication - Two Modes",
+    "user_answer": "Learning Analytics receives data from LearnerAI in two ways: 1) On-demand mode: Learning Analytics requests data for a specific user by sending user_id to /api/fill-content-metrics endpoint. LearnerAI responds with user data (without learning_path unless requested). 2) Batch mode: LearnerAI sends all data for all users every day via scheduled batch job to {ANALYTICS_URL}/api/v1/paths/batch endpoint (includes learning_path for all users). DistributePathUseCase no longer automatically sends to Analytics - data is sent on-demand or via daily batch.",
+    "tags": ["USER-REFINEMENT", "LEARNING-ANALYTICS", "COMMUNICATION", "ON-DEMAND", "BATCH"]
+  },
+  {
+    "phase": "Phase 5: Implementation (TDD)",
     "decision_context": "Repository Updates - Competency-Based Queries",
     "user_answer": "Updated repositories to use competency_target_name: SkillsGapRepository.getSkillsGapByUserAndCompetency(), SupabaseRepository queries courses table by competency_target_name (primary key), CourseRepository uses competency_target_name. LearningPath entity includes competencyTargetName field. All code updated to use competency_target_name instead of course_id.",
     "tags": ["USER-REFINEMENT", "REPOSITORY", "COMPETENCY", "QUERIES", "SCHEMA-UPDATE"]

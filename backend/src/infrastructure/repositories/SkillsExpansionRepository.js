@@ -22,6 +22,8 @@ export class SkillsExpansionRepository {
       .from('skills_expansions')
       .insert({
         expansion_id: expansionData.expansion_id || undefined,
+        gap_id: expansionData.gap_id,
+        user_id: expansionData.user_id,
         prompt_1_output: expansionData.prompt_1_output || null,
         prompt_2_output: expansionData.prompt_2_output || null
       })
@@ -59,14 +61,22 @@ export class SkillsExpansionRepository {
 
   /**
    * Get all skills expansions
-   * @param {Object} options - Query options (limit, offset)
+   * @param {Object} options - Query options (limit, offset, user_id, gap_id)
    * @returns {Promise<Array<Object>>}
    */
   async getAllSkillsExpansions(options = {}) {
     let query = this.client
       .from('skills_expansions')
-      .select('*')
-      .order('created_at', { ascending: false });
+      .select('*');
+
+    if (options.user_id) {
+      query = query.eq('user_id', options.user_id);
+    }
+    if (options.gap_id) {
+      query = query.eq('gap_id', options.gap_id);
+    }
+
+    query = query.order('created_at', { ascending: false });
 
     if (options.limit) {
       query = query.limit(options.limit);
@@ -85,6 +95,24 @@ export class SkillsExpansionRepository {
   }
 
   /**
+   * Get skills expansions by user_id
+   * @param {string} userId
+   * @returns {Promise<Array<Object>>}
+   */
+  async getSkillsExpansionsByUserId(userId) {
+    return this.getAllSkillsExpansions({ user_id: userId });
+  }
+
+  /**
+   * Get skills expansions by gap_id
+   * @param {string} gapId
+   * @returns {Promise<Array<Object>>}
+   */
+  async getSkillsExpansionsByGapId(gapId) {
+    return this.getAllSkillsExpansions({ gap_id: gapId });
+  }
+
+  /**
    * Update skills expansion
    * @param {string} expansionId
    * @param {Object} updates
@@ -94,6 +122,8 @@ export class SkillsExpansionRepository {
     const updateData = {};
     if (updates.prompt_1_output !== undefined) updateData.prompt_1_output = updates.prompt_1_output;
     if (updates.prompt_2_output !== undefined) updateData.prompt_2_output = updates.prompt_2_output;
+    if (updates.gap_id !== undefined) updateData.gap_id = updates.gap_id;
+    if (updates.user_id !== undefined) updateData.user_id = updates.user_id;
 
     const { data, error } = await this.client
       .from('skills_expansions')
@@ -133,6 +163,8 @@ export class SkillsExpansionRepository {
   _mapToSkillsExpansion(record) {
     return {
       expansion_id: record.expansion_id,
+      gap_id: record.gap_id,
+      user_id: record.user_id,
       prompt_1_output: record.prompt_1_output,
       prompt_2_output: record.prompt_2_output,
       created_at: record.created_at,

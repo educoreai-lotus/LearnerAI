@@ -34,7 +34,7 @@ export class DistributePathUseCase {
       errors: []
     };
 
-    // Send to Course Builder
+    // Send to Course Builder (with rollback)
     try {
       // Fetch skills gap data to get user_name and company_name
       if (!this.skillsGapRepository || !learningPath.userId || !competencyTargetName) {
@@ -60,56 +60,77 @@ export class DistributePathUseCase {
         learning_path: learningPath.pathMetadata || learningPath.learning_path || learningPath.toJSON()
       };
       
-      results.courseBuilder = await this.courseBuilderClient.sendLearningPath(courseBuilderPayload);
-      console.log(`✅ Learning path sent to Course Builder: ${learningPathId}`);
+      // Send with rollback enabled (will return mock data if fails)
+      results.courseBuilder = await this.courseBuilderClient.sendLearningPath(courseBuilderPayload, {
+        maxRetries: 3,
+        retryDelay: 1000,
+        useRollback: true
+      });
+      
+      if (results.courseBuilder.rollback) {
+        console.warn(`⚠️ Course Builder unavailable, used rollback mock data: ${learningPathId}`);
+        results.errors.push({ 
+          service: 'courseBuilder', 
+          error: 'Service unavailable - rollback mock data used',
+          rollback: true 
+        });
+      } else {
+        console.log(`✅ Learning path sent to Course Builder: ${learningPathId}`);
+      }
     } catch (error) {
       console.error(`❌ Failed to send to Course Builder: ${error.message}`);
       results.errors.push({ service: 'courseBuilder', error: error.message });
+      // Even if error, try to get rollback data
+      try {
+        const courseBuilderPayload = {
+          user_id: learningPath.userId,
+          competency_target_name: competencyTargetName,
+          learning_path: learningPath.pathMetadata || learningPath.learning_path || learningPath.toJSON()
+        };
+        results.courseBuilder = this.courseBuilderClient.getRollbackMockData(courseBuilderPayload);
+        console.warn(`⚠️ Using rollback mock data for Course Builder`);
+      } catch (rollbackError) {
+        console.error(`❌ Failed to get rollback data: ${rollbackError.message}`);
+      }
     }
 
-    // Send to Analytics (with gap_id, skills_raw_data, exam_status)
-    try {
-      // Fetch skills gap data to include gap_id, skills_raw_data, and exam_status
-      if (!this.skillsGapRepository || !learningPath.userId || !competencyTargetName) {
-        throw new Error('Missing required data: skillsGapRepository, userId, or competencyTargetName');
-      }
-      
-      const skillsGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(
-        learningPath.userId,
-        competencyTargetName
-      );
-      
-      if (!skillsGap) {
-        throw new Error(`Skills gap not found for user ${learningPath.userId}, competency ${competencyTargetName}`);
-      }
-      
-      // Build complete analytics payload with all required fields
-      const analyticsPayload = {
-        user_id: learningPath.userId,
-        user_name: skillsGap.user_name, // From skills_gap table
-        company_id: skillsGap.company_id, // From skills_gap table
-        company_name: skillsGap.company_name, // From skills_gap table
-        competency_target_name: competencyTargetName,
-        gap_id: skillsGap.gap_id,
-        skills_raw_data: skillsGap.skills_raw_data,
-        exam_status: skillsGap.exam_status, // Use exam_status (matches database field)
-        learning_path: learningPath.pathMetadata || learningPath.learning_path || learningPath.toJSON()
-      };
-      
-      results.analytics = await this.analyticsClient.updatePathAnalytics(analyticsPayload);
-      console.log(`✅ Learning path sent to Analytics: ${learningPathId}`);
-    } catch (error) {
-      console.error(`❌ Failed to send to Analytics: ${error.message}`);
-      results.errors.push({ service: 'analytics', error: error.message });
-    }
+    // Note: Learning Analytics no longer receives data automatically here.
+    // Learning Analytics receives data in two ways:
+    // 1. On-demand: Learning Analytics requests data via /api/fill-content-metrics
+    // 2. Batch: Daily scheduled batch job sends all users data via analyticsClient.sendBatchAnalytics()
+    // 
+    // We no longer send to Analytics automatically when a path is generated.
+    results.analytics = { message: 'Learning Analytics receives data via on-demand requests or daily batch, not automatically on path generation' };
 
-    // Send to Reports
+    // Send to Reports (with rollback)
     try {
-      results.reports = await this.reportsClient.updatePathReports(learningPath.toJSON());
-      console.log(`✅ Learning path sent to Reports: ${learningPathId}`);
+      // Send with rollback enabled (will return mock data if fails)
+      results.reports = await this.reportsClient.updatePathReports(learningPath.toJSON(), {
+        maxRetries: 3,
+        retryDelay: 1000,
+        useRollback: true
+      });
+      
+      if (results.reports.rollback) {
+        console.warn(`⚠️ Reports service unavailable, used rollback mock data: ${learningPathId}`);
+        results.errors.push({ 
+          service: 'reports', 
+          error: 'Service unavailable - rollback mock data used',
+          rollback: true 
+        });
+      } else {
+        console.log(`✅ Learning path sent to Reports: ${learningPathId}`);
+      }
     } catch (error) {
       console.error(`❌ Failed to send to Reports: ${error.message}`);
       results.errors.push({ service: 'reports', error: error.message });
+      // Even if error, try to get rollback data
+      try {
+        results.reports = this.reportsClient.getRollbackMockData(learningPath.toJSON());
+        console.warn(`⚠️ Using rollback mock data for Reports`);
+      } catch (rollbackError) {
+        console.error(`❌ Failed to get rollback data: ${rollbackError.message}`);
+      }
     }
 
     return results;

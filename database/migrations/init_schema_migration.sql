@@ -60,10 +60,14 @@ CREATE TABLE IF NOT EXISTS skills_gap (
 -- =====================================================
 CREATE TABLE IF NOT EXISTS skills_expansions (
     expansion_id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    gap_id UUID,
+    user_id UUID NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     prompt_1_output JSONB,
-    prompt_2_output JSONB
+    prompt_2_output JSONB,
+    CONSTRAINT fk_skills_expansions_gap FOREIGN KEY (gap_id) REFERENCES skills_gap(gap_id) ON DELETE CASCADE,
+    CONSTRAINT fk_skills_expansions_user FOREIGN KEY (user_id) REFERENCES learners(user_id) ON DELETE CASCADE
 );
 
 -- =====================================================
@@ -73,11 +77,13 @@ CREATE TABLE IF NOT EXISTS skills_expansions (
 CREATE TABLE IF NOT EXISTS courses (
     competency_target_name TEXT PRIMARY KEY NOT NULL,
     user_id UUID NOT NULL,
+    gap_id UUID,
     learning_path JSONB NOT NULL,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     last_modified_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     approved BOOLEAN DEFAULT FALSE NOT NULL,
-    CONSTRAINT fk_courses_user FOREIGN KEY (user_id) REFERENCES learners(user_id) ON DELETE CASCADE
+    CONSTRAINT fk_courses_user FOREIGN KEY (user_id) REFERENCES learners(user_id) ON DELETE CASCADE,
+    CONSTRAINT fk_courses_gap FOREIGN KEY (gap_id) REFERENCES skills_gap(gap_id) ON DELETE CASCADE
 );
 
 -- =====================================================
@@ -113,8 +119,9 @@ CREATE TABLE IF NOT EXISTS jobs (
     error TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    CONSTRAINT fk_jobs_user FOREIGN KEY (user_id) REFERENCES learners(user_id) ON DELETE CASCADE,
-    CONSTRAINT fk_jobs_competency FOREIGN KEY (competency_target_name) REFERENCES courses(competency_target_name) ON DELETE SET NULL
+    CONSTRAINT fk_jobs_user FOREIGN KEY (user_id) REFERENCES learners(user_id) ON DELETE CASCADE
+    -- Note: No FK constraint on competency_target_name because jobs are created BEFORE courses exist
+    -- The competency_target_name is metadata indicating what the job will create
 );
 
 -- =====================================================

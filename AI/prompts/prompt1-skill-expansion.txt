@@ -19,23 +19,17 @@ OUTPUT FORMAT: Return a single JSON object containing the expanded list of compe
   "reasoning_summary": "[A brief explanation of why the expanded competencies were chosen and how they relate to the target goal.]",
   "expanded_competencies_list": [
     {
-      "competency_name": "Advanced Data Structures and Algorithm Optimization",
-      "competency_type": "Core",
-      "target_level": "Advanced"
+      "competency_name": "Advanced Data Structures and Algorithm Optimization"
     },
     {
       "competency_name": "Production System Debugging and Error Handling",
-      "competency_type": "Out-of-the-Box",
-      "target_level": "Intermediate",
       "justification": "Essential for maintaining models in production; goes beyond basic coding."
     },
     {
       "competency_name": "Cloud Security and Compliance Fundamentals (e.g., Data Anonymization)",
-      "competency_type": "Out-of-the-Box",
-      "target_level": "Beginner",
       "justification": "Mandatory context for modern, cloud-based data projects."
     }
   ]
 }
 
-Note: Include both Core and Out-of-the-Box competencies. Out-of-the-Box competencies should have a justification field explaining why they are essential beyond the explicit gaps.
+Note: Include both Core and Out-of-the-Box competencies. You may optionally include a justification field for Out-of-the-Box competencies explaining why they are essential beyond the explicit gaps.

@@ -17,7 +17,8 @@ export function createLearningPathsRouter(dependencies) {
     jobRepository,
     promptLoader,
     cacheRepository = null, // Optional - old schema feature
-    skillsGapRepository // Add for fetching updated skills_raw_data
+    skillsGapRepository, // Add for fetching updated skills_raw_data
+    skillsExpansionRepository // Add for saving prompt outputs
   } = dependencies;
 
   const generatePathUseCase = new GenerateLearningPathUseCase({
@@ -27,7 +28,8 @@ export function createLearningPathsRouter(dependencies) {
     jobRepository,
     promptLoader,
     cacheRepository,
-    skillsGapRepository
+    skillsGapRepository,
+    skillsExpansionRepository
   });
 
   /**

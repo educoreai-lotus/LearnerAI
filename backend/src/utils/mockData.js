@@ -214,6 +214,7 @@ export const mockCourses = [
   {
     competency_target_name: 'JavaScript ES6+ Syntax',
     user_id: 'a1b2c3d4-e5f6-4789-a012-345678901234',
+    gap_id: 'd7e8f9a0-b1c2-3456-7890-123456789012', // Links to first mockSkillsGap
     learning_path: {
       steps: [
         {
@@ -335,6 +336,7 @@ export const mockCourses = [
   {
     competency_target_name: 'React Hooks',
     user_id: 'b2c3d4e5-f6a7-8901-2345-678901234567',
+    gap_id: 'e8f9a0b1-c2d3-4567-8901-234567890123', // Links to second mockSkillsGap (React Hooks for Sara)
     learning_path: {
       steps: [
         {
@@ -427,6 +429,7 @@ export const mockCourses = [
   {
     competency_target_name: 'TypeScript Fundamentals',
     user_id: 'b2c3d4e5-f6a7-8901-2345-678901234567',
+    gap_id: 'f9a0b1c2-d3e4-5678-9012-345678901234', // Links to third mockSkillsGap (TypeScript for Sara)
     learning_path: {
       steps: [
         {
@@ -551,6 +554,7 @@ export const mockCourses = [
   {
     competency_target_name: 'Node.js Backend Development',
     user_id: 'b2c3d4e5-f6a7-8901-2345-678901234567',
+    gap_id: 'a0b1c2d3-e4f5-6789-0123-456789012345', // Links to fourth mockSkillsGap (Node.js Backend Development for Sara)
     learning_path: {
       steps: [
         {
@@ -675,6 +679,7 @@ export const mockCourses = [
   {
     competency_target_name: 'Python Basics',
     user_id: 'd4e5f6a7-b8c9-0123-4567-890123456789',
+    gap_id: 'f9a0b1c2-d3e4-5678-9012-345678901234', // Links to third mockSkillsGap
     learning_path: {
       steps: [
         {
@@ -767,6 +772,7 @@ export const mockCourses = [
   {
     competency_target_name: 'Node.js Backend',
     user_id: 'e5f6a7b8-c9d0-1234-5678-901234567890',
+    gap_id: 'a0b1c2d3-e4f5-6789-0123-456789012345', // Links to fourth mockSkillsGap
     learning_path: {
       steps: [
         {
@@ -859,6 +865,7 @@ export const mockCourses = [
   {
     competency_target_name: 'TypeScript Fundamentals',
     user_id: 'f6a7b8c9-d0e1-2345-6789-012345678901',
+    gap_id: 'b1c2d3e4-f5a6-7890-1234-567890123456', // Links to fifth mockSkillsGap
     learning_path: {
       steps: [
         {
@@ -953,6 +960,8 @@ export const mockCourses = [
 export const mockSkillsExpansions = [
   {
     expansion_id: 'f1a2b3c4-d5e6-7890-1234-567890abcdef',
+    gap_id: 'd7e8f9a0-b1c2-3456-7890-123456789012', // Links to first mockSkillsGap
+    user_id: 'a1b2c3d4-e5f6-4789-a012-345678901234', // Links to Alice Johnson
     prompt_1_output: {
       expandedCompetencies: [
         {

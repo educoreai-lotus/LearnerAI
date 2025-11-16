@@ -243,10 +243,13 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 }
 ```
 
-**Note:** The `competencies` array is a simple array of competency names (strings) identified from Prompt 2 (Competency Identification). For example:
-- `"React Hooks"`
-- `"TypeScript Fundamentals"`
-- `"Node.js Backend Development"`
+**Note:** 
+- The `competencies` array is a simple array of competency names (strings) identified from Prompt 2 (Competency Identification). For example:
+  - `"React Hooks"`
+  - `"TypeScript Fundamentals"`
+  - `"Node.js Backend Development"`
+- **Skills Engine returns the LOWEST LAYER** (nano/micro skills) by default, which matches the level of the initial skills gap.
+- This ensures consistency: both the initial gap and expanded breakdown are at the same granularity level (lowest layer).
 
 #### **Response (from Skills Engine)**
 ```json
@@ -338,13 +341,55 @@ LEARNER_AI_SERVICE_TOKEN=your-learner-ai-token
 
 ## 3️⃣ Learning Analytics Microservice
 
-### 📤 **Outgoing: LearnerAI → Learning Analytics**
+Learning Analytics has **two distinct communication patterns** with LearnerAI:
 
-LearnerAI sends learning path data to Learning Analytics for tracking and analysis.
+---
+
+### 📥 **Communication Type 1: On-Demand Requests (Incoming)**
+
+Learning Analytics requests data for a specific user by calling LearnerAI's fill-fields endpoint.
+
+#### **Endpoint (in LearnerAI)**
+```
+POST /api/fill-content-metrics
+```
+
+#### **Request Body (from Learning Analytics)**
+```json
+{
+  "serviceName": "LearningAnalytics",
+  "payload": "{\"user_id\":\"uuid\"}"
+}
+```
+
+#### **Response (from LearnerAI)**
+```json
+{
+  "serviceName": "LearningAnalytics",
+  "payload": "[{\"user_id\":\"uuid\",\"user_name\":\"string\",\"company_id\":\"uuid\",\"company_name\":\"string\",\"competency_target_name\":\"string\",\"gap_id\":\"uuid\",\"skills_raw_data\":{...},\"exam_status\":\"PASS\"|\"FAIL\"},...]"
+}
+```
+
+**Note:** In on-demand mode, LearnerAI does **NOT** send `learning_path` unless Learning Analytics specifically requests it by including `competency_target_name` in the request.
+
+#### **When Learning Analytics Calls This**
+- ✅ When Learning Analytics needs data for a specific user
+- ✅ On-demand requests for user analytics
+
+#### **Implementation**
+- **Route**: `backend/src/api/routes/endpoints.js`
+- **Handler**: `fillLearningAnalyticsData()` function
+- **Method**: Learning Analytics calls `/api/fill-content-metrics` with `serviceName: "LearningAnalytics"`
+
+---
+
+### 📤 **Communication Type 2: Batch Mode (Outgoing)**
+
+LearnerAI sends all data for all users every day in a scheduled batch.
 
 #### **Endpoint (in Learning Analytics)**
 ```
-POST {ANALYTICS_URL}/api/v1/paths/update
+POST {ANALYTICS_URL}/api/v1/paths/batch
 ```
 
 #### **Headers (from LearnerAI)**
@@ -355,62 +400,63 @@ X-Service-Token: {ANALYTICS_TOKEN}
 ```
 
 #### **Request Body (from LearnerAI)**
+Array of user data objects (all users with their learning paths):
+
 ```json
-{
-  "user_id": "uuid",
-  "user_name": "string",
-  "company_id": "uuid",
-  "company_name": "string",
-  "competency_target_name": "string",
-  "gap_id": "uuid",
-  "skills_raw_data": {
-    "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
+[
+  {
+    "user_id": "uuid",
+    "user_name": "string",
+    "company_id": "uuid",
+    "company_name": "string",
+    "competency_target_name": "string",
+    "gap_id": "uuid",
+    "skills_raw_data": {
+      "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
+    },
+    "exam_status": "PASS" | "FAIL",
+    "learning_path": {
+      "steps": [...],
+      "estimatedCompletion": "string",
+      "totalSteps": 1,
+      "createdAt": "ISO DateTime",
+      "updatedAt": "ISO DateTime"
+    }
   },
-  "exam_status": "PASS" | "FAIL",
-  "learning_path": {
-    "steps": [
-      {
-        "step": 1,
-        "title": "string",
-        "duration": "string",
-        "resources": ["string"],
-        "objectives": ["string"],
-        "estimatedTime": "string"
-      }
-    ],
-    "estimatedCompletion": "string",
-    "totalSteps": 1,
-    "createdAt": "ISO DateTime",
-    "updatedAt": "ISO DateTime"
+  {
+    // ... more user data objects
   }
-}
+]
 ```
 
 #### **When LearnerAI Calls This**
-- After learning path is generated and approved (if manual approval)
-- Immediately after generation (if auto approval)
+- ✅ **Scheduled daily batch** (e.g., every day at midnight)
+- ✅ Contains **all users** with their learning paths
+- ✅ Includes **complete data** with `learning_path` for each user
 
 #### **Implementation**
 - **Client**: `AnalyticsClient` (`backend/src/infrastructure/clients/AnalyticsClient.js`)
-- **Use Case**: `DistributePathUseCase`
-- **Method**: `analyticsClient.updatePathAnalytics(pathData)`
+- **Method**: `analyticsClient.sendBatchAnalytics(batchData)`
+- **Scheduled**: Daily batch job (cron/scheduler)
 
-#### **Example (LearnerAI calling Learning Analytics)**
+#### **Example (LearnerAI calling Learning Analytics - Batch Mode)**
 ```javascript
-// In DistributePathUseCase
-const analyticsPayload = {
-  user_id: learningPath.userId,
-  user_name: skillsGap.user_name,
-  company_id: skillsGap.company_id,
-  company_name: skillsGap.company_name,
-  competency_target_name: competencyTargetName,
-  gap_id: skillsGap.gap_id,
-  skills_raw_data: skillsGap.skills_raw_data,
-  exam_status: skillsGap.exam_status,
-  learning_path: learningPath.pathMetadata
-};
+// In scheduled batch job (e.g., daily at midnight)
+const allUsersData = await getAllUsersAnalyticsData(); // Fetch all users with their learning paths
 
-await analyticsClient.updatePathAnalytics(analyticsPayload);
+const batchPayload = allUsersData.map(userData => ({
+  user_id: userData.user_id,
+  user_name: userData.user_name,
+  company_id: userData.company_id,
+  company_name: userData.company_name,
+  competency_target_name: userData.competency_target_name,
+  gap_id: userData.gap_id,
+  skills_raw_data: userData.skills_raw_data,
+  exam_status: userData.exam_status,
+  learning_path: userData.learning_path // Included in batch mode
+}));
+
+await analyticsClient.sendBatchAnalytics(batchPayload);
 ```
 
 #### **Environment Variables**
@@ -420,7 +466,7 @@ ANALYTICS_TOKEN=your-token-here
 ```
 
 #### **Full Documentation**
-See `LEARNING_ANALYTICS_JSON.md` for complete JSON specification.
+See `LEARNING_ANALYTICS_JSON.md` for complete JSON specification and both communication modes.
 
 ---
 

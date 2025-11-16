@@ -11,8 +11,20 @@ export class SkillsEngineClient {
 
   /**
    * Request skill breakdown for competencies
+   * Requests the LOWEST LAYER (nano/micro skills) for the given competencies.
+   * This matches the level of the initial skills gap (nano/micro skills).
+   * 
    * @param {Array} competencies - Array of competency names (strings) or objects with 'name' property
-   * @returns {Promise<object>} Skill breakdown with micro/nano divisions
+   * @param {object} options - Request options (maxRetries, retryDelay, useMockData)
+   * @returns {Promise<object>} Skill breakdown with micro/nano divisions (lowest layer)
+   * 
+   * Response format:
+   * {
+   *   "Competency_Name": {
+   *     "microSkills": [...],  // Lowest layer - mid level
+   *     "nanoSkills": [...]    // Lowest layer - most granular
+   *   }
+   * }
    */
   async requestSkillBreakdown(competencies, options = {}) {
     const {
@@ -38,10 +50,14 @@ export class SkillsEngineClient {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         // Send simple array of competency names (strings)
+        // Note: Skills Engine returns the LOWEST LAYER (nano/micro skills) by default
+        // This matches the level of the initial skills gap
         const response = await this.httpClient.post(
           `${this.baseUrl}/api/skills/breakdown`,
           {
             competencies: competencyNames
+            // If Skills Engine requires a parameter to specify lowest layer, add it here:
+            // level: "lowest" or granularity: "nano" or depth: "full"
           },
           {
             headers: {

@@ -130,13 +130,13 @@ describe('GenerateLearningPathUseCase', () => {
       mockGeminiClient.executePrompt
         .mockResolvedValueOnce({
           expanded_competencies_list: [
-            { competency_name: 'Competency A', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Test' },
-            { competency_name: 'Competency B', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Test' }
+            { competency_name: 'Competency A', justification: 'Test' },
+            { competency_name: 'Competency B', justification: 'Test' }
           ]
         })
         .mockResolvedValueOnce({
           competencies_for_skills_engine_processing: [
-            { competency_name: 'Competency A', target_level: 'Intermediate' }
+            { competency_name: 'Competency A' }
           ]
         })
         .mockResolvedValueOnce({
@@ -184,16 +184,16 @@ describe('GenerateLearningPathUseCase', () => {
 
       const prompt1Result = {
         expanded_competencies_list: [
-          { competency_name: 'Competency A', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Desc A' },
-          { competency_name: 'Competency B', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Desc B' },
-          { competency_name: 'Competency C', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Desc C' }
+          { competency_name: 'Competency A', justification: 'Desc A' },
+          { competency_name: 'Competency B', justification: 'Desc B' },
+          { competency_name: 'Competency C', justification: 'Desc C' }
         ]
       };
 
       const prompt2Result = {
         competencies_for_skills_engine_processing: [
-          { competency_name: 'Competency A', target_level: 'Intermediate', source_type: 'Out-of-the-Box', example_query_to_send: 'query A' },
-          { competency_name: 'Competency B', target_level: 'Intermediate', source_type: 'Out-of-the-Box', example_query_to_send: 'query B' }
+          { competency_name: 'Competency A', example_query_to_send: 'query A' },
+          { competency_name: 'Competency B', example_query_to_send: 'query B' }
         ],
         standard_skills_engine_query_template: 'template'
       };
@@ -245,7 +245,7 @@ describe('GenerateLearningPathUseCase', () => {
       });
 
       // Note: The test defines competencies but the actual extraction happens from prompt2Result
-      // The extraction maps competency_name -> name, target_level -> targetLevel, etc.
+      // The extraction maps competency_name -> name
 
       const skillBreakdown = {
         'Competency A': {
@@ -261,14 +261,14 @@ describe('GenerateLearningPathUseCase', () => {
       mockGeminiClient.executePrompt
         .mockResolvedValueOnce({ 
           expanded_competencies_list: [
-            { competency_name: 'Competency A', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Test' },
-            { competency_name: 'Competency B', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Test' }
+            { competency_name: 'Competency A', justification: 'Test' },
+            { competency_name: 'Competency B', justification: 'Test' }
           ]
         })
         .mockResolvedValueOnce({ 
           competencies_for_skills_engine_processing: [
-            { competency_name: 'Competency A', target_level: 'Intermediate', source_type: 'Out-of-the-Box', example_query_to_send: 'query A' },
-            { competency_name: 'Competency B', target_level: 'Intermediate', source_type: 'Out-of-the-Box', example_query_to_send: 'query B' }
+            { competency_name: 'Competency A', example_query_to_send: 'query A' },
+            { competency_name: 'Competency B', example_query_to_send: 'query B' }
           ],
           standard_skills_engine_query_template: 'template'
         })
@@ -329,11 +329,11 @@ describe('GenerateLearningPathUseCase', () => {
       mockGeminiClient.executePrompt
         .mockResolvedValueOnce({ 
           expanded_competencies_list: [
-            { competency_name: 'Competency A', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Test' }
+            { competency_name: 'Competency A', justification: 'Test' }
           ]
         })
         .mockResolvedValueOnce({ 
-          competencies_for_skills_engine_processing: [{ name: 'Competency A', targetLevel: 'Intermediate' }] 
+          competencies_for_skills_engine_processing: [{ competency_name: 'Competency A' }] 
         })
         .mockResolvedValueOnce(pathResult);
       mockSkillsEngineClient.requestSkillBreakdown.mockResolvedValue({
@@ -382,11 +382,11 @@ describe('GenerateLearningPathUseCase', () => {
       mockGeminiClient.executePrompt
         .mockResolvedValueOnce({ 
           expanded_competencies_list: [
-            { competency_name: 'Competency A', competency_type: 'Out-of-the-Box', target_level: 'Intermediate', justification: 'Test' }
+            { competency_name: 'Competency A', justification: 'Test' }
           ]
         })
         .mockResolvedValueOnce({ 
-          competencies_for_skills_engine_processing: [{ name: 'Competency A', targetLevel: 'Intermediate' }] 
+          competencies_for_skills_engine_processing: [{ competency_name: 'Competency A' }] 
         })
         .mockResolvedValueOnce(pathResult);
       mockSkillsEngineClient.requestSkillBreakdown.mockResolvedValue({

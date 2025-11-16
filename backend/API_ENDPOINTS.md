@@ -48,6 +48,7 @@ http://localhost:5000/api/v1
   {
     "competency_target_name": "string (required, primary key)",
     "user_id": "uuid (required)",
+    "gap_id": "uuid (optional, links to skills_gap)",
     "learning_path": "jsonb (required)",
     "approved": "boolean (optional, default: false)"
   }
@@ -121,6 +122,8 @@ http://localhost:5000/api/v1
   ```json
   {
     "expansion_id": "uuid (optional)",
+    "gap_id": "uuid (optional, links to skills_gap)",
+    "user_id": "uuid (required)",
     "prompt_1_output": "jsonb (optional)",
     "prompt_2_output": "jsonb (optional)"
   }
@@ -134,6 +137,8 @@ http://localhost:5000/api/v1
 - **Query Parameters:**
   - `limit` (optional, default: 50)
   - `offset` (optional, default: 0)
+  - `user_id` (optional, filter by user)
+  - `gap_id` (optional, filter by skills gap)
 
 #### Update Skills Expansion
 - **PUT** `/api/v1/skills-expansions/:expansionId`

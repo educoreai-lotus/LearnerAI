@@ -57,6 +57,7 @@ describe('CourseRepository', () => {
       const courseData = {
         competency_target_name: 'JavaScript ES6+ Syntax',
         user_id: 'user-123',
+        gap_id: 'gap-123',
         learning_path: {
           steps: [
             { step: 1, title: 'Introduction', duration: '1 week' }
@@ -69,6 +70,7 @@ describe('CourseRepository', () => {
       const mockRecord = {
         competency_target_name: 'JavaScript ES6+ Syntax',
         user_id: 'user-123',
+        gap_id: 'gap-123',
         learning_path: courseData.learning_path,
         approved: false,
         created_at: '2025-01-01T00:00:00Z',
@@ -83,6 +85,7 @@ describe('CourseRepository', () => {
       expect(mockClient.insert).toHaveBeenCalledWith({
         competency_target_name: 'JavaScript ES6+ Syntax',
         user_id: 'user-123',
+        gap_id: 'gap-123',
         learning_path: courseData.learning_path,
         approved: false
       });
@@ -95,6 +98,7 @@ describe('CourseRepository', () => {
       const mockRecord = {
         competency_target_name: 'JavaScript ES6+ Syntax',
         user_id: 'user-123',
+        gap_id: 'gap-123',
         learning_path: { steps: [] },
         approved: false,
         created_at: '2025-01-01T00:00:00Z',
@@ -128,12 +132,14 @@ describe('CourseRepository', () => {
         {
           competency_target_name: 'JavaScript ES6+ Syntax',
           user_id: 'user-1',
+          gap_id: 'gap-1',
           learning_path: { steps: [] },
           approved: false
         },
         {
           competency_target_name: 'React Hooks',
           user_id: 'user-2',
+          gap_id: 'gap-2',
           learning_path: { steps: [] },
           approved: true
         }
@@ -154,12 +160,14 @@ describe('CourseRepository', () => {
         {
           competency_target_name: 'JavaScript ES6+ Syntax',
           user_id: 'user-123',
+          gap_id: 'gap-123',
           learning_path: { steps: [] },
           approved: false
         },
         {
           competency_target_name: 'React Hooks',
           user_id: 'user-123',
+          gap_id: 'gap-124',
           learning_path: { steps: [] },
           approved: true
         }
@@ -189,6 +197,7 @@ describe('CourseRepository', () => {
       const mockRecord = {
         competency_target_name: 'JavaScript ES6+ Syntax',
         user_id: 'user-123',
+        gap_id: 'gap-123',
         learning_path: updates.learning_path,
         approved: false,
         created_at: '2025-01-01T00:00:00Z',

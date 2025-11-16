@@ -23,6 +23,7 @@ export class CourseRepository {
       .insert({
         competency_target_name: courseData.competency_target_name,
         user_id: courseData.user_id,
+        gap_id: courseData.gap_id || null,
         learning_path: courseData.learning_path,
         approved: courseData.approved || false
       })
@@ -123,6 +124,7 @@ export class CourseRepository {
     const updateData = {};
     if (updates.learning_path !== undefined) updateData.learning_path = updates.learning_path;
     if (updates.approved !== undefined) updateData.approved = updates.approved;
+    if (updates.gap_id !== undefined) updateData.gap_id = updates.gap_id;
 
     const { data, error } = await this.client
       .from('courses')
@@ -163,6 +165,7 @@ export class CourseRepository {
     return {
       competency_target_name: record.competency_target_name,
       user_id: record.user_id,
+      gap_id: record.gap_id,
       learning_path: record.learning_path,
       approved: record.approved,
       created_at: record.created_at,

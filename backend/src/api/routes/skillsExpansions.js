@@ -14,10 +14,20 @@ export function createSkillsExpansionsRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { expansion_id, prompt_1_output, prompt_2_output } = req.body;
+      const { expansion_id, gap_id, user_id, prompt_1_output, prompt_2_output } = req.body;
+
+      // Validate required fields
+      if (!user_id) {
+        return res.status(400).json({
+          error: 'Missing required field',
+          message: 'user_id is required'
+        });
+      }
 
       const skillsExpansion = await skillsExpansionRepository.createSkillsExpansion({
         expansion_id,
+        gap_id: gap_id || null,
+        user_id,
         prompt_1_output,
         prompt_2_output
       });
@@ -63,16 +73,20 @@ export function createSkillsExpansionsRouter(dependencies) {
 
   /**
    * GET /api/v1/skills-expansions
-   * Get all skills expansions (with optional pagination)
+   * Get all skills expansions (with optional pagination and filters)
    */
   router.get('/', async (req, res) => {
     try {
       const limit = parseInt(req.query.limit) || 50;
       const offset = parseInt(req.query.offset) || 0;
+      const user_id = req.query.user_id;
+      const gap_id = req.query.gap_id;
 
       const skillsExpansions = await skillsExpansionRepository.getAllSkillsExpansions({
         limit,
-        offset
+        offset,
+        user_id,
+        gap_id
       });
 
       res.json({

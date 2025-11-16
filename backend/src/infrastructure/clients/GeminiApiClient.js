@@ -74,17 +74,34 @@ export class GeminiApiClient {
 
   /**
    * Parse response from Gemini
+   * Handles JSON wrapped in markdown code blocks (```json ... ```)
    */
   _parseResponse(response) {
     if (!response) {
       throw new Error('Empty response from Gemini API');
     }
 
-    // Try to parse as JSON first
+    // Remove markdown code blocks if present (```json ... ``` or ``` ... ```)
+    let cleanedResponse = response.trim();
+    
+    // Check if response is wrapped in markdown code blocks
+    if (cleanedResponse.startsWith('```')) {
+      // Extract content between code blocks
+      const codeBlockRegex = /^```(?:json)?\s*\n([\s\S]*?)\n```$/;
+      const match = cleanedResponse.match(codeBlockRegex);
+      if (match) {
+        cleanedResponse = match[1].trim();
+      } else {
+        // Fallback: remove first ``` and last ```
+        cleanedResponse = cleanedResponse.replace(/^```(?:json)?\s*\n?/, '').replace(/\n?```$/, '').trim();
+      }
+    }
+
+    // Try to parse as JSON
     try {
-      return JSON.parse(response);
+      return JSON.parse(cleanedResponse);
     } catch {
-      // If not JSON, return as string
+      // If not JSON, return as string (original response)
       return response;
     }
   }

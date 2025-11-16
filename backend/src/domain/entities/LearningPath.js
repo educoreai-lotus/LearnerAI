@@ -8,6 +8,7 @@ export class LearningPath {
     userId,
     companyId,
     competencyTargetName, // competency_target_name (primary key of courses table)
+    gapId = null, // Link to original skills gap
     pathSteps = [],
     pathTitle = null,
     totalDurationHours = null,
@@ -21,6 +22,7 @@ export class LearningPath {
     this.userId = userId;
     this.companyId = companyId;
     this.competencyTargetName = competencyTargetName || id; // Use id if not provided
+    this.gapId = gapId; // Link to original skills gap
     this.pathSteps = pathSteps; // Array of step objects or learning_modules
     this.pathTitle = pathTitle; // Title of the learning path
     this.totalDurationHours = totalDurationHours; // Total estimated duration
@@ -68,6 +70,7 @@ export class LearningPath {
       userId: this.userId,
       companyId: this.companyId,
       competencyTargetName: this.competencyTargetName,
+      gapId: this.gapId,
       pathSteps: this.pathSteps,
       pathTitle: this.pathTitle,
       totalDurationHours: this.totalDurationHours,

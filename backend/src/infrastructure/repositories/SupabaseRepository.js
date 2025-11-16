@@ -76,6 +76,7 @@ export class SupabaseRepository {
       .upsert({
         competency_target_name: learningPath.competencyTargetName || learningPath.id, // Primary key
         user_id: learningPath.userId,
+        gap_id: learningPath.gapId || null, // Link to original skills gap
         learning_path: pathData,
         approved: learningPath.status === 'completed',
         created_at: learningPath.createdAt,
@@ -140,6 +141,7 @@ export class SupabaseRepository {
       userId: record.user_id,
       companyId: pathData.companyId || null, // May be stored in learning_path JSONB
       competencyTargetName: record.competency_target_name,
+      gapId: record.gap_id || null, // Link to original skills gap
       pathSteps: pathData.pathSteps || [],
       pathTitle: pathData.pathTitle || null,
       totalDurationHours: pathData.totalDurationHours || null,

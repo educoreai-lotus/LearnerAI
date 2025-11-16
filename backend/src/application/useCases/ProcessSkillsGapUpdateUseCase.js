@@ -27,7 +27,7 @@ export class ProcessSkillsGapUpdateUseCase {
    * @param {string} gapData.user_name
    * @param {string} gapData.company_id
    * @param {string} gapData.company_name
-   * @param {string} gapData.competency_name - Maps to competency_target_name in database
+   * @param {string} gapData.competency_target_name - Primary field (competency_name also accepted for backward compatibility)
    * @param {string} gapData.status
    * @param {Object} gapData.gap - JSONB with micro/nano skills (lowest layer of skills gap hierarchy)
    * @returns {Promise<Object>} Updated skills gap
@@ -38,18 +38,20 @@ export class ProcessSkillsGapUpdateUseCase {
       user_name,
       company_id,
       company_name,
-      competency_name, // Maps to competency_target_name in skills_gap table
+      competency_target_name, // Primary field
+      competency_name, // Accepted for backward compatibility
       status,
       gap // JSONB with micro/nano skills (lowest layer - saved directly to skills_raw_data)
     } = gapData;
 
     // Validate required fields
-    if (!user_id || !user_name || !company_id || !company_name || !competency_name || !gap) {
-      throw new Error('Missing required fields: user_id, user_name, company_id, company_name, competency_name, gap');
+    const competencyTargetName = competency_target_name || competency_name;
+    if (!user_id || !user_name || !company_id || !company_name || !competencyTargetName || !gap) {
+      throw new Error('Missing required fields: user_id, user_name, company_id, company_name, competency_target_name, gap');
     }
 
     // Step 1: Check if skills_gap exists (user_id + competency_target_name)
-    const existingGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competency_name);
+    const existingGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competencyTargetName);
 
     let skillsGap;
 
@@ -65,7 +67,7 @@ export class ProcessSkillsGapUpdateUseCase {
         user_name // Update in case it changed
       });
 
-      console.log(`✅ Updated existing skills gap for user ${user_id}, competency ${competency_name}`);
+      console.log(`✅ Updated existing skills gap for user ${user_id}, competency ${competencyTargetName}`);
     } else {
       // Step 3: Create new skills_gap
       skillsGap = await this.skillsGapRepository.createSkillsGap({
@@ -73,12 +75,12 @@ export class ProcessSkillsGapUpdateUseCase {
         company_id,
         company_name,
         user_name,
-        competency_target_name: competency_name, // Map competency_name to competency_target_name
+        competency_target_name: competencyTargetName,
         skills_raw_data: gap,
         exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null
       });
 
-      console.log(`✅ Created new skills gap for user ${user_id}, competency ${competency_name}`);
+      console.log(`✅ Created new skills gap for user ${user_id}, competency ${competencyTargetName}`);
     }
 
     // Step 4: Check if learner exists

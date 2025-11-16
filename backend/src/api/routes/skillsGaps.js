@@ -33,7 +33,7 @@ export function createSkillsGapsRouter(dependencies) {
    *   user_name: "string",
    *   company_id: "uuid",
    *   company_name: "string",
-   *   competency_name: "string", // Maps to competency_target_name in database
+   *   competency_target_name: "string", // Primary field (competency_name also accepted for backward compatibility)
    *   status: "pass" | "fail",
    *   gap: { ... } // JSONB with micro/nano skills
    * }
@@ -65,7 +65,8 @@ export function createSkillsGapsRouter(dependencies) {
           user_name,
           company_id,
           company_name,
-          competency_name: competency_name || competency_target_name,
+          competency_target_name: competency_target_name || competency_name, // Primary field
+          competency_name, // For backward compatibility
           status,
           gap
         });
