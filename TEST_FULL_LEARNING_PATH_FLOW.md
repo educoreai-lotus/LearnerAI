@@ -84,32 +84,40 @@ SUPABASE_KEY=your-supabase-key
 4. **Body (raw JSON):**
 ```json
 {
-  "user_id": "a1b2c3d4-e5f6-4789-a012-345678901234",
-  "user_name": "Alice Johnson",
-  "company_id": "c1d2e3f4-5678-9012-3456-789012345678",
-  "company_name": "TechCorp Inc.",
-  "competency_target_name": "JavaScript Basics",
+  "user_id": "12345678-90ab-cdef-1234-567890abcdef",
+  "user_name": "Sarah Williams",
+  "company_id": "98765432-10fe-dcba-9876-543210fedcba",
+  "company_name": "CloudTech Systems",
+  "competency_target_name": "React Development",
   "status": "fail",
   "gap": {
     "missing_skills_map": {
       "microSkills": [
         {
-          "id": "MGS_ES6_Syntax",
-          "name": "ES6+ Syntax (Arrow Functions, Destructuring, Spread)"
+          "id": "MGS_React_Hooks",
+          "name": "React Hooks (useState, useEffect, useContext)"
         },
         {
-          "id": "MGS_Promise_Handling",
-          "name": "Promise Handling and Error Management"
+          "id": "MGS_Component_Lifecycle",
+          "name": "Component Lifecycle and State Management"
+        },
+        {
+          "id": "MGS_Props_Validation",
+          "name": "Props Validation and TypeScript Integration"
         }
       ],
       "nanoSkills": [
         {
-          "id": "MGS_Async_Await",
-          "name": "Async/Await Patterns"
+          "id": "MGS_Custom_Hooks",
+          "name": "Custom Hooks Creation and Composition"
         },
         {
-          "id": "MGS_Promise_Chaining",
-          "name": "Promise Chaining and Composition"
+          "id": "MGS_Context_API",
+          "name": "Context API for State Sharing"
+        },
+        {
+          "id": "MGS_Memoization",
+          "name": "React.memo and useMemo Optimization"
         }
       ]
     }
@@ -121,32 +129,40 @@ SUPABASE_KEY=your-supabase-key
 
 ```powershell
 $gapBody = @{
-    user_id = "a1b2c3d4-e5f6-4789-a012-345678901234"
-    user_name = "Alice Johnson"
-    company_id = "c1d2e3f4-5678-9012-3456-789012345678"
-    company_name = "TechCorp Inc."
-    competency_target_name = "JavaScript Basics"
+    user_id = "12345678-90ab-cdef-1234-567890abcdef"
+    user_name = "Sarah Williams"
+    company_id = "98765432-10fe-dcba-9876-543210fedcba"
+    company_name = "CloudTech Systems"
+    competency_target_name = "React Development"
     status = "fail"
     gap = @{
         missing_skills_map = @{
             microSkills = @(
                 @{
-                    id = "MGS_ES6_Syntax"
-                    name = "ES6+ Syntax (Arrow Functions, Destructuring, Spread)"
+                    id = "MGS_React_Hooks"
+                    name = "React Hooks (useState, useEffect, useContext)"
                 },
                 @{
-                    id = "MGS_Promise_Handling"
-                    name = "Promise Handling and Error Management"
+                    id = "MGS_Component_Lifecycle"
+                    name = "Component Lifecycle and State Management"
+                },
+                @{
+                    id = "MGS_Props_Validation"
+                    name = "Props Validation and TypeScript Integration"
                 }
             )
             nanoSkills = @(
                 @{
-                    id = "MGS_Async_Await"
-                    name = "Async/Await Patterns"
+                    id = "MGS_Custom_Hooks"
+                    name = "Custom Hooks Creation and Composition"
                 },
                 @{
-                    id = "MGS_Promise_Chaining"
-                    name = "Promise Chaining and Composition"
+                    id = "MGS_Context_API"
+                    name = "Context API for State Sharing"
+                },
+                @{
+                    id = "MGS_Memoization"
+                    name = "React.memo and useMemo Optimization"
                 }
             )
         }
@@ -166,8 +182,8 @@ Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-gaps" `
   "message": "Skills gap processed successfully",
   "skillsGap": {
     "gap_id": "uuid-here",
-    "user_id": "a1b2c3d4-e5f6-4789-a012-345678901234",
-    "competency_target_name": "JavaScript Basics",
+    "user_id": "12345678-90ab-cdef-1234-567890abcdef",
+    "competency_target_name": "React Development",
     "exam_status": "fail",
     "skills_raw_data": { ... }
   }
@@ -196,9 +212,9 @@ Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-gaps" `
 4. **Body (raw JSON):**
 ```json
 {
-  "userId": "a1b2c3d4-e5f6-4789-a012-345678901234",
-  "companyId": "c1d2e3f4-5678-9012-3456-789012345678",
-  "competencyTargetName": "JavaScript Basics"
+  "userId": "12345678-90ab-cdef-1234-567890abcdef",
+  "companyId": "98765432-10fe-dcba-9876-543210fedcba",
+  "competencyTargetName": "React Development"
 }
 ```
 
@@ -206,9 +222,9 @@ Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-gaps" `
 
 ```powershell
 $generateBody = @{
-    userId = "a1b2c3d4-e5f6-4789-a012-345678901234"
-    companyId = "c1d2e3f4-5678-9012-3456-789012345678"
-    competencyTargetName = "JavaScript Basics"
+    userId = "12345678-90ab-cdef-1234-567890abcdef"
+    companyId = "98765432-10fe-dcba-9876-543210fedcba"
+    competencyTargetName = "React Development"
 } | ConvertTo-Json
 
 $response = Invoke-RestMethod -Uri "http://localhost:5000/api/v1/learning-paths/generate" `
@@ -369,14 +385,14 @@ SELECT
   prompt_2_output,
   created_at
 FROM skills_expansions
-WHERE user_id = 'a1b2c3d4-e5f6-4789-a012-345678901234'
+WHERE user_id = '12345678-90ab-cdef-1234-567890abcdef'
 ORDER BY created_at DESC
 LIMIT 1;
 ```
 
 **Via API:**
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-expansions?user_id=a1b2c3d4-e5f6-4789-a012-345678901234" -Method GET
+Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-expansions?user_id=12345678-90ab-cdef-1234-567890abcdef" -Method GET
 ```
 
 **✅ What to Verify:**
@@ -399,15 +415,15 @@ SELECT
   approved,
   created_at
 FROM courses
-WHERE user_id = 'a1b2c3d4-e5f6-4789-a012-345678901234'
-  AND competency_target_name = 'JavaScript Basics'
+WHERE user_id = '12345678-90ab-cdef-1234-567890abcdef'
+  AND competency_target_name = 'React Development'
 ORDER BY created_at DESC
 LIMIT 1;
 ```
 
 **Via API:**
 ```powershell
-Invoke-RestMethod -Uri "http://localhost:5000/api/v1/courses/user/a1b2c3d4-e5f6-4789-a012-345678901234" -Method GET
+Invoke-RestMethod -Uri "http://localhost:5000/api/v1/courses/user/12345678-90ab-cdef-1234-567890abcdef" -Method GET
 ```
 
 **✅ What to Verify:**
@@ -426,20 +442,20 @@ Here's a complete script that does all steps:
 # Step 1: Send skills gap from Skills Engine
 Write-Host "Step 1: Sending skills gap..." -ForegroundColor Cyan
 $gapBody = @{
-    user_id = "a1b2c3d4-e5f6-4789-a012-345678901234"
-    user_name = "Alice Johnson"
-    company_id = "c1d2e3f4-5678-9012-3456-789012345678"
-    company_name = "TechCorp Inc."
-    competency_target_name = "JavaScript Basics"
+    user_id = "12345678-90ab-cdef-1234-567890abcdef"
+    user_name = "Sarah Williams"
+    company_id = "98765432-10fe-dcba-9876-543210fedcba"
+    company_name = "CloudTech Systems"
+    competency_target_name = "React Development"
     status = "fail"
     gap = @{
         missing_skills_map = @{
             microSkills = @(
-                @{ id = "MGS_ES6_Syntax"; name = "ES6+ Syntax" },
-                @{ id = "MGS_Promise_Handling"; name = "Promise Handling" }
+                @{ id = "MGS_React_Hooks"; name = "React Hooks" },
+                @{ id = "MGS_Component_Lifecycle"; name = "Component Lifecycle" }
             )
             nanoSkills = @(
-                @{ id = "MGS_Async_Await"; name = "Async/Await Patterns" }
+                @{ id = "MGS_Custom_Hooks"; name = "Custom Hooks" }
             )
         }
     }
@@ -452,9 +468,9 @@ Write-Host "✅ Skills gap saved: $($gapResponse.skillsGap.gap_id)" -ForegroundC
 # Step 2: Generate learning path
 Write-Host "`nStep 2: Generating learning path..." -ForegroundColor Cyan
 $generateBody = @{
-    userId = "a1b2c3d4-e5f6-4789-a012-345678901234"
-    companyId = "c1d2e3f4-5678-9012-3456-789012345678"
-    competencyTargetName = "JavaScript Basics"
+    userId = "12345678-90ab-cdef-1234-567890abcdef"
+    companyId = "98765432-10fe-dcba-9876-543210fedcba"
+    competencyTargetName = "React Development"
 } | ConvertTo-Json
 
 $generateResponse = Invoke-RestMethod -Uri "http://localhost:5000/api/v1/learning-paths/generate" `
@@ -486,11 +502,11 @@ while ($true) {
 Write-Host "`nStep 4: Verifying results..." -ForegroundColor Cyan
 
 # Check skills expansions
-$expansions = Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-expansions?user_id=a1b2c3d4-e5f6-4789-a012-345678901234" -Method GET
+$expansions = Invoke-RestMethod -Uri "http://localhost:5000/api/v1/skills-expansions?user_id=12345678-90ab-cdef-1234-567890abcdef" -Method GET
 Write-Host "✅ Skills expansions found: $($expansions.length)" -ForegroundColor Green
 
 # Check courses
-$courses = Invoke-RestMethod -Uri "http://localhost:5000/api/v1/courses/user/a1b2c3d4-e5f6-4789-a012-345678901234" -Method GET
+$courses = Invoke-RestMethod -Uri "http://localhost:5000/api/v1/courses/user/12345678-90ab-cdef-1234-567890abcdef" -Method GET
 Write-Host "✅ Courses found: $($courses.length)" -ForegroundColor Green
 
 Write-Host "`n✅ Full flow test completed!" -ForegroundColor Green

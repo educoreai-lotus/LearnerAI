@@ -114,10 +114,10 @@ export default function CompanyDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-text-primary mb-2">
+            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
               {users.length > 0 && users[0].companyName ? `${users[0].companyName} Dashboard` : 'Company Dashboard'}
             </h1>
-            <p className="text-text-secondary">
+            <p className="text-neutral-600 dark:text-neutral-400">
               {users.length > 0 ? `Viewing ${users.length} user${users.length !== 1 ? 's' : ''} and their learning paths` : 'View all users and their learning paths'}
             </p>
           </div>
@@ -130,7 +130,7 @@ export default function CompanyDashboard() {
                 placeholder="Search users..."
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
-                className="flex-1 px-4 py-2 rounded-button bg-bg-secondary border border-emeraldbrand-200 dark:border-emeraldbrand-800 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-cyan"
+                className="flex-1 px-4 py-3 rounded-input bg-white dark:bg-slate-800 border border-neutral-300 dark:border-neutral-600 text-neutral-900 dark:text-neutral-50 placeholder-neutral-400 dark:placeholder-neutral-500 focus:outline-none focus:ring-2 focus:ring-primary-700 dark:focus:ring-primary-400 focus:border-transparent transition-all duration-fast"
               />
               <PrimaryButton onClick={loadCompanyData}>
                 Refresh
@@ -166,12 +166,12 @@ export default function CompanyDashboard() {
           {selectedUser && learningPaths[selectedUser.userId] && learningPaths[selectedUser.userId].length > 0 && (
             <Card className="mt-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-text-primary">
+                <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
                   Learning Paths for {selectedUser.name}
                 </h2>
                 <button
                   onClick={() => setSelectedUser(null)}
-                  className="text-sm text-text-secondary hover:text-text-primary transition-colors"
+                  className="text-sm text-neutral-600 dark:text-neutral-400 hover:text-neutral-900 dark:hover:text-neutral-50 transition-colors duration-fast"
                   type="button"
                 >
                   Close
@@ -183,7 +183,7 @@ export default function CompanyDashboard() {
                 <div className="mb-6">
                   {learningPaths[selectedUser.userId].length <= 5 ? (
                     // Tabs for 5 or fewer paths
-                    <div className="border-b border-emeraldbrand-200 dark:border-emeraldbrand-800">
+                    <div className="border-b border-neutral-200 dark:border-neutral-700">
                       <div className="flex space-x-1 overflow-x-auto">
                         {learningPaths[selectedUser.userId].map((path, index) => {
                           const learningPath = path.learning_path || path.pathData || {};
@@ -193,10 +193,10 @@ export default function CompanyDashboard() {
                             <button
                               key={index}
                               onClick={() => setSelectedPathIndex(index)}
-                              className={`px-4 py-2 text-sm font-medium transition-all duration-300 ease-in-out whitespace-nowrap ${
+                              className={`px-4 py-2 text-sm font-medium transition-all duration-fast whitespace-nowrap ${
                                 isActive
-                                  ? 'border-b-2 border-primary-cyan text-primary-cyan'
-                                  : 'text-text-secondary hover:text-text-primary hover:border-b-2 hover:border-gray-300 dark:hover:border-gray-600'
+                                  ? 'border-b-2 border-primary-700 dark:border-primary-400 text-primary-700 dark:text-primary-400'
+                                  : 'text-neutral-600 dark:text-neutral-300 hover:text-neutral-900 dark:hover:text-neutral-50 hover:border-b-2 hover:border-neutral-300 dark:hover:border-neutral-600'
                               }`}
                               type="button"
                             >
@@ -209,14 +209,14 @@ export default function CompanyDashboard() {
                   ) : (
                     // Dropdown for more than 5 paths
                     <div className="flex items-center gap-3">
-                      <label htmlFor="path-selector" className="text-sm font-medium text-text-primary whitespace-nowrap">
+                      <label htmlFor="path-selector" className="text-sm font-medium text-neutral-900 dark:text-neutral-50 whitespace-nowrap">
                         Select Learning Path:
                       </label>
                       <select
                         id="path-selector"
                         value={selectedPathIndex}
                         onChange={(e) => setSelectedPathIndex(Number(e.target.value))}
-                        className="flex-1 px-4 py-2 rounded-md bg-bg-secondary border border-emeraldbrand-200 dark:border-emeraldbrand-800 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-cyan transition-all duration-300 ease-in-out"
+                        className="flex-1 px-4 py-3 rounded-input bg-white dark:bg-slate-800 border border-neutral-300 dark:border-neutral-600 text-neutral-900 dark:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-700 dark:focus:ring-primary-400 focus:border-transparent transition-all duration-fast"
                       >
                         {learningPaths[selectedUser.userId].map((path, index) => {
                           const learningPath = path.learning_path || path.pathData || {};
@@ -227,7 +227,7 @@ export default function CompanyDashboard() {
                           );
                         })}
                       </select>
-                      <span className="text-sm text-text-secondary whitespace-nowrap">
+                      <span className="text-sm text-neutral-600 dark:text-neutral-400 whitespace-nowrap">
                         {selectedPathIndex + 1} of {learningPaths[selectedUser.userId].length}
                       </span>
                     </div>
@@ -316,11 +316,11 @@ export default function CompanyDashboard() {
                 return (
                   <div>
                     {/* Path Header - Same as User View */}
-                    <div className="mb-6 pb-4 border-b border-emeraldbrand-200 dark:border-emeraldbrand-800">
-                      <h3 className="text-2xl font-bold text-text-primary mb-2">
+                    <div className="mb-6 pb-4 border-b border-neutral-200 dark:border-neutral-700">
+                      <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
                         {pathForTimeline.pathTitle || 'Learning Path'}
                       </h3>
-                      <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                      <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
                         <span>
                           <strong>Course:</strong> {path.competencyTargetName}
                         </span>
@@ -363,7 +363,7 @@ export default function CompanyDashboard() {
           {selectedUser && (!learningPaths[selectedUser.userId] || learningPaths[selectedUser.userId].length === 0) && (
             <Card className="mt-8">
               <div className="text-center py-8">
-                <p className="text-text-muted">No learning paths found for {selectedUser.name}</p>
+                <p className="text-neutral-500 dark:text-neutral-500">No learning paths found for {selectedUser.name}</p>
               </div>
             </Card>
           )}

@@ -201,8 +201,8 @@ export default function UserView() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-text-primary mb-2">My Learning Paths</h1>
-            <p className="text-text-secondary">
+            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">My Learning Paths</h1>
+            <p className="text-neutral-600 dark:text-neutral-400">
               {courses.length > 0 
                 ? `You have ${courses.length} learning path${courses.length !== 1 ? 's' : ''} available`
                 : 'View your personalized learning journey'
@@ -213,14 +213,14 @@ export default function UserView() {
           {/* Course Selection */}
           <Card className="mb-8">
             <div className="flex items-center space-x-4">
-              <label htmlFor="course-select" className="text-text-primary font-medium">
+              <label htmlFor="course-select" className="text-neutral-900 dark:text-neutral-50 font-medium">
                 Select Course:
               </label>
               <select
                 id="course-select"
                 value={selectedCourse || ''}
                 onChange={(e) => handleCourseChange(e.target.value)}
-                className="flex-1 px-4 py-2 rounded-button bg-bg-secondary border border-emeraldbrand-200 dark:border-emeraldbrand-800 text-text-primary focus:outline-none focus:ring-2 focus:ring-primary-cyan"
+                className="flex-1 px-4 py-3 rounded-input bg-white dark:bg-slate-800 border border-neutral-300 dark:border-neutral-600 text-neutral-900 dark:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-700 dark:focus:ring-primary-400 focus:border-transparent transition-all duration-fast"
               >
                 <option value="">-- Select a course --</option>
                 {courses.map((course) => (
@@ -244,11 +244,11 @@ export default function UserView() {
                 </div>
               ) : learningPath ? (
                 <>
-                  <div className="mb-6 pb-4 border-b border-emeraldbrand-200 dark:border-emeraldbrand-800">
-                    <h2 className="text-2xl font-bold text-text-primary mb-2">
+                  <div className="mb-6 pb-4 border-b border-neutral-200 dark:border-neutral-700">
+                    <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
                       {learningPath.pathTitle || 'Learning Path'}
                     </h2>
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-text-secondary">
+                    <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
                       {learningPath.totalDurationHours && (
                         <span>
                           <strong>Total Duration:</strong> {learningPath.totalDurationHours} hours
@@ -278,7 +278,7 @@ export default function UserView() {
                   <LearningPathTimeline path={learningPath} />
                 </>
               ) : (
-                <div className="text-center py-12 text-text-muted">
+                <div className="text-center py-12 text-neutral-500 dark:text-neutral-500">
                   <p>No learning path available for this course.</p>
                   <PrimaryButton
                     variant="primary"
@@ -297,7 +297,7 @@ export default function UserView() {
 
           {!selectedCourse && (
             <Card className="text-center py-12">
-              <p className="text-text-muted">Please select a course to view your learning path</p>
+              <p className="text-neutral-500 dark:text-neutral-500">Please select a course to view your learning path</p>
             </Card>
           )}
         </div>
