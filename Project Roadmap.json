@@ -1,214 +1,257 @@
-[
-  {
-    "phase_name": "Phase 1: Project Initialization & Environment Setup",
-    "tasks": [
-      {
-        "task_description": "[USER-DECISION] Set up repository structure with frontend/, backend/, ai/, docs/, database/, and dataBase/ directories",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Configure local and production environments (skip staging for now)",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Set up centralized, role-based access control (RBAC) system for secrets management",
-        "completed": false
-      },
-      {
-        "task_description": "Create .env.example files and .gitignore to protect sensitive information",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-DECISION] Set up GitHub Actions to automatically run tests on every push, with manual deployments to Vercel and Railway",
-        "completed": false
-      },
-      {
-        "task_description": "[USER-DECISION] Create dataBase/ folder at root level for AI-specific data storage (embeddings, training datasets)",
-        "completed": true
-      },
-      {
-        "task_description": "Configure Vite build tool for React frontend",
-        "completed": true
-      },
-      {
-        "task_description": "Set up Express.js backend structure for Railway deployment",
-        "completed": true
-      },
-      {
-        "task_description": "Configure Supabase connection and database setup",
-        "completed": true
-      }
-    ]
+{
+  "project_summary": {
+    "total_tasks": 44,
+    "completed_tasks": 36,
+    "remaining_tasks": 8,
+    "completion_percentage": 81.8,
+    "last_updated": "2025-11-16"
   },
-  {
-    "phase_name": "Phase 2: Core Features Implementation",
-    "tasks": [
-      {
-        "task_description": "Implement Feature 1: Adaptive Learning Path Generation with 3-prompt flow",
-        "completed": true
+  "phases": [
+    {
+      "phase_name": "Phase 1: Project Initialization & Environment Setup",
+      "phase_completion": {
+        "completed": 7,
+        "total": 9,
+        "percentage": 77.8
       },
-      {
-        "task_description": "Integrate Gemini API (gemini-2.5-flash model)",
-        "completed": true
+      "tasks": [
+        {
+          "task_description": "[USER-DECISION] Set up repository structure with frontend/, backend/, ai/, docs/, database/, and dataBase/ directories",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-DECISION] Configure local and production environments (skip staging for now)",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-DECISION] Set up centralized, role-based access control (RBAC) system for secrets management",
+          "completed": false
+        },
+        {
+          "task_description": "Create .env.example files and .gitignore to protect sensitive information",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-DECISION] Set up GitHub Actions to automatically run tests on every push, with manual deployments to Vercel and Railway",
+          "completed": false
+        },
+        {
+          "task_description": "[USER-DECISION] Create dataBase/ folder at root level for AI-specific data storage (embeddings, training datasets)",
+          "completed": true
+        },
+        {
+          "task_description": "Configure Vite build tool for React frontend",
+          "completed": true
+        },
+        {
+          "task_description": "Set up Express.js backend structure for Railway deployment",
+          "completed": true
+        },
+        {
+          "task_description": "Configure Supabase connection and database setup",
+          "completed": true
+        }
+      ]
+    },
+    {
+      "phase_name": "Phase 2: Core Features Implementation",
+      "phase_completion": {
+        "completed": 8,
+        "total": 8,
+        "percentage": 100.0
       },
-      {
-        "task_description": "Implement asynchronous job processing with status tracking",
-        "completed": true
+      "tasks": [
+        {
+          "task_description": "Implement Feature 1: Adaptive Learning Path Generation with 3-prompt flow",
+          "completed": true
+        },
+        {
+          "task_description": "Integrate Gemini API (gemini-2.5-flash model)",
+          "completed": true
+        },
+        {
+          "task_description": "Implement asynchronous job processing with status tracking",
+          "completed": true
+        },
+        {
+          "task_description": "Create job status endpoints for frontend polling",
+          "completed": true
+        },
+        {
+          "task_description": "Implement Feature 2: Company Registration and Approval Workflow",
+          "completed": true
+        },
+        {
+          "task_description": "Implement Feature 3: Course Completion Detection and Next Course Suggestions via RAG",
+          "completed": true
+        },
+        {
+          "task_description": "Create microservice clients (CourseBuilder, Analytics, Reports, RAG)",
+          "completed": true
+        },
+        {
+          "task_description": "Implement learning path distribution to microservices",
+          "completed": true
+        }
+      ]
+    },
+    {
+      "phase_name": "Phase 3: Database Schema & Migrations",
+      "phase_completion": {
+        "completed": 5,
+        "total": 5,
+        "percentage": 100.0
       },
-      {
-        "task_description": "Create job status endpoints for frontend polling",
-        "completed": true
+      "tasks": [
+        {
+          "task_description": "[USER-REFINEMENT] Rebuild database schema with new tables: learners, companies, skills_gap, skills_expansions, courses, recommendations",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Use competency_target_name as primary key for courses table",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Add companies table with decision_maker_policy and decision_maker JSONB",
+          "completed": true
+        },
+        {
+          "task_description": "Create migration files (init_schema_migration.sql)",
+          "completed": true
+        },
+        {
+          "task_description": "Create sample backup data file (20251112_sample_backup.sql)",
+          "completed": true
+        }
+      ]
+    },
+    {
+      "phase_name": "Phase 4: API Endpoints & Repositories",
+      "phase_completion": {
+        "completed": 5,
+        "total": 5,
+        "percentage": 100.0
       },
-      {
-        "task_description": "Implement Feature 2: Company Registration and Approval Workflow",
-        "completed": true
+      "tasks": [
+        {
+          "task_description": "Create repositories for all new tables (LearnerRepository, CompanyRepository, SkillsGapRepository, etc.)",
+          "completed": true
+        },
+        {
+          "task_description": "Create API routes for CRUD operations on all tables",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Implement ProcessSkillsGapUpdateUseCase for Skills Engine integration",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Implement ProcessCompanyUpdateUseCase for Directory microservice integration",
+          "completed": true
+        },
+        {
+          "task_description": "Update DistributePathUseCase to include skills gap data for Learning Analytics",
+          "completed": true
+        }
+      ]
+    },
+    {
+      "phase_name": "Phase 5: Frontend UI Development",
+      "phase_completion": {
+        "completed": 6,
+        "total": 6,
+        "percentage": 100.0
       },
-      {
-        "task_description": "Implement Feature 3: Course Completion Detection and Next Course Suggestions via RAG",
-        "completed": true
+      "tasks": [
+        {
+          "task_description": "Set up Tailwind CSS with custom theme configuration",
+          "completed": true
+        },
+        {
+          "task_description": "Create reusable UI components (Header, Card, Button, UserCard, LearningPathTimeline, LoadingSpinner)",
+          "completed": true
+        },
+        {
+          "task_description": "Implement Company Dashboard page",
+          "completed": true
+        },
+        {
+          "task_description": "Implement User View page with learning path timeline",
+          "completed": true
+        },
+        {
+          "task_description": "Implement light/dark mode theming",
+          "completed": true
+        },
+        {
+          "task_description": "Integrate logo service for dynamic logo loading",
+          "completed": true
+        }
+      ]
+    },
+    {
+      "phase_name": "Phase 6: Integration & Refinements",
+      "phase_completion": {
+        "completed": 5,
+        "total": 5,
+        "percentage": 100.0
       },
-      {
-        "task_description": "Create microservice clients (CourseBuilder, Analytics, Reports, RAG)",
-        "completed": true
+      "tasks": [
+        {
+          "task_description": "[USER-REFINEMENT] Update all code to use competency_target_name instead of course_id",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Update Skills Engine flow to use competency_name mapping to competency_target_name",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Document that gap from Skills Engine contains lowest layer (micro + nano skills)",
+          "completed": true
+        },
+        {
+          "task_description": "[USER-REFINEMENT] Update Course Builder payload to include: user_id, user_name, company_id, company_name, competency_target_name, learning_path",
+          "completed": true
+        },
+        {
+          "task_description": "Create documentation files (COURSE_BUILDER_JSON.md, LEARNING_ANALYTICS_JSON.md, SKILLS_ENGINE_FLOW_UPDATED.md)",
+          "completed": true
+        }
+      ]
+    },
+    {
+      "phase_name": "Phase 7: Deployment & Testing",
+      "phase_completion": {
+        "completed": 0,
+        "total": 6,
+        "percentage": 0.0
       },
-      {
-        "task_description": "Implement learning path distribution to microservices",
-        "completed": true
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 3: Database Schema & Migrations",
-    "tasks": [
-      {
-        "task_description": "[USER-REFINEMENT] Rebuild database schema with new tables: learners, companies, skills_gap, skills_expansions, courses, recommendations",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Use competency_target_name as primary key for courses table",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Add companies table with decision_maker_policy and decision_maker JSONB",
-        "completed": true
-      },
-      {
-        "task_description": "Create migration files (init_schema_migration.sql)",
-        "completed": true
-      },
-      {
-        "task_description": "Create sample backup data file (20251112_sample_backup.sql)",
-        "completed": true
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 4: API Endpoints & Repositories",
-    "tasks": [
-      {
-        "task_description": "Create repositories for all new tables (LearnerRepository, CompanyRepository, SkillsGapRepository, etc.)",
-        "completed": true
-      },
-      {
-        "task_description": "Create API routes for CRUD operations on all tables",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Implement ProcessSkillsGapUpdateUseCase for Skills Engine integration",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Implement ProcessCompanyUpdateUseCase for Directory microservice integration",
-        "completed": true
-      },
-      {
-        "task_description": "Update DistributePathUseCase to include skills gap data for Learning Analytics",
-        "completed": true
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 5: Frontend UI Development",
-    "tasks": [
-      {
-        "task_description": "Set up Tailwind CSS with custom theme configuration",
-        "completed": true
-      },
-      {
-        "task_description": "Create reusable UI components (Header, Card, Button, UserCard, LearningPathTimeline, LoadingSpinner)",
-        "completed": true
-      },
-      {
-        "task_description": "Implement Company Dashboard page",
-        "completed": true
-      },
-      {
-        "task_description": "Implement User View page with learning path timeline",
-        "completed": true
-      },
-      {
-        "task_description": "Implement light/dark mode theming",
-        "completed": true
-      },
-      {
-        "task_description": "Integrate logo service for dynamic logo loading",
-        "completed": true
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 6: Integration & Refinements",
-    "tasks": [
-      {
-        "task_description": "[USER-REFINEMENT] Update all code to use competency_target_name instead of course_id",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Update Skills Engine flow to use competency_name mapping to competency_target_name",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Document that gap from Skills Engine contains lowest layer (micro + nano skills)",
-        "completed": true
-      },
-      {
-        "task_description": "[USER-REFINEMENT] Update Course Builder payload to include: user_id, user_name, company_id, company_name, competency_target_name, learning_path",
-        "completed": true
-      },
-      {
-        "task_description": "Create documentation files (COURSE_BUILDER_JSON.md, LEARNING_ANALYTICS_JSON.md, SKILLS_ENGINE_FLOW_UPDATED.md)",
-        "completed": true
-      }
-    ]
-  },
-  {
-    "phase_name": "Phase 7: Deployment & Testing",
-    "tasks": [
-      {
-        "task_description": "Deploy backend to Railway",
-        "completed": false
-      },
-      {
-        "task_description": "Deploy frontend to Vercel",
-        "completed": false
-      },
-      {
-        "task_description": "Set up environment variables in production",
-        "completed": false
-      },
-      {
-        "task_description": "Run database migrations in production",
-        "completed": false
-      },
-      {
-        "task_description": "Test end-to-end flow with Skills Engine integration",
-        "completed": false
-      },
-      {
-        "task_description": "Test microservice communication (Course Builder, Learning Analytics, Reports)",
-        "completed": false
-      }
-    ]
-  }
-]
-
+      "tasks": [
+        {
+          "task_description": "Deploy backend to Railway",
+          "completed": false
+        },
+        {
+          "task_description": "Deploy frontend to Vercel",
+          "completed": false
+        },
+        {
+          "task_description": "Set up environment variables in production",
+          "completed": false
+        },
+        {
+          "task_description": "Run database migrations in production",
+          "completed": false
+        },
+        {
+          "task_description": "Test end-to-end flow with Skills Engine integration",
+          "completed": false
+        },
+        {
+          "task_description": "Test microservice communication (Course Builder, Learning Analytics, Reports)",
+          "completed": false
+        }
+      ]
+    }
+  ]
+}
