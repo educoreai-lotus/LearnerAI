@@ -80,12 +80,11 @@ jobs:
         continue-on-error: true
 
       - name: Deploy to Railway
-        uses: bervProject/railway-deploy@master
+        uses: railway-app/railway-deploy@v1
         if: github.ref == 'refs/heads/main'
         with:
-          railway_token: ${{ secrets.RAILWAY_TOKEN }}
+          railway-token: ${{ secrets.RAILWAY_TOKEN }}
           service: ${{ secrets.RAILWAY_SERVICE_ID }}
-          detach: true
 
   notify:
     name: Deployment Notification
