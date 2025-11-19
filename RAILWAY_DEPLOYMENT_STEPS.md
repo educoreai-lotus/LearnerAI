@@ -24,6 +24,16 @@ Before deploying, you need:
 3. Go to **Settings** → **General**
 4. Copy the **Service ID** (it's a UUID)
 
+### Configure Root Directory (IMPORTANT):
+1. Go to your Railway project
+2. Click on your backend service
+3. Go to **Settings** → **General**
+4. Find **Root Directory** setting
+5. Set it to: `backend`
+6. Save the changes
+
+**This tells Railway to use the `backend` folder as the root directory for this service.**
+
 ## Step 2: Add GitHub Secrets
 
 1. Go to your GitHub repository
@@ -84,8 +94,15 @@ After deployment, add these environment variables in Railway:
 
 ## Troubleshooting
 
+### Issue: "Could not find root directory: /backend"
+- **Solution**: Configure the root directory in Railway dashboard:
+  1. Go to Railway Dashboard → Your Service → **Settings** → **General**
+  2. Find **Root Directory** field
+  3. Set it to: `backend` (not `/backend`)
+  4. Save and redeploy
+
 ### Issue: "Unable to resolve action"
-- ✅ Fixed! We updated to `railway-app/railway-deploy@v1`
+- ✅ Fixed! We now use Railway CLI directly
 
 ### Issue: "401 Unauthorized"
 - Check that `RAILWAY_TOKEN` is correct in GitHub secrets
