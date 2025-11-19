@@ -79,12 +79,14 @@ jobs:
         run: npm test
         continue-on-error: true
 
+      - name: Install Railway CLI
+        run: npm install -g @railway/cli
+
       - name: Deploy to Railway
-        uses: railway-app/railway-deploy@v1
         if: github.ref == 'refs/heads/main'
-        with:
-          railway-token: ${{ secrets.RAILWAY_TOKEN }}
-          service: ${{ secrets.RAILWAY_SERVICE_ID }}
+        run: railway up --service ${{ secrets.RAILWAY_SERVICE_ID }} --detach
+        env:
+          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
   notify:
     name: Deployment Notification
