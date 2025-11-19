@@ -57,6 +57,10 @@ export default function Header() {
 
   // Check if a route is active
   const isActiveRoute = (path) => {
+    // Home should be active on both '/' and '/home'
+    if (path === '/home') {
+      return location.pathname === '/' || location.pathname === '/home' || location.pathname.startsWith('/home/');
+    }
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
