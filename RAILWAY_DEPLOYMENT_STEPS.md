@@ -95,11 +95,16 @@ After deployment, add these environment variables in Railway:
 ## Troubleshooting
 
 ### Issue: "Could not find root directory: /backend"
-- **Solution**: Configure the root directory in Railway dashboard:
-  1. Go to Railway Dashboard → Your Service → **Settings** → **General**
+- **Solution 1**: Configure the root directory in Railway dashboard:
+  1. Go to Railway Dashboard → Your Service → **Settings** → **Source**
   2. Find **Root Directory** field
-  3. Set it to: `backend` (not `/backend`)
-  4. Save and redeploy
+  3. Set it to: `backend` (without leading slash)
+  4. Save changes
+
+- **Solution 2**: Ensure `railway.json` is in the correct location:
+  1. The `railway.json` file MUST be in `backend/railway.json` (same directory as `package.json`)
+  2. If it's in the root directory, move it to `backend/`
+  3. Commit and push the change
 
 ### Issue: "Unable to resolve action"
 - ✅ Fixed! We now use Railway CLI directly

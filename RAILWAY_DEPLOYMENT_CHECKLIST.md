@@ -31,8 +31,10 @@
 
 ## Step 3: Verify railway.json Configuration
 
-### 3.1 Check railway.json File
-Open `learnerAI/railway.json` and verify:
+### 3.1 Check railway.json File Location
+**IMPORTANT:** The `railway.json` file MUST be in the `backend/` directory (same directory as `package.json`).
+
+Open `learnerAI/backend/railway.json` and verify:
 
 ```json
 {
