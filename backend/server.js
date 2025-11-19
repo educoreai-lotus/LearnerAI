@@ -255,6 +255,8 @@ if (dependencies.repository && dependencies.jobRepository) {
   app.use('/api/v1/completions', createCompletionsRouter(dependencies));
   app.use('/api/v1/suggestions', createSuggestionsRouter(dependencies));
   app.use('/api/assets', createAssetsRouter());
+  // Logo route for header component
+  app.use('/api/logo', createAssetsRouter());
   
   // New schema endpoints
   app.use('/api/v1/learners', createLearnersRouter(dependencies));

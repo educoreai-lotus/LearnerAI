@@ -99,7 +99,7 @@ export default function CompanyDashboard() {
     return (
       <div className="min-h-screen bg-bg-primary">
         <Header />
-        <div className="pt-24 flex items-center justify-center">
+        <div className="flex items-center justify-center">
           <LoadingSpinner size="lg" />
         </div>
       </div>
@@ -110,7 +110,7 @@ export default function CompanyDashboard() {
     <div className="min-h-screen bg-bg-primary">
       <Header />
       
-      <main className="pt-24 pb-12">
+      <main className="pb-12">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">

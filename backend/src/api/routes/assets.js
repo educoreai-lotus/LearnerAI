@@ -27,25 +27,78 @@ export function createAssetsRouter() {
     // }
 
     try {
-      // Serve logo from assets folder
-      const logoPath = path.join(__dirname, '../../../assets', `logo-${theme}.svg`);
+      // Serve logo from assets folder - try JPG first (with space in filename)
+      const logoPathJpg = path.join(__dirname, '../../../assets', `${theme} logo.jpg`);
       const fs = await import('fs/promises');
       
       try {
-        // Check if file exists and serve it
-        await fs.access(logoPath);
-        const fileContent = await fs.readFile(logoPath, 'utf8');
-        res.setHeader('Content-Type', 'image/svg+xml');
+        // Check if JPG file exists and serve it
+        await fs.access(logoPathJpg);
+        const fileContent = await fs.readFile(logoPathJpg);
+        res.setHeader('Content-Type', 'image/jpeg');
         res.setHeader('Cache-Control', 'public, max-age=3600');
         res.send(fileContent);
-      } catch (fileError) {
-        // File doesn't exist, return 404
-        res.status(404).json({ 
-          message: 'Logo not found',
-          expectedPath: logoPath,
-          theme,
-          hint: 'Add logo-light.svg and logo-dark.svg to backend/assets/'
-        });
+      } catch (jpgError) {
+        // If JPG doesn't exist, try SVG fallback
+        try {
+          const logoPathSvg = path.join(__dirname, '../../../assets', `logo-${theme}.svg`);
+          await fs.access(logoPathSvg);
+          const fileContent = await fs.readFile(logoPathSvg, 'utf8');
+          res.setHeader('Content-Type', 'image/svg+xml');
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.send(fileContent);
+        } catch (svgError) {
+          // File doesn't exist, return 404
+          res.status(404).json({ 
+            message: 'Logo not found',
+            theme,
+            hint: `Add "${theme} logo.jpg" or "logo-${theme}.svg" to backend/assets/`
+          });
+        }
+      }
+    } catch (error) {
+      console.error('Error serving logo:', error);
+      res.status(500).json({ error: 'Failed to serve logo' });
+    }
+  });
+
+  /**
+   * GET /:theme (when mounted at /api/logo)
+   * Serves the logo image based on theme (for header component)
+   * Path param: theme (light|dark)
+   */
+  router.get('/:theme', async (req, res) => {
+    const theme = req.params.theme || 'light';
+    const fs = await import('fs/promises');
+
+    try {
+      // Serve logo from assets folder - try JPG first (with space in filename)
+      const logoPathJpg = path.join(__dirname, '../../../assets', `${theme} logo.jpg`);
+      
+      try {
+        // Check if JPG file exists and serve it
+        await fs.access(logoPathJpg);
+        const fileContent = await fs.readFile(logoPathJpg);
+        res.setHeader('Content-Type', 'image/jpeg');
+        res.setHeader('Cache-Control', 'public, max-age=3600');
+        res.send(fileContent);
+      } catch (jpgError) {
+        // If JPG doesn't exist, try SVG fallback
+        try {
+          const logoPathSvg = path.join(__dirname, '../../../assets', `logo-${theme}.svg`);
+          await fs.access(logoPathSvg);
+          const fileContent = await fs.readFile(logoPathSvg, 'utf8');
+          res.setHeader('Content-Type', 'image/svg+xml');
+          res.setHeader('Cache-Control', 'public, max-age=3600');
+          res.send(fileContent);
+        } catch (svgError) {
+          // File doesn't exist, return 404
+          res.status(404).json({ 
+            message: 'Logo not found',
+            theme,
+            hint: `Add "${theme} logo.jpg" or "logo-${theme}.svg" to backend/assets/`
+          });
+        }
       }
     } catch (error) {
       console.error('Error serving logo:', error);
