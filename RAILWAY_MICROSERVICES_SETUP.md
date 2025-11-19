@@ -230,7 +230,7 @@ COURSE_BUILDER_TOKEN=sk_xxxxx
 **What's already done:**
 - ✅ Endpoints are implemented
 - ✅ CORS is configured
-- ✅ Health check exists
+- ✅ Health check exis
 - ✅ Error handling is in place
 
 ---
