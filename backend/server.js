@@ -41,6 +41,7 @@ import { createSkillsExpansionsRouter } from './src/api/routes/skillsExpansions.
 import { createRecommendationsRouter } from './src/api/routes/recommendations.js';
 import { createSeedRouter } from './src/api/routes/seed.js';
 import { createEndpointsRouter } from './src/api/routes/endpoints.js';
+import { createAiRouter } from './src/api/routes/ai.js';
 import { 
   fillDirectoryData, 
   fillSkillsEngineData, 
@@ -242,6 +243,12 @@ app.get('/api', (req, res) => {
       skillsGaps: '/api/v1/skills-gaps',
       skillsExpansions: '/api/v1/skills-expansions',
       recommendations: '/api/v1/recommendations',
+      ai: {
+        query: '/api/v1/ai/query',
+        chat: '/api/v1/ai/chat',
+        models: '/api/v1/ai/models',
+        health: '/api/v1/ai/health'
+      },
       seed: '/api/seed'
     }
   });
@@ -267,6 +274,9 @@ if (dependencies.repository && dependencies.jobRepository) {
   
   // Seed endpoints (for testing)
   app.use('/api/seed', createSeedRouter(dependencies));
+  
+  // AI query endpoints
+  app.use('/api/v1/ai', createAiRouter(dependencies));
   
   // Fill-fields endpoint (for microservices to request data from LearnerAI)
   app.use('/api', createEndpointsRouter(dependencies));

@@ -185,6 +185,82 @@ http://localhost:5000/api/v1
 
 ---
 
+### 6. AI Query (`/api/v1/ai`)
+
+#### Query AI
+- **POST** `/api/v1/ai/query`
+- **Body:**
+  ```json
+  {
+    "prompt": "string (required) - The prompt/question to send to AI",
+    "model": "string (optional) - Model name (default: gemini-2.5-flash)",
+    "temperature": "number (optional) - 0.0 to 1.0 (default: 0.7)",
+    "maxTokens": "number (optional) - Max response tokens (default: 2048)",
+    "format": "string (optional) - 'json' or 'text' (default: 'text')"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "response": "string or object - AI response",
+    "model": "string - Model used",
+    "duration": "string - Response time",
+    "timestamp": "ISO timestamp"
+  }
+  ```
+
+#### Chat with AI (Conversation Context)
+- **POST** `/api/v1/ai/chat`
+- **Body:**
+  ```json
+  {
+    "messages": [
+      { "role": "user", "content": "Hello" },
+      { "role": "assistant", "content": "Hi there!" },
+      { "role": "user", "content": "What is JavaScript?" }
+    ],
+    "model": "string (optional)",
+    "temperature": "number (optional)"
+  }
+  ```
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "response": "string - AI response",
+    "model": "string - Model used",
+    "duration": "string - Response time",
+    "timestamp": "ISO timestamp"
+  }
+  ```
+
+#### Get Available Models
+- **GET** `/api/v1/ai/models`
+- **Response:**
+  ```json
+  {
+    "success": true,
+    "current": "gemini-2.5-flash",
+    "available": ["gemini-2.5-flash", "gemini-2.5-pro", ...],
+    "note": "Model availability depends on your API key and region"
+  }
+  ```
+
+#### AI Health Check
+- **GET** `/api/v1/ai/health`
+- **Response:**
+  ```json
+  {
+    "status": "healthy",
+    "service": "Gemini AI",
+    "model": "gemini-2.5-flash",
+    "timestamp": "ISO timestamp"
+  }
+  ```
+
+---
+
 ## Example Requests
 
 ### Create a Learner
@@ -239,6 +315,39 @@ curl -X POST http://localhost:5000/api/v1/skills-gaps \
     },
     "exam_status": "fail"
   }'
+```
+
+### Query AI
+```bash
+curl -X POST http://localhost:5000/api/v1/ai/query \
+  -H "Content-Type: application/json" \
+  -d '{
+    "prompt": "Explain what JavaScript closures are in simple terms",
+    "format": "text"
+  }'
+```
+
+### Chat with AI (with context)
+```bash
+curl -X POST http://localhost:5000/api/v1/ai/chat \
+  -H "Content-Type: application/json" \
+  -d '{
+    "messages": [
+      { "role": "user", "content": "What is React?" },
+      { "role": "assistant", "content": "React is a JavaScript library for building user interfaces..." },
+      { "role": "user", "content": "How does it compare to Vue.js?" }
+    ]
+  }'
+```
+
+### Get Available AI Models
+```bash
+curl -X GET http://localhost:5000/api/v1/ai/models
+```
+
+### Check AI Health
+```bash
+curl -X GET http://localhost:5000/api/v1/ai/health
 ```
 
 ## Response Format
