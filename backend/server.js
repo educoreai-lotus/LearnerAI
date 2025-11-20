@@ -125,11 +125,24 @@ try {
     serviceToken: process.env.REPORTS_TOKEN,
     httpClient
   });
-  const ragClient = new RAGMicroserviceClient({
-    baseUrl: process.env.RAG_MICROSERVICE_URL || 'http://localhost:5004',
-    serviceToken: process.env.RAG_MICROSERVICE_TOKEN,
-    httpClient
-  });
+  // Initialize RAG client (optional - will use mock responses if not configured)
+  let ragClient = null;
+  if (process.env.RAG_MICROSERVICE_URL) {
+    try {
+      ragClient = new RAGMicroserviceClient({
+        baseUrl: process.env.RAG_MICROSERVICE_URL,
+        serviceToken: process.env.RAG_MICROSERVICE_TOKEN || null,
+        httpClient
+      });
+      console.log('✅ RAG Microservice client initialized');
+    } catch (error) {
+      console.warn('⚠️  RAG Microservice client initialization failed:', error.message);
+      console.warn('⚠️  RAG features will use mock responses');
+      ragClient = null;
+    }
+  } else {
+    console.warn('⚠️  RAG_MICROSERVICE_URL not set - RAG features will use mock responses');
+  }
 
   // Initialize services
   const notificationService = new NotificationService();
@@ -153,10 +166,10 @@ try {
     skillsGapRepository
   });
 
-  // Initialize Feature 3 use cases
+  // Initialize Feature 3 use cases (RAG client is optional)
   const generateCourseSuggestionsUseCase = new GenerateCourseSuggestionsUseCase({
     geminiClient,
-    ragClient,
+    ragClient: ragClient || null, // Allow null RAG client
     promptLoader,
     suggestionsRepository,
     learningPathRepository: repository,

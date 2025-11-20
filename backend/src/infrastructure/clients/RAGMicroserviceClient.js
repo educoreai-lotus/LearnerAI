@@ -9,13 +9,15 @@ export class RAGMicroserviceClient {
     if (!baseUrl) {
       throw new Error('RAG Microservice base URL is required');
     }
+    // Make serviceToken optional - will use mock responses if not provided
     if (!serviceToken) {
-      throw new Error('RAG Microservice service token is required');
+      console.warn('⚠️  RAG Microservice token not provided - will use mock responses');
     }
     
     this.baseUrl = baseUrl.replace(/\/$/, ''); // Remove trailing slash
     this.serviceToken = serviceToken;
     this.httpClient = httpClient || new HttpClient();
+    this.enabled = !!serviceToken; // Track if RAG service is actually available
   }
 
   /**
@@ -25,6 +27,12 @@ export class RAGMicroserviceClient {
    * @returns {Promise<Object>} Enhanced suggestions from RAG
    */
   async processCourseSuggestions(suggestions, completionData) {
+    // If token not provided, return mock response immediately
+    if (!this.enabled) {
+      console.warn('⚠️  RAG Microservice not configured - using mock response');
+      return this._getMockRAGResponse(suggestions);
+    }
+
     const url = `${this.baseUrl}/api/v1/suggestions/process`;
     
     const payload = {
@@ -63,6 +71,12 @@ export class RAGMicroserviceClient {
    * @returns {Promise<Object>} Enhanced suggestions
    */
   async getEnhancedSuggestions(userId, competencyTargetName) {
+    // If token not provided, return null (caller should handle)
+    if (!this.enabled) {
+      console.warn('⚠️  RAG Microservice not configured - cannot get enhanced suggestions');
+      return null;
+    }
+
     const url = `${this.baseUrl}/api/v1/suggestions/${userId}/${competencyTargetName}`;
     
     try {
