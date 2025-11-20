@@ -94,12 +94,17 @@ jobs:
           sleep 30
 
       - name: Seed database with mock data
-        if: github.ref == 'refs/heads/main' && secrets.RAILWAY_URL != ''
+        if: github.ref == 'refs/heads/main'
         run: |
-          echo "🌱 Seeding database with mock data..."
-          curl -X POST "${{ secrets.RAILWAY_URL }}/api/seed" \
-            -H "Content-Type: application/json" \
-            || echo "⚠️  Seeding failed. Please seed manually: curl -X POST ${{ secrets.RAILWAY_URL }}/api/seed"
+          if [ -z "${{ secrets.RAILWAY_URL }}" ]; then
+            echo "⚠️  RAILWAY_URL secret not set. Skipping automatic seeding."
+            echo "Please seed manually: curl -X POST YOUR_RAILWAY_URL/api/seed"
+          else
+            echo "🌱 Seeding database with mock data..."
+            curl -X POST "${{ secrets.RAILWAY_URL }}/api/seed" \
+              -H "Content-Type: application/json" \
+              || echo "⚠️  Seeding failed. Please seed manually: curl -X POST ${{ secrets.RAILWAY_URL }}/api/seed"
+          fi
         continue-on-error: true
 
   notify:
