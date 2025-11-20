@@ -87,6 +87,26 @@ jobs:
         env:
           RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
 
+      - name: Wait for Railway deployment
+        if: github.ref == 'refs/heads/main'
+        run: |
+          echo "Waiting 30 seconds for Railway deployment to be ready..."
+          sleep 30
+
+      - name: Seed database with mock data
+        if: github.ref == 'refs/heads/main'
+        run: |
+          if [ -z "${{ secrets.RAILWAY_URL }}" ]; then
+            echo "⚠️  RAILWAY_URL secret not set. Skipping automatic seeding."
+            echo "Please seed manually: curl -X POST YOUR_RAILWAY_URL/api/seed"
+          else
+            echo "🌱 Seeding database with mock data..."
+            curl -X POST "${{ secrets.RAILWAY_URL }}/api/seed" \
+              -H "Content-Type: application/json" \
+              || echo "⚠️  Seeding failed. Please seed manually: curl -X POST ${{ secrets.RAILWAY_URL }}/api/seed"
+          fi
+        continue-on-error: true
+
   notify:
     name: Deployment Notification
     runs-on: ubuntu-latest
