@@ -19,6 +19,7 @@ import { SkillsGapRepository } from './src/infrastructure/repositories/SkillsGap
 import { SkillsExpansionRepository } from './src/infrastructure/repositories/SkillsExpansionRepository.js';
 import { RecommendationRepository } from './src/infrastructure/repositories/RecommendationRepository.js';
 import { CompanyRepository } from './src/infrastructure/repositories/CompanyRepository.js';
+import { ApprovalRepository } from './src/infrastructure/repositories/ApprovalRepository.js';
 import { PromptLoader } from './src/infrastructure/prompts/PromptLoader.js';
 import { NotificationService } from './src/infrastructure/services/NotificationService.js';
 
@@ -26,6 +27,8 @@ import { NotificationService } from './src/infrastructure/services/NotificationS
 import { DistributePathUseCase } from './src/application/useCases/DistributePathUseCase.js';
 import { DetectCompletionUseCase } from './src/application/useCases/DetectCompletionUseCase.js';
 import { GenerateCourseSuggestionsUseCase } from './src/application/useCases/GenerateCourseSuggestionsUseCase.js';
+import { CheckApprovalPolicyUseCase } from './src/application/useCases/CheckApprovalPolicyUseCase.js';
+import { RequestPathApprovalUseCase } from './src/application/useCases/RequestPathApprovalUseCase.js';
 
 // API Routes
 import { createLearningPathsRouter } from './src/api/routes/learningPaths.js';
@@ -42,6 +45,7 @@ import { createRecommendationsRouter } from './src/api/routes/recommendations.js
 import { createSeedRouter } from './src/api/routes/seed.js';
 import { createEndpointsRouter } from './src/api/routes/endpoints.js';
 import { createAiRouter } from './src/api/routes/ai.js';
+import { createApprovalsRouter } from './src/api/routes/approvals.js';
 import { 
   fillDirectoryData, 
   fillSkillsEngineData, 
@@ -108,6 +112,10 @@ try {
     process.env.SUPABASE_URL,
     process.env.SUPABASE_KEY
   );
+  const approvalRepository = new ApprovalRepository(
+    process.env.SUPABASE_URL,
+    process.env.SUPABASE_KEY
+  );
 
   // Initialize microservice clients
   const courseBuilderClient = new CourseBuilderClient({
@@ -150,14 +158,12 @@ try {
   // Initialize prompt loader
   const promptLoader = new PromptLoader();
 
-  // Initialize Feature 2 use cases (disabled - repositories deleted with old schema)
-  // const checkApprovalPolicyUseCase = new CheckApprovalPolicyUseCase({ companyRepository });
-  // const requestPathApprovalUseCase = new RequestPathApprovalUseCase({
-  //   approvalRepository,
-  //   notificationService
-  // });
-  const checkApprovalPolicyUseCase = null;
-  const requestPathApprovalUseCase = null;
+  // Initialize Feature 2 use cases (Approval Workflow)
+  const checkApprovalPolicyUseCase = new CheckApprovalPolicyUseCase({ companyRepository });
+  const requestPathApprovalUseCase = new RequestPathApprovalUseCase({
+    approvalRepository,
+    notificationService
+  });
   const distributePathUseCase = new DistributePathUseCase({
     courseBuilderClient,
     analyticsClient,
@@ -193,6 +199,7 @@ try {
     skillsExpansionRepository,
     recommendationRepository,
     companyRepository,
+    approvalRepository,
     courseBuilderClient,
     analyticsClient,
     reportsClient,
@@ -284,6 +291,9 @@ if (dependencies.repository && dependencies.jobRepository) {
   app.use('/api/v1/skills-gaps', createSkillsGapsRouter(dependencies));
   app.use('/api/v1/skills-expansions', createSkillsExpansionsRouter(dependencies));
   app.use('/api/v1/recommendations', createRecommendationsRouter(dependencies));
+  
+  // Approval workflow endpoints
+  app.use('/api/v1/approvals', createApprovalsRouter(dependencies));
   
   // Seed endpoints (for testing)
   app.use('/api/seed', createSeedRouter(dependencies));

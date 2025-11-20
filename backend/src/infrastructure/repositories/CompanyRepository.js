@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { Company } from '../../domain/entities/Company.js';
 
 /**
  * CompanyRepository
@@ -123,17 +124,19 @@ export class CompanyRepository {
   }
 
   /**
-   * Map database record to company object
+   * Map database record to Company entity
    */
   _mapToCompany(record) {
-    return {
-      company_id: record.company_id,
-      company_name: record.company_name,
-      approval_policy: record.approval_policy,
-      decision_maker: record.decision_maker,
-      created_at: record.created_at,
-      last_modified_at: record.last_modified_at
-    };
+    // Map database column names to Company entity properties
+    // Database: decision_maker_policy -> Entity: approvalPolicy
+    return new Company({
+      companyId: record.company_id,
+      companyName: record.company_name,
+      approvalPolicy: record.decision_maker_policy || record.approval_policy || 'auto',
+      decisionMaker: record.decision_maker,
+      createdAt: record.created_at,
+      updatedAt: record.last_modified_at
+    });
   }
 }
 
