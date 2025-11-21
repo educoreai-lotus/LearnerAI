@@ -456,10 +456,12 @@ app.use((req, res) => {
 });
 
 // Start server
-app.listen(PORT, () => {
-  console.log(`🚀 LearnerAI Backend server running on port ${PORT}`);
-  console.log(`📍 Health check: http://localhost:${PORT}/health`);
-  console.log(`📍 API endpoint: http://localhost:${PORT}/api`);
+// Listen on 0.0.0.0 to accept connections from Railway/external sources
+const HOST = process.env.HOST || '0.0.0.0';
+app.listen(PORT, HOST, () => {
+  console.log(`🚀 LearnerAI Backend server running on ${HOST}:${PORT}`);
+  console.log(`📍 Health check: http://${HOST}:${PORT}/health`);
+  console.log(`📍 API endpoint: http://${HOST}:${PORT}/api`);
 });
 
 export default app;
