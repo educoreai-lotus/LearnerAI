@@ -2,11 +2,13 @@ export default {
   testEnvironment: 'node',
   transform: {},
   moduleFileExtensions: ['js', 'json'],
-  testMatch: ['**/__tests__/**/*.test.js'],
+  testMatch: [
+    '**/tests/**/*.test.js'
+  ],
   collectCoverageFrom: [
     'src/**/*.js',
     '!src/**/*.test.js',
-    '!src/**/__tests__/**'
+    '!tests/**'
   ],
   coverageDirectory: 'coverage',
   verbose: true

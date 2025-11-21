@@ -1,11 +1,10 @@
 import express from 'express';
 
-const router = express.Router();
-
 /**
  * Initialize routes with dependencies
  */
 export function createJobsRouter(dependencies) {
+  const router = express.Router();
   const { jobRepository } = dependencies;
 
   /**

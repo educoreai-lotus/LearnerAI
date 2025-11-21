@@ -386,14 +386,59 @@ export async function fillManagementReportingData(data, { courseRepository, skil
 
 /**
  * Assessment Handler
- * Handles requests from the assessment service
+ * Handles requests from the assessment service (Skills Engine)
  * Payload must contain an "action" field indicating the type of action
  */
 async function assessmentHandler(payload, dependencies) {
-  const { courseRepository, skillsGapRepository } = dependencies;
+  const { courseRepository, skillsGapRepository, learnerRepository, companyRepository } = dependencies;
   const { action } = payload;
   
-  // Process based on action type
+  // Handle skills gap updates from Skills Engine
+  if (action === 'update_skills_gap') {
+    const { ProcessSkillsGapUpdateUseCase } = await import('../../application/useCases/ProcessSkillsGapUpdateUseCase.js');
+    const processGapUpdateUseCase = new ProcessSkillsGapUpdateUseCase({
+      skillsGapRepository,
+      learnerRepository,
+      companyRepository
+    });
+    
+    // Extract skills gap data from payload
+    const {
+      user_id,
+      user_name,
+      company_id,
+      company_name,
+      competency_target_name,
+      competency_name,
+      exam_status,
+      status,
+      gap
+    } = payload;
+    
+    // Process the skills gap update
+    const skillsGap = await processGapUpdateUseCase.execute({
+      user_id,
+      user_name,
+      company_id,
+      company_name,
+      competency_target_name: competency_target_name || competency_name,
+      competency_name,
+      status: status || (exam_status === 'PASS' ? 'pass' : exam_status === 'FAIL' ? 'fail' : null),
+      gap
+    });
+    
+    return {
+      success: true,
+      request_id: `assessment_${Date.now()}`,
+      action: action,
+      data: {
+        message: 'Skills gap updated successfully',
+        skillsGap
+      }
+    };
+  }
+  
+  // Default: Process other assessment actions
   const result = {
     success: true,
     request_id: `assessment_${Date.now()}`,
