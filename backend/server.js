@@ -62,8 +62,18 @@ const PORT = process.env.PORT || 5000;
 
 // Middleware
 app.use(cors());
-app.use(express.json());
-app.use(express.urlencoded({ extended: true }));
+
+// Handle aborted requests gracefully
+app.use((req, res, next) => {
+  req.on('aborted', () => {
+    console.warn('⚠️  Request aborted:', req.method, req.path);
+  });
+  next();
+});
+
+// Body parser with size limits to prevent memory issues
+app.use(express.json({ limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 
 // Initialize dependencies
 let dependencies;
@@ -397,11 +407,44 @@ app.get('/', (req, res) => {
 
 // Error handling middleware
 app.use((err, req, res, next) => {
-  console.error('Error:', err.stack);
-  res.status(500).json({ 
-    error: 'Something went wrong!',
-    message: err.message 
-  });
+  // Handle request aborted errors gracefully
+  if (err.code === 'ECONNABORTED' || 
+      err.message === 'request aborted' || 
+      err.message?.includes('aborted') ||
+      err.type === 'request.aborted' ||
+      err.name === 'BadRequestError') {
+    // Don't log as error if client aborted - it's usually intentional
+    if (!res.headersSent) {
+      return res.status(499).json({ 
+        error: 'Request aborted',
+        message: 'The request was cancelled by the client'
+      });
+    }
+    return; // Response already sent, just return
+  }
+
+  // Handle body parsing errors
+  if (err.type === 'entity.parse.failed' || err.type === 'entity.too.large') {
+    console.error('Body parsing error:', err.message);
+    if (!res.headersSent) {
+      return res.status(400).json({ 
+        error: 'Invalid request body',
+        message: err.message 
+      });
+    }
+    return;
+  }
+
+  // Log other errors
+  console.error('Error:', err.stack || err.message);
+  
+  // Only send response if headers haven't been sent
+  if (!res.headersSent) {
+    res.status(err.status || 500).json({ 
+      error: 'Something went wrong!',
+      message: err.message 
+    });
+  }
 });
 
 // 404 handler

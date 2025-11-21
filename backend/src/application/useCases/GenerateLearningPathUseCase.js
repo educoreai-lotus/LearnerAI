@@ -90,6 +90,7 @@ export class GenerateLearningPathUseCase {
       // Fetch the latest skills_raw_data from database (after Skills Engine update)
       let skillsRawData = null;
       let gapId = null;
+      let examStatus = null;
       if (this.skillsGapRepository) {
         try {
           // Get the most recent skills gap for this user and competency
@@ -103,7 +104,8 @@ export class GenerateLearningPathUseCase {
             }
             // Get gap_id for linking to skills_expansions
             gapId = relevantGap.gap_id;
-            console.log(`✅ Found gap_id: ${gapId} for linking to skills_expansions`);
+            examStatus = relevantGap.exam_status; // Get exam_status to check if this is after failure
+            console.log(`✅ Found gap_id: ${gapId} for linking to skills_expansions, exam_status: ${examStatus}`);
           }
         } catch (error) {
           console.warn(`⚠️  Could not fetch skills_raw_data from database: ${error.message}`);
@@ -312,11 +314,16 @@ export class GenerateLearningPathUseCase {
         status: 'completed'
       });
 
-      // Save learning path
+      // Check if this is an update after exam failure (course already exists + exam_status is 'fail')
+      const existingCourse = await this.repository.getLearningPath(competencyTargetName);
+      const isUpdateAfterFailure = existingCourse && examStatus === 'fail';
+
+      // Save learning path (updates if exists, creates if new)
       const savedPath = await this.repository.saveLearningPath(learningPath);
 
       // Check approval policy and handle distribution
-      await this._handlePathDistribution(savedPath, skillsGap);
+      // Skip approval if this is an update after exam failure
+      await this._handlePathDistribution(savedPath, skillsGap, isUpdateAfterFailure);
 
       // Mark job as completed
       await this.jobRepository.updateJob(job.id, {
@@ -339,9 +346,24 @@ export class GenerateLearningPathUseCase {
 
   /**
    * Handle path distribution based on approval policy
+   * @param {LearningPath} learningPath - The learning path to distribute
+   * @param {Object} skillsGap - The skills gap data
+   * @param {boolean} isUpdateAfterFailure - If true, this is an update after exam failure (skip approval)
    * @private
    */
-  async _handlePathDistribution(learningPath, skillsGap) {
+  async _handlePathDistribution(learningPath, skillsGap, isUpdateAfterFailure = false) {
+    // Special case: Skip approval workflow for updates after exam failure
+    if (isUpdateAfterFailure) {
+      console.log(`🔄 Learning path ${learningPath.id} is an update after exam failure - skipping approval workflow`);
+      if (this.distributePathUseCase) {
+        await this.distributePathUseCase.execute(learningPath.id);
+        console.log(`✅ Learning path ${learningPath.id} distributed automatically (update after failure, no approval needed)`);
+      } else {
+        console.warn('⚠️  DistributePathUseCase not configured, skipping distribution');
+      }
+      return;
+    }
+
     if (!this.checkApprovalPolicyUseCase) {
       console.warn('⚠️  Approval workflow not configured, skipping distribution');
       return;

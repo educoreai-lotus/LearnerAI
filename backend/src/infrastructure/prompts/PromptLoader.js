@@ -7,17 +7,23 @@ const __dirname = dirname(__filename);
 
 /**
  * PromptLoader
- * Loads prompt templates from the ai/prompts/ directory
+ * Loads prompt templates from backend/src/infrastructure/prompts/prompts/ directory
  */
 export class PromptLoader {
   constructor(promptsDirectory = null) {
     if (promptsDirectory) {
       this.promptsDirectory = promptsDirectory;
     } else {
-      // From backend/src/infrastructure/prompts/ 
-      // Go up 4 levels: prompts -> infrastructure -> src -> backend -> project root
-      // Then into ai/prompts/
-      this.promptsDirectory = join(__dirname, '../../../../ai/prompts');
+      // Prompts are stored in backend/src/infrastructure/prompts/prompts/
+      // This works for both local development and Railway deployment
+      const localPromptsDir = join(__dirname, 'prompts');
+      
+      // Use environment variable if set, otherwise use local directory
+      if (process.env.PROMPTS_DIRECTORY) {
+        this.promptsDirectory = process.env.PROMPTS_DIRECTORY;
+      } else {
+        this.promptsDirectory = localPromptsDir;
+      }
     }
   }
 
@@ -30,6 +36,7 @@ export class PromptLoader {
     // Try different file extensions
     const extensions = ['.txt', '.md', ''];
     
+    // Try primary directory first
     for (const ext of extensions) {
       try {
         const filePath = join(this.promptsDirectory, `${promptName}${ext}`);
@@ -41,7 +48,7 @@ export class PromptLoader {
       }
     }
 
-    throw new Error(`Prompt file not found: ${promptName}`);
+    throw new Error(`Prompt file not found: ${promptName} (searched in: ${this.promptsDirectory})`);
   }
 
   /**

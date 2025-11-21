@@ -400,7 +400,12 @@ Learning Path Completed
 - `GenerateLearningPathUseCase` triggers distribution
 
 **2. Check Approval Policy**
-- Query company's `decision_maker_policy`:
+- **First, check if this is an update after exam failure:**
+  - If course already exists AND `exam_status === 'fail'`:
+    - ✅ Skip approval workflow entirely
+    - ✅ Automatically distribute to Course Builder
+    - ✅ No notification sent to decision maker
+- **Otherwise, query company's `decision_maker_policy`:**
   - `"auto"` → Skip approval, proceed directly
   - `"manual"` → Require approval
 

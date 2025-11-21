@@ -60,6 +60,12 @@ This document contains all requirements for the Learner AI Microservice, organiz
      - If rejected: Receive feedback from decision maker with correction requirements
      - Store approval status and feedback in database
      - Handle Course Builder service failures with mock data rollback
+   - **Exception: Updates After Exam Failure**:
+     - If learning path is an **update** after exam failure (course already exists + `exam_status: 'fail'`):
+       - **Skip approval workflow entirely** (even for manual approval companies)
+       - **Automatically distribute** to Course Builder without decision maker approval
+       - **No notification** sent to decision maker
+       - This exception only applies to path updates, not new path creation
 
 3. **Analytics & Reporting Updates**
    - Update Learning Analytics microservice with generated path data

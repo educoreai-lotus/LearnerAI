@@ -125,6 +125,26 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 
 -- =====================================================
+-- Table: path_approvals
+-- Description: Stores approval requests for learning paths when manual approval is required
+-- =====================================================
+CREATE TABLE IF NOT EXISTS path_approvals (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    learning_path_id TEXT NOT NULL, -- References courses.competency_target_name (TEXT, not UUID)
+    company_id UUID NOT NULL,
+    decision_maker_id UUID NOT NULL,
+    status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+    feedback TEXT,
+    approved_at TIMESTAMP WITH TIME ZONE,
+    rejected_at TIMESTAMP WITH TIME ZONE,
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
+    CONSTRAINT fk_path_approvals_company FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
+    -- Note: No FK constraint on learning_path_id because it references courses.competency_target_name (TEXT)
+    -- The learning_path_id is actually the competency_target_name from the courses table
+);
+
+-- =====================================================
 -- Indexes for Performance
 -- =====================================================
 
@@ -162,6 +182,14 @@ CREATE INDEX IF NOT EXISTS idx_recommendations_suggested_courses ON recommendati
     CREATE INDEX IF NOT EXISTS idx_jobs_user_status ON jobs(user_id, status);
     CREATE INDEX IF NOT EXISTS idx_jobs_type_status ON jobs(type, status);
     CREATE INDEX IF NOT EXISTS idx_jobs_competency_target_name ON jobs(competency_target_name);
+
+-- Path approvals indexes
+CREATE INDEX IF NOT EXISTS idx_path_approvals_id ON path_approvals(id);
+CREATE INDEX IF NOT EXISTS idx_path_approvals_learning_path_id ON path_approvals(learning_path_id);
+CREATE INDEX IF NOT EXISTS idx_path_approvals_company_id ON path_approvals(company_id);
+CREATE INDEX IF NOT EXISTS idx_path_approvals_decision_maker_id ON path_approvals(decision_maker_id);
+CREATE INDEX IF NOT EXISTS idx_path_approvals_status ON path_approvals(status);
+CREATE INDEX IF NOT EXISTS idx_path_approvals_pending ON path_approvals(decision_maker_id, status) WHERE status = 'pending';
 
 -- =====================================================
 -- Trigger Function: Update last_modified_at
@@ -234,6 +262,12 @@ CREATE TRIGGER trigger_jobs_updated_at
     FOR EACH ROW
     EXECUTE FUNCTION update_updated_at_column();
 
+DROP TRIGGER IF EXISTS trigger_path_approvals_updated_at ON path_approvals;
+CREATE TRIGGER trigger_path_approvals_updated_at
+    BEFORE UPDATE ON path_approvals
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();
+
 -- =====================================================
 -- Migration Complete
 -- =====================================================
@@ -248,6 +282,7 @@ CREATE TRIGGER trigger_jobs_updated_at
 -- 5. courses - Learning paths/courses (competency_target_name as primary key)
 -- 6. recommendations - Course recommendations
 -- 7. jobs - Background job processing status
+-- 8. path_approvals - Approval requests for learning paths (manual approval workflow)
 --
--- Total: 7 tables
+-- Total: 8 tables
 

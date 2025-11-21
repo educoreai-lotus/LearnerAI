@@ -171,6 +171,11 @@ Frontend (Vercel) → Railway API → [Supabase | Gemini API | External Microser
      - Wait for decision maker response
      - If approved: Update approval record, proceed to Course Builder
      - If rejected: Update approval record with feedback, store feedback for corrections
+   - **Exception: Updates After Exam Failure**:
+     - If path is an **update** after exam failure (existing course + `exam_status: 'fail'`):
+       - Skip approval workflow (even for manual approval companies)
+       - Automatically distribute to Course Builder
+       - No approval request created, no notification sent
 
 4. **Distribution Process**
    - **To Course Builder**: Send complete learning path via REST API (only after approval if manual)
