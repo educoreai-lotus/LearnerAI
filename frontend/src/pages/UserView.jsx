@@ -120,7 +120,10 @@ export default function UserView() {
                   order: step.order || step.step || (startIndex + moduleSteps.indexOf(step) + 1)
                 })),
                 module_title: module.module_title || module.name,
-                estimated_duration_hours: module.estimated_duration_hours || module.duration
+                description: module.description || module.module_description,
+                estimated_duration_hours: module.estimated_duration_hours || module.duration,
+                // Preserve subtopics from database structure
+                subtopics: module.subtopics || []
               };
             });
           } else {
@@ -145,7 +148,10 @@ export default function UserView() {
             ...module,
             module_order: module.module_order || index + 1,
             module_title: module.module_title || module.name,
-            estimated_duration_hours: module.estimated_duration_hours || module.duration
+            description: module.description || module.module_description,
+            estimated_duration_hours: module.estimated_duration_hours || module.duration,
+            // Preserve subtopics from database structure
+            subtopics: module.subtopics || []
           }));
         }
         
@@ -157,6 +163,8 @@ export default function UserView() {
         setLearningPath({
           id: course.competency_target_name || course.competencyTargetName || competencyTargetName,
           pathTitle: pathData.pathTitle || pathData.path_title || course.pathTitle || 'Learning Path',
+          pathGoal: pathData.pathGoal || pathData.path_goal,
+          pathDescription: pathData.pathDescription || pathData.path_description,
           totalDurationHours: pathData.totalDurationHours || pathData.total_duration_hours || pathData.estimatedCompletion,
           estimatedCompletion: pathData.estimatedCompletion,
           totalSteps: pathData.totalSteps || steps.length,
@@ -248,6 +256,21 @@ export default function UserView() {
                     <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
                       {learningPath.pathTitle || 'Learning Path'}
                     </h2>
+                    
+                    {/* Path Goal */}
+                    {learningPath.pathGoal && (
+                      <p className="text-base font-medium text-primary-700 dark:text-primary-400 mb-2">
+                        {learningPath.pathGoal}
+                      </p>
+                    )}
+                    
+                    {/* Path Description */}
+                    {learningPath.pathDescription && (
+                      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 leading-relaxed">
+                        {learningPath.pathDescription}
+                      </p>
+                    )}
+                    
                     <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
                       {learningPath.totalDurationHours && (
                         <span>

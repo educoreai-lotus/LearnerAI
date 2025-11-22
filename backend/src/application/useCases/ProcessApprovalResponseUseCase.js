@@ -33,26 +33,47 @@ export class ProcessApprovalResponseUseCase {
       throw new Error(`Approval ${approvalId} not found`);
     }
 
-    if (!approval.isPending()) {
-      throw new Error(`Approval ${approvalId} is already ${approval.status}`);
+    // Allow approval if status is 'pending' or 'changes_requested'
+    // Reject if already 'approved' or 'rejected'
+    if (approval.isApproved()) {
+      throw new Error(`Approval ${approvalId} is already approved`);
     }
+    if (approval.isRejected()) {
+      throw new Error(`Approval ${approvalId} is already rejected`);
+    }
+    // Allow processing if pending or changes_requested
 
     // Update approval status
     const updatedApproval = await this.approvalRepository.updateApproval(approvalId, {
       status: response,
       feedback,
       approvedAt: response === 'approved' ? new Date().toISOString() : null,
-      rejectedAt: (response === 'rejected' || response === 'changes_requested') ? new Date().toISOString() : null
+      rejectedAt: response === 'rejected' ? new Date().toISOString() : null,
+      changesRequestedAt: response === 'changes_requested' ? new Date().toISOString() : null
     });
 
-    // If approved, distribute the learning path
-    if (response === 'approved' && this.distributePathUseCase) {
-      try {
-        await this.distributePathUseCase.execute(approval.learningPathId);
-        console.log(`✅ Learning path ${approval.learningPathId} distributed after approval`);
-      } catch (error) {
-        console.error(`⚠️  Failed to distribute path after approval: ${error.message}`);
-        // Don't fail the approval process if distribution fails
+    // If approved, update the course's approved field and distribute the learning path
+    if (response === 'approved') {
+      // Update the course's approved field to true
+      if (this.courseRepository) {
+        try {
+          await this.courseRepository.updateCourse(approval.learningPathId, { approved: true });
+          console.log(`✅ Course ${approval.learningPathId} marked as approved in courses table`);
+        } catch (error) {
+          console.error(`⚠️  Failed to update course approved status: ${error.message}`);
+          // Don't fail the approval process if course update fails
+        }
+      }
+
+      // Distribute the learning path
+      if (this.distributePathUseCase) {
+        try {
+          await this.distributePathUseCase.execute(approval.learningPathId);
+          console.log(`✅ Learning path ${approval.learningPathId} distributed after approval`);
+        } catch (error) {
+          console.error(`⚠️  Failed to distribute path after approval: ${error.message}`);
+          // Don't fail the approval process if distribution fails
+        }
       }
     }
 

@@ -1,11 +1,14 @@
-Act as a Senior Learning Path Advisor and Career Progression Specialist. You have been provided with information about a learner who has successfully completed a course. Your task is to analyze their completion and generate intelligent, personalized suggestions for follow-up courses or advanced training that will help them progress in their learning journey.
-
+Act as a Senior Learning Path Advisor and Career Progression Specialist. 
+You have been provided with information about a learner who has successfully completed a course.
+Your task is to analyze their completion and generate intelligent, personalized suggestions 
+for follow-up courses or advanced training that will help them progress in their learning journey.
+ 
 INPUT DATA (Course Completion Information):
 
 Learner Information:
 - User ID: {userId}
 - Completed Competency: {completedCourseId} (competency_target_name)
-- Course Completion Date: {completionDate}
+- Course Completion Date: {completionDate}                                                                              
 
 Completed Course Details:
 {completedCourseDetails}
@@ -56,7 +59,8 @@ OUTPUT FORMAT: Return a single JSON object containing personalized course sugges
     "next_milestone": "Master machine learning fundamentals",
     "estimated_time_to_next_level": "3-6 months with suggested courses"
   },
-  "personalization_notes": "Based on your strong performance in data analysis, these courses will help you transition to more advanced roles. Focus on ML fundamentals first, then system architecture."
+  "personalization_notes": "Based on your strong performance in data analysis, these courses will help you 
+  transition to more advanced roles. Focus on ML fundamentals first, then system architecture."
 }
 
 GUIDELINES:

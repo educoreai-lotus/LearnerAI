@@ -31,17 +31,44 @@ export default function ApprovalReview() {
     try {
       setLoading(true);
       setError(null);
+      console.log('Loading approval details for:', approvalId);
       const response = await api.getApprovalDetails(approvalId);
+      console.log('Approval response:', response);
+      
+      if (!response || !response.approval) {
+        console.error('Invalid response structure:', response);
+        setError('notfound');
+        return;
+      }
+      
       setApprovalData(response.approval);
+      
+      if (!response.learningPath) {
+        console.error('Learning path not found in response:', response);
+        setError('notfound');
+        return;
+      }
+      
       setLearningPath(response.learningPath);
     } catch (err) {
       console.error('Failed to load approval:', err);
-      if (err.message.includes('403') || err.message.includes('permission')) {
+      console.error('Error details:', {
+        message: err.message,
+        stack: err.stack,
+        response: err.response
+      });
+      
+      if (err.message.includes('403') || err.message.includes('permission') || err.message.includes('Forbidden')) {
         setError('unauthorized');
-      } else if (err.message.includes('404') || err.message.includes('not found')) {
+      } else if (err.message.includes('404') || err.message.includes('not found') || err.message.includes('Not Found')) {
         setError('notfound');
       } else {
         setError('general');
+        // Show error toast
+        setToast({ 
+          message: `Failed to load approval: ${err.message}`, 
+          type: 'error' 
+        });
       }
     } finally {
       setLoading(false);
@@ -121,7 +148,7 @@ export default function ApprovalReview() {
     );
   }
 
-  if (error === 'notfound' || !approvalData || !learningPath) {
+  if (error === 'notfound') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800">
         <Header />
@@ -132,7 +159,65 @@ export default function ApprovalReview() {
                 Approval Not Found
               </h2>
               <p className="text-neutral-600 dark:text-neutral-300 mb-6">
-                The approval request you're looking for doesn't exist or has been removed.
+                The approval request you're looking for doesn't exist or the learning path hasn't been created yet.
+              </p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+                Approval ID: {approvalId}
+              </p>
+              <PrimaryButton onClick={() => navigate('/approvals')}>
+                View All Approvals
+              </PrimaryButton>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (error === 'general') {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <div className="text-center py-8">
+              <h2 className="text-2xl font-bold text-red-600 dark:text-red-400 mb-4">
+                Error Loading Approval
+              </h2>
+              <p className="text-neutral-600 dark:text-neutral-300 mb-6">
+                There was an error loading the approval details. Please try again.
+              </p>
+              <div className="flex gap-3 justify-center">
+                <PrimaryButton onClick={loadApprovalData}>
+                  Retry
+                </PrimaryButton>
+                <PrimaryButton onClick={() => navigate('/approvals')} variant="secondary">
+                  Back to Approvals
+                </PrimaryButton>
+              </div>
+            </div>
+          </Card>
+        </div>
+      </div>
+    );
+  }
+
+  if (!approvalData || !learningPath) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800">
+        <Header />
+        <div className="container mx-auto px-4 py-8">
+          <Card>
+            <div className="text-center py-8">
+              <h2 className="text-2xl font-bold text-neutral-800 dark:text-neutral-200 mb-4">
+                Missing Data
+              </h2>
+              <p className="text-neutral-600 dark:text-neutral-300 mb-6">
+                {!approvalData && 'Approval data is missing.'}
+                {!learningPath && 'Learning path data is missing.'}
+              </p>
+              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
+                Approval ID: {approvalId}
               </p>
               <PrimaryButton onClick={() => navigate('/approvals')}>
                 View All Approvals
@@ -166,15 +251,34 @@ export default function ApprovalReview() {
         </div>
       )}
 
-      <div className="container mx-auto px-4 py-8">
-        <div className="mb-6">
-          <h1 className="text-3xl font-bold text-primary-800 dark:text-primary-300 mb-2">
-            Learning Path Review
-          </h1>
-          <p className="text-neutral-600 dark:text-neutral-400">
-            Review the learning path and make your decision
-          </p>
-        </div>
+      <main className="pb-12">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          {/* Page Header */}
+          <div className="mb-8">
+            <div className="flex items-center gap-4 mb-4">
+              <button
+                onClick={() => navigate('/approvals')}
+                className="group flex items-center gap-3 px-5 py-3 bg-white dark:bg-slate-800 border-2 border-primary-600 dark:border-primary-500 text-primary-700 dark:text-primary-400 rounded-lg font-semibold shadow-md hover:shadow-lg hover:bg-primary-50 dark:hover:bg-slate-700 hover:border-primary-700 dark:hover:border-primary-400 transition-all duration-200 transform hover:-translate-y-0.5"
+                type="button"
+              >
+                <svg 
+                  className="w-5 h-5 transition-transform duration-200 group-hover:-translate-x-1" 
+                  fill="none" 
+                  stroke="currentColor" 
+                  viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+                </svg>
+                <span>Back to Approvals</span>
+              </button>
+            </div>
+            <h1 className="text-3xl font-bold text-primary-800 dark:text-primary-300 mb-2">
+              Learning Path Review
+            </h1>
+            <p className="text-neutral-600 dark:text-neutral-400">
+              Review the learning path and make your decision
+            </p>
+          </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
@@ -255,7 +359,11 @@ export default function ApprovalReview() {
                           </p>
                           <ul className="list-disc list-inside text-sm text-neutral-700 dark:text-neutral-300 space-y-1">
                             {module.subtopics.map((subtopic, subIndex) => (
-                              <li key={subIndex}>{subtopic}</li>
+                              <li key={subIndex}>
+                                {typeof subtopic === 'string' 
+                                  ? subtopic 
+                                  : subtopic.title || subtopic.name || JSON.stringify(subtopic)}
+                              </li>
                             ))}
                           </ul>
                         </div>
@@ -376,7 +484,8 @@ export default function ApprovalReview() {
             </Card>
           </div>
         </div>
-      </div>
+        </div>
+      </main>
       {toast && (
         <Toast
           message={toast.message}

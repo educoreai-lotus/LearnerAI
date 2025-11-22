@@ -73,6 +73,9 @@ CREATE TABLE IF NOT EXISTS skills_expansions (
 -- =====================================================
 -- Table: courses
 -- Description: Stores learning paths/courses for learners
+-- Note: competency_target_name is the primary key, making it globally unique.
+-- This design assumes each competency name is unique across all users.
+-- If multiple users need the same competency, consider adding a composite key (user_id, competency_target_name).
 -- =====================================================
 CREATE TABLE IF NOT EXISTS courses (
     competency_target_name TEXT PRIMARY KEY NOT NULL,
@@ -140,9 +143,9 @@ CREATE TABLE IF NOT EXISTS path_approvals (
     changes_requested_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
-    CONSTRAINT fk_path_approvals_company FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
-    -- Note: No FK constraint on learning_path_id because it references courses.competency_target_name (TEXT)
-    -- The learning_path_id is actually the competency_target_name from the courses table
+    CONSTRAINT fk_path_approvals_company FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE,
+    -- Foreign key constraint to courses table using competency_target_name
+    CONSTRAINT fk_path_approvals_learning_path FOREIGN KEY (learning_path_id) REFERENCES courses(competency_target_name) ON DELETE CASCADE
 );
 
 -- =====================================================
@@ -286,4 +289,9 @@ CREATE TRIGGER trigger_path_approvals_updated_at
 -- 8. path_approvals - Approval requests for learning paths (manual approval workflow)
 --
 -- Total: 8 tables
+--
+-- Schema Improvements:
+-- - Added foreign key constraint: path_approvals.learning_path_id -> courses.competency_target_name
+--   This ensures referential integrity and prevents orphaned approval records.
+--   The constraint uses ON DELETE CASCADE to automatically clean up approvals when courses are deleted.
 

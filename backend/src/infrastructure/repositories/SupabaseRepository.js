@@ -60,12 +60,22 @@ export class SupabaseRepository {
    */
   async saveLearningPath(learningPath) {
     // Store complete path data in JSONB format (courses table uses learning_path column)
+    // Convert from internal format (pathMetadata may have snake_case from prompt) to camelCase for storage
+    const pathMetadata = learningPath.pathMetadata || {};
     const pathData = {
-      pathSteps: learningPath.pathSteps,
-      pathTitle: learningPath.pathTitle,
-      totalDurationHours: learningPath.totalDurationHours,
-      learningModules: learningPath.pathMetadata?.learning_modules || null,
-      metadata: learningPath.pathMetadata,
+      // Use camelCase format for storage (convert from snake_case if needed)
+      pathTitle: learningPath.pathTitle || pathMetadata.pathTitle || pathMetadata.path_title,
+      pathGoal: pathMetadata.pathGoal || pathMetadata.path_goal,
+      pathDescription: pathMetadata.pathDescription || pathMetadata.path_description,
+      totalDurationHours: learningPath.totalDurationHours || pathMetadata.totalDurationHours || pathMetadata.total_estimated_duration_hours,
+      difficulty: pathMetadata.difficulty,
+      audience: pathMetadata.audience,
+      learning_modules: pathMetadata.learning_modules || learningPath.pathSteps || [],
+      estimatedCompletion: pathMetadata.estimatedCompletion || pathMetadata.estimated_completion,
+      metadata: pathMetadata.metadata || {},
+      // Keep legacy fields for backward compatibility
+      pathSteps: learningPath.pathSteps || pathMetadata.learning_modules || [],
+      learningModules: pathMetadata.learning_modules || null,
       companyId: learningPath.companyId,
       competencyTargetName: learningPath.competencyTargetName,
       status: learningPath.status

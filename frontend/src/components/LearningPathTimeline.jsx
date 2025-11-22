@@ -191,6 +191,29 @@ export default function LearningPathTimeline({ path, className = '' }) {
                       </div>
                     </div>
                   )}
+
+                  {/* Show subtopics if available (from database learning_modules structure) */}
+                  {module.subtopics && module.subtopics.length > 0 && (
+                    <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700">
+                      <h4 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50 mb-3">
+                        Subtopics ({module.subtopics.length})
+                      </h4>
+                      <div className="space-y-3">
+                        {module.subtopics.map((subtopic, subIndex) => (
+                          <div key={subIndex} className="bg-neutral-50 dark:bg-slate-800/50 rounded-lg p-4 border border-neutral-200 dark:border-neutral-700">
+                            <h5 className="text-sm font-semibold text-neutral-900 dark:text-neutral-50 mb-1">
+                              {subtopic.title || `Subtopic ${subIndex + 1}`}
+                            </h5>
+                            {subtopic.description && (
+                              <p className="text-sm text-neutral-600 dark:text-neutral-400 leading-relaxed">
+                                {subtopic.description}
+                              </p>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   
                 </div>
               </div>

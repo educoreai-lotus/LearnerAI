@@ -43,18 +43,48 @@ export default function CompanyDashboard() {
             const coursesResponse = await api.getCoursesByUser(userId);
             const courses = coursesResponse.courses || coursesResponse || [];
             
+            // Debug logging
+            console.log(`CompanyDashboard - Courses for user ${userId}:`, {
+              coursesCount: courses.length,
+              courses: courses.map(c => ({
+                competency: c.competency_target_name,
+                hasLearningPath: !!c.learning_path,
+                learningPathType: typeof c.learning_path,
+                learningPathKeys: c.learning_path && typeof c.learning_path === 'object' ? Object.keys(c.learning_path) : 'N/A',
+                approved: c.approved
+              }))
+            });
+            
             // Transform courses to learning path format
-            const userPaths = courses.map(course => ({
-              userId: course.user_id || userId,
-              user_id: course.user_id || userId,
-              competencyTargetName: course.competency_target_name || course.competencyTargetName,
-              pathTitle: course.learning_path?.pathTitle || course.learning_path?.path_title || course.competency_target_name,
-              pathData: course.learning_path,
-              learning_path: course.learning_path,
-              status: course.learning_path?.status || 'active',
-              totalDurationHours: course.learning_path?.totalDurationHours || course.learning_path?.total_duration_hours,
-              approved: course.approved
-            }));
+            const userPaths = courses.map(course => {
+              // Parse learning_path if it's a string
+              let learningPathData = course.learning_path;
+              if (typeof learningPathData === 'string') {
+                try {
+                  learningPathData = JSON.parse(learningPathData);
+                } catch (e) {
+                  console.warn(`Failed to parse learning_path for course ${course.competency_target_name}:`, e);
+                  learningPathData = {};
+                }
+              }
+              
+              // If learning_path is null or undefined, create empty object
+              if (!learningPathData) {
+                learningPathData = {};
+              }
+              
+              return {
+                userId: course.user_id || userId,
+                user_id: course.user_id || userId,
+                competencyTargetName: course.competency_target_name || course.competencyTargetName,
+                pathTitle: learningPathData.pathTitle || learningPathData.path_title || course.competency_target_name,
+                pathData: learningPathData,
+                learning_path: learningPathData,
+                status: learningPathData.status || 'active',
+                totalDurationHours: learningPathData.totalDurationHours || learningPathData.total_duration_hours,
+                approved: course.approved
+              };
+            });
             
             pathMap[userId] = userPaths;
             
@@ -251,9 +281,26 @@ export default function CompanyDashboard() {
                   }
                 }
                 
+                // If pathData is null or undefined, set to empty object
+                if (!pathData || typeof pathData !== 'object') {
+                  pathData = {};
+                }
+                
                 // Extract steps and modules (same logic as UserView)
                 const steps = pathData.steps || pathData.pathSteps || [];
-                let modules = pathData.learning_modules || pathData.learningModules || [];
+                let modules = pathData.learning_modules || pathData.learningModules || pathData.modules || [];
+                
+                // Debug logging
+                console.log('CompanyDashboard - Path data for', path.competencyTargetName, ':', {
+                  hasPathData: !!pathData,
+                  pathDataKeys: pathData ? Object.keys(pathData) : [],
+                  stepsCount: steps.length,
+                  modulesCount: modules.length,
+                  learning_modules: pathData.learning_modules,
+                  learningModules: pathData.learningModules,
+                  modules: pathData.modules,
+                  rawLearningPath: path.learning_path
+                });
                 
                 // Map steps to modules for display (same as UserView)
                 if (steps.length > 0) {
@@ -274,7 +321,10 @@ export default function CompanyDashboard() {
                           order: step.order || step.step || (startIndex + moduleSteps.indexOf(step) + 1)
                         })),
                         module_title: module.module_title || module.name,
-                        estimated_duration_hours: module.estimated_duration_hours || module.duration
+                        description: module.description || module.module_description,
+                        estimated_duration_hours: module.estimated_duration_hours || module.duration,
+                        // Preserve subtopics from database structure
+                        subtopics: module.subtopics || []
                       };
                     });
                   } else {
@@ -288,22 +338,32 @@ export default function CompanyDashboard() {
                       order: step.step || step.order || index + 1,
                       module_order: step.step || step.order || index + 1,
                       stepId: step.stepId || step.step_id,
+                      skills: step.skills || [],
                       steps: [step]
                     }));
                   }
                 } else if (modules.length > 0) {
+                  // Only modules, no steps - ensure proper structure
                   modules = modules.map((module, index) => ({
                     ...module,
                     module_order: module.module_order || index + 1,
                     module_title: module.module_title || module.name,
-                    estimated_duration_hours: module.estimated_duration_hours || module.duration
+                    description: module.description || module.module_description,
+                    estimated_duration_hours: module.estimated_duration_hours || module.duration,
+                    // Include subtopics if available
+                    subtopics: module.subtopics || []
                   }));
                 }
+                
+                // Check if learning path has content
+                const hasContent = modules.length > 0 || steps.length > 0 || Object.keys(pathData).length > 0;
                 
                 // Create path object for LearningPathTimeline component
                 const pathForTimeline = {
                   id: path.competencyTargetName,
                   pathTitle: pathData.pathTitle || pathData.path_title || path.pathTitle || 'Learning Path',
+                  pathGoal: pathData.pathGoal || pathData.path_goal,
+                  pathDescription: pathData.pathDescription || pathData.path_description,
                   totalDurationHours: pathData.totalDurationHours || pathData.total_duration_hours,
                   estimatedCompletion: pathData.estimatedCompletion,
                   totalSteps: pathData.totalSteps || steps.length,
@@ -313,6 +373,26 @@ export default function CompanyDashboard() {
                   approved: path.approved
                 };
                 
+                // If no content, show message
+                if (!hasContent) {
+                  return (
+                    <div>
+                      <div className="mb-6 pb-4 border-b border-neutral-200 dark:border-neutral-700">
+                        <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
+                          {path.competencyTargetName}
+                        </h3>
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400">
+                          Learning path is being generated. Please check back later.
+                        </p>
+                      </div>
+                      <div className="text-center py-8 text-neutral-500 dark:text-neutral-500">
+                        <p>Learning path content is not available yet.</p>
+                        <p className="text-sm mt-2">The learning path may still be processing or hasn't been generated.</p>
+                      </div>
+                    </div>
+                  );
+                }
+                
                 return (
                   <div>
                     {/* Path Header - Same as User View */}
@@ -320,6 +400,21 @@ export default function CompanyDashboard() {
                       <h3 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
                         {pathForTimeline.pathTitle || 'Learning Path'}
                       </h3>
+                      
+                      {/* Path Goal */}
+                      {pathForTimeline.pathGoal && (
+                        <p className="text-base font-medium text-primary-700 dark:text-primary-400 mb-2">
+                          {pathForTimeline.pathGoal}
+                        </p>
+                      )}
+                      
+                      {/* Path Description */}
+                      {pathForTimeline.pathDescription && (
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 leading-relaxed">
+                          {pathForTimeline.pathDescription}
+                        </p>
+                      )}
+                      
                       <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
                         <span>
                           <strong>Course:</strong> {path.competencyTargetName}

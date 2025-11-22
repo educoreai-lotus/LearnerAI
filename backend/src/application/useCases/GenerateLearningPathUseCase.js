@@ -582,19 +582,34 @@ export class GenerateLearningPathUseCase {
 
     // Check for new format with learning_modules
     if (parsed.learning_modules && Array.isArray(parsed.learning_modules)) {
+      // The prompt generates snake_case format (path_title, total_estimated_duration_hours)
+      // We preserve both formats for compatibility and convert to camelCase for storage
+      const pathTitle = parsed.path_title || parsed.pathTitle || 'Personalized Learning Path';
+      const totalDuration = parsed.total_estimated_duration_hours || parsed.totalDurationHours || null;
+      
       return {
-        path_title: parsed.path_title || 'Personalized Learning Path',
+        // Keep snake_case for internal processing (used by LearningPath entity)
+        path_title: pathTitle,
         learner_id: parsed.learner_id || userId,
-        total_estimated_duration_hours: parsed.total_estimated_duration_hours || null,
-        learning_modules: parsed.learning_modules
+        total_estimated_duration_hours: totalDuration,
+        learning_modules: parsed.learning_modules,
+        // Add camelCase versions for storage (used by repository)
+        pathTitle: pathTitle,
+        pathGoal: parsed.pathGoal || parsed.path_goal,
+        pathDescription: parsed.pathDescription || parsed.path_description,
+        totalDurationHours: totalDuration,
+        difficulty: parsed.difficulty,
+        audience: parsed.audience,
+        estimatedCompletion: parsed.estimatedCompletion || parsed.estimated_completion,
+        metadata: parsed.metadata
       };
     }
 
     // Fallback to old format with pathSteps
     return {
       pathSteps: this._extractPathSteps(parsed),
-      path_title: parsed.path_title || 'Learning Path',
-      total_estimated_duration_hours: parsed.total_estimated_duration_hours || null
+      path_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
+      total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null
     };
   }
 
