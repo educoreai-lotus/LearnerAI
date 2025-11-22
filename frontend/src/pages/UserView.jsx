@@ -201,7 +201,7 @@ export default function UserView() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">My Learning Paths</h1>
+            <h1 className="text-3xl font-bold text-primary-800 dark:text-primary-300 mb-2">My Learning Paths</h1>
             <p className="text-neutral-600 dark:text-neutral-400">
               {courses.length > 0 
                 ? `You have ${courses.length} learning path${courses.length !== 1 ? 's' : ''} available`

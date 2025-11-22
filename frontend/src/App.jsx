@@ -1,31 +1,25 @@
-import { useState } from 'react';
+import { Routes, Route, Navigate } from 'react-router-dom';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
+import ViewSwitcher from './components/ViewSwitcher';
 import CompanyDashboard from './pages/CompanyDashboard';
 import UserView from './pages/UserView';
+import ApprovalReview from './pages/ApprovalReview';
+import ApprovalsList from './pages/ApprovalsList';
 
 function App() {
-  const [currentView, setCurrentView] = useState('user'); // 'user' or 'company'
-
   return (
     <AppProvider>
       <div className="App">
         <Header />
-        {currentView === 'company' ? (
-          <CompanyDashboard />
-        ) : (
-          <UserView />
-        )}
-        
-        {/* View Toggle (for development) */}
-        <div className="fixed bottom-4 right-4 z-50">
-          <button
-            onClick={() => setCurrentView(currentView === 'user' ? 'company' : 'user')}
-            className="px-4 py-2 bg-primary-700 dark:bg-primary-600 text-white rounded-button text-sm hover:bg-primary-800 dark:hover:bg-primary-700 transition-all duration-fast"
-          >
-            Switch to {currentView === 'user' ? 'Company' : 'User'} View
-          </button>
-        </div>
+        <Routes>
+          <Route path="/" element={<UserView />} />
+          <Route path="/company" element={<CompanyDashboard />} />
+          <Route path="/approvals" element={<ApprovalsList />} />
+          <Route path="/approvals/:approvalId" element={<ApprovalReview />} />
+          <Route path="*" element={<Navigate to="/" replace />} />
+        </Routes>
+        <ViewSwitcher />
       </div>
     </AppProvider>
   );

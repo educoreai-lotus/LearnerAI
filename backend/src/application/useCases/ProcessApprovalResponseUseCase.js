@@ -1,24 +1,30 @@
 /**
  * ProcessApprovalResponseUseCase
- * Handles approval or rejection of learning paths
+ * Handles approval, rejection, or changes request for learning paths
  */
 export class ProcessApprovalResponseUseCase {
-  constructor({ approvalRepository, distributePathUseCase, notificationService }) {
+  constructor({ approvalRepository, distributePathUseCase, notificationService, courseRepository, learnerRepository }) {
     this.approvalRepository = approvalRepository;
     this.distributePathUseCase = distributePathUseCase;
     this.notificationService = notificationService;
+    this.courseRepository = courseRepository;
+    this.learnerRepository = learnerRepository;
   }
 
   /**
-   * Process approval response (approve or reject)
+   * Process approval response (approve, reject, or request changes)
    * @param {string} approvalId
-   * @param {string} response - 'approved' or 'rejected'
-   * @param {string} feedback - Optional feedback message
+   * @param {string} response - 'approved', 'rejected', or 'changes_requested'
+   * @param {string} feedback - Optional feedback message (required for changes_requested)
    * @returns {Promise<PathApproval>}
    */
   async execute(approvalId, response, feedback = null) {
-    if (!['approved', 'rejected'].includes(response)) {
-      throw new Error('Response must be "approved" or "rejected"');
+    if (!['approved', 'rejected', 'changes_requested'].includes(response)) {
+      throw new Error('Response must be "approved", "rejected", or "changes_requested"');
+    }
+
+    if (response === 'changes_requested' && !feedback) {
+      throw new Error('Feedback is required when requesting changes');
     }
 
     // Get the approval
@@ -36,7 +42,7 @@ export class ProcessApprovalResponseUseCase {
       status: response,
       feedback,
       approvedAt: response === 'approved' ? new Date().toISOString() : null,
-      rejectedAt: response === 'rejected' ? new Date().toISOString() : null
+      rejectedAt: (response === 'rejected' || response === 'changes_requested') ? new Date().toISOString() : null
     });
 
     // If approved, distribute the learning path
@@ -50,13 +56,33 @@ export class ProcessApprovalResponseUseCase {
       }
     }
 
-    // Send notification
-    if (this.notificationService) {
+    // Send notification to requester (if approved or changes_requested)
+    if (this.notificationService && (response === 'approved' || response === 'changes_requested')) {
       try {
-        // Get learning path data for notification (would need to fetch from repository)
-        await this.notificationService.sendApprovalStatus(updatedApproval, {
-          id: approval.learningPathId
-        });
+        // Get learning path and requester info for notification
+        if (this.courseRepository && this.learnerRepository) {
+          const course = await this.courseRepository.getCourseById(approval.learningPathId);
+          if (course) {
+            const learner = await this.learnerRepository.getLearnerById(course.user_id);
+            
+            // Parse learning path data
+            let learningPathData = course.learning_path;
+            if (typeof learningPathData === 'string') {
+              try {
+                learningPathData = JSON.parse(learningPathData);
+              } catch (e) {
+                learningPathData = {};
+              }
+            }
+
+            // Send notification (email would need to be available from learner or Directory)
+            await this.notificationService.sendApprovalStatus(
+              updatedApproval.toJSON(),
+              learningPathData,
+              learner ? { name: learner.user_name, email: null } : null
+            );
+          }
+        }
       } catch (error) {
         console.error('Failed to send approval status notification:', error.message);
         // Don't fail the process if notification fails

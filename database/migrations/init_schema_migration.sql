@@ -133,10 +133,11 @@ CREATE TABLE IF NOT EXISTS path_approvals (
     learning_path_id TEXT NOT NULL, -- References courses.competency_target_name (TEXT, not UUID)
     company_id UUID NOT NULL,
     decision_maker_id UUID NOT NULL,
-    status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected')) DEFAULT 'pending',
+    status TEXT NOT NULL CHECK (status IN ('pending', 'approved', 'rejected', 'changes_requested')) DEFAULT 'pending',
     feedback TEXT,
     approved_at TIMESTAMP WITH TIME ZONE,
     rejected_at TIMESTAMP WITH TIME ZONE,
+    changes_requested_at TIMESTAMP WITH TIME ZONE,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     updated_at TIMESTAMP WITH TIME ZONE DEFAULT NOW() NOT NULL,
     CONSTRAINT fk_path_approvals_company FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE

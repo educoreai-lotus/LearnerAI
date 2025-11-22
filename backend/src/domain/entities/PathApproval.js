@@ -8,10 +8,11 @@ export class PathApproval {
     learningPathId,
     companyId,
     decisionMakerId,
-    status = 'pending', // 'pending', 'approved', 'rejected'
+    status = 'pending', // 'pending', 'approved', 'rejected', 'changes_requested'
     feedback = null,
     approvedAt = null,
     rejectedAt = null,
+    changesRequestedAt = null,
     createdAt,
     updatedAt
   }) {
@@ -19,8 +20,8 @@ export class PathApproval {
       throw new Error('PathApproval requires learningPathId, companyId, and decisionMakerId');
     }
 
-    if (!['pending', 'approved', 'rejected'].includes(status)) {
-      throw new Error('status must be "pending", "approved", or "rejected"');
+    if (!['pending', 'approved', 'rejected', 'changes_requested'].includes(status)) {
+      throw new Error('status must be "pending", "approved", "rejected", or "changes_requested"');
     }
 
     this.id = id;
@@ -31,6 +32,7 @@ export class PathApproval {
     this.feedback = feedback;
     this.approvedAt = approvedAt;
     this.rejectedAt = rejectedAt;
+    this.changesRequestedAt = changesRequestedAt;
     this.createdAt = createdAt || new Date().toISOString();
     this.updatedAt = updatedAt || new Date().toISOString();
   }
@@ -47,6 +49,10 @@ export class PathApproval {
     return this.status === 'rejected';
   }
 
+  isChangesRequested() {
+    return this.status === 'changes_requested';
+  }
+
   toJSON() {
     return {
       id: this.id,
@@ -57,6 +63,7 @@ export class PathApproval {
       feedback: this.feedback,
       approvedAt: this.approvedAt,
       rejectedAt: this.rejectedAt,
+      changesRequestedAt: this.changesRequestedAt,
       createdAt: this.createdAt,
       updatedAt: this.updatedAt
     };

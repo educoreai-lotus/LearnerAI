@@ -52,28 +52,24 @@ export default function Header() {
 
   // Navigation items - Only Home
   const navItems = [
-    { path: '/home', label: 'Home', icon: true },
+    { path: '/', label: 'Home', icon: true },
   ];
 
   // Check if a route is active
   const isActiveRoute = (path) => {
     // Home should be active on both '/' and '/home'
-    if (path === '/home') {
+    if (path === '/' || path === '/home') {
       return location.pathname === '/' || location.pathname === '/home' || location.pathname.startsWith('/home/');
     }
     return location.pathname === path || location.pathname.startsWith(path + '/');
   };
 
-  // Navigation button classes - Home button follows design system rules
+  // Navigation button classes - Home button always has green background on all pages
   const getNavButtonClasses = (isActive) => {
-    if (isActive) {
-      return isDayMode
-        ? 'bg-emerald-100 text-emerald-600'
-        : 'bg-emerald-900/20 text-emerald-400';
-    }
+    // Home button always has the green background regardless of active state
     return isDayMode
-      ? 'bg-transparent text-gray-600 hover:bg-emerald-50 hover:text-emerald-600'
-      : 'bg-transparent text-gray-300 hover:bg-emerald-900/20 hover:text-emerald-400';
+      ? 'bg-primary-100 text-primary-700 hover:bg-primary-200 hover:text-primary-800' // Always green background
+      : 'bg-primary-900/20 text-primary-400 hover:bg-primary-900/30 hover:text-primary-300'; // Always green background in dark mode
   };
 
   return (
@@ -93,7 +89,7 @@ export default function Header() {
                 src={logoUrl}
                 alt="EDUCORE AI Logo"
                 className="h-auto max-h-14 transition-all duration-300 ease-in-out cursor-pointer"
-                onClick={() => navigate('/home')}
+                onClick={() => navigate('/')}
                 onError={() => setLogoError(true)}
               />
             ) : (
@@ -101,7 +97,7 @@ export default function Header() {
                 className={`text-lg font-semibold cursor-pointer transition-all duration-300 ease-in-out ${
                   isDayMode ? 'text-gray-600' : 'text-gray-300'
                 }`}
-                onClick={() => navigate('/home')}
+                onClick={() => navigate('/')}
               >
                 EDUCORE AI
               </div>

@@ -114,7 +114,7 @@ export default function CompanyDashboard() {
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           {/* Page Header */}
           <div className="mb-8">
-            <h1 className="text-3xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
+            <h1 className="text-3xl font-bold text-primary-800 dark:text-primary-300 mb-2">
               {users.length > 0 && users[0].companyName ? `${users[0].companyName} Dashboard` : 'Company Dashboard'}
             </h1>
             <p className="text-neutral-600 dark:text-neutral-400">
@@ -166,7 +166,7 @@ export default function CompanyDashboard() {
           {selectedUser && learningPaths[selectedUser.userId] && learningPaths[selectedUser.userId].length > 0 && (
             <Card className="mt-8">
               <div className="flex items-center justify-between mb-6">
-                <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50">
+                <h2 className="text-2xl font-bold text-primary-800 dark:text-primary-300">
                   Learning Paths for {selectedUser.name}
                 </h2>
                 <button

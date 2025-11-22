@@ -93,18 +93,49 @@ export class ApprovalRepository {
    * @returns {Promise<Array<PathApproval>>}
    */
   async getPendingApprovalsByDecisionMaker(decisionMakerId) {
-    const { data, error } = await this.client
-      .from('path_approvals')
-      .select('*')
-      .eq('decision_maker_id', decisionMakerId)
-      .eq('status', 'pending')
-      .order('created_at', { ascending: false });
+    try {
+      if (!decisionMakerId) {
+        console.warn('getPendingApprovalsByDecisionMaker called without decisionMakerId');
+        return [];
+      }
 
-    if (error) {
-      throw new Error(`Failed to get pending approvals: ${error.message}`);
+      // Try using .or() first (Supabase PostgREST syntax)
+      let query = this.client
+        .from('path_approvals')
+        .select('*')
+        .eq('decision_maker_id', decisionMakerId);
+
+      // Use .or() for status filter (Supabase PostgREST syntax)
+      query = query.or('status.eq.pending,status.eq.changes_requested');
+      
+      const { data, error } = await query.order('created_at', { ascending: false });
+
+      if (error) {
+        console.error('Supabase error getting pending approvals:', error);
+        console.error('Error details:', JSON.stringify(error, null, 2));
+        throw new Error(`Failed to get pending approvals: ${error.message}`);
+      }
+
+      // Return empty array if no data
+      if (!data || data.length === 0) {
+        console.log(`No pending approvals found for decision maker: ${decisionMakerId}`);
+        return [];
+      }
+
+      console.log(`Found ${data.length} pending approvals for decision maker: ${decisionMakerId}`);
+      return data.map(item => {
+        try {
+          return this._mapToPathApproval(item);
+        } catch (mapError) {
+          console.error('Error mapping approval:', mapError, 'Item:', item);
+          throw mapError;
+        }
+      });
+    } catch (error) {
+      console.error('Error in getPendingApprovalsByDecisionMaker:', error);
+      console.error('Stack trace:', error.stack);
+      throw error;
     }
-
-    return data.map(item => this._mapToPathApproval(item));
   }
 
   /**
@@ -122,9 +153,15 @@ export class ApprovalRepository {
     if (updates.status === 'approved') {
       updateData.approved_at = updates.approvedAt || new Date().toISOString();
       updateData.rejected_at = null;
+      updateData.changes_requested_at = null;
     } else if (updates.status === 'rejected') {
       updateData.rejected_at = updates.rejectedAt || new Date().toISOString();
       updateData.approved_at = null;
+      updateData.changes_requested_at = null;
+    } else if (updates.status === 'changes_requested') {
+      updateData.changes_requested_at = updates.changesRequestedAt || new Date().toISOString();
+      updateData.approved_at = null;
+      updateData.rejected_at = null;
     }
 
     const { data, error } = await this.client
@@ -173,6 +210,7 @@ export class ApprovalRepository {
       feedback: record.feedback,
       approvedAt: record.approved_at,
       rejectedAt: record.rejected_at,
+      changesRequestedAt: record.changes_requested_at,
       createdAt: record.created_at,
       updatedAt: record.updated_at
     });

@@ -1,11 +1,26 @@
+import sgMail from '@sendgrid/mail';
+import {
+  getApprovalRequestTemplate,
+  getApprovalStatusApprovedTemplate,
+  getApprovalStatusChangesRequestedTemplate
+} from './emailTemplates.js';
+
 /**
  * NotificationService
- * Handles sending notifications to decision makers
- * In production, this would integrate with email/SMS services
+ * Handles sending email notifications via SendGrid
  */
 export class NotificationService {
   constructor() {
-    // In production, initialize email/SMS clients here
+    const sendGridApiKey = process.env.SENDGRID_API_KEY;
+    if (sendGridApiKey) {
+      sgMail.setApiKey(sendGridApiKey);
+      this.sendGridEnabled = true;
+    } else {
+      console.warn('⚠️  SENDGRID_API_KEY not set - email notifications will be logged only');
+      this.sendGridEnabled = false;
+    }
+    this.fromEmail = process.env.FROM_EMAIL || 'noreply@learnerai.com';
+    this.frontendUrl = process.env.FRONTEND_URL || 'http://localhost:5173';
   }
 
   /**
@@ -16,37 +31,89 @@ export class NotificationService {
    * @returns {Promise<void>}
    */
   async sendApprovalRequest(approvalData, learningPath, decisionMaker) {
-    // TODO: Integrate with email service (e.g., SendGrid, AWS SES)
-    // For now, log the notification
-    console.log('📧 Approval Request Notification:');
-    console.log(`   To: ${decisionMaker.email}`);
-    console.log(`   Subject: Learning Path Approval Required - ${learningPath.pathTitle || 'New Path'}`);
-    console.log(`   Approval ID: ${approvalData.id}`);
-    console.log(`   Learning Path ID: ${approvalData.learningPathId}`);
-    console.log(`   Link: ${process.env.FRONTEND_URL || 'http://localhost:5173'}/approvals/${approvalData.id}`);
-    
-    // In production:
-    // await emailClient.send({
-    //   to: decisionMaker.email,
-    //   subject: `Learning Path Approval Required - ${learningPath.pathTitle}`,
-    //   template: 'approval-request',
-    //   data: { approvalData, learningPath, decisionMaker }
-    // });
+    if (!decisionMaker.email) {
+      console.warn('⚠️  Decision maker email not provided, skipping notification');
+      return;
+    }
+
+    const subject = `Learning Path Approval Required - ${learningPath.pathTitle || learningPath.path_title || 'New Path'}`;
+    const htmlContent = getApprovalRequestTemplate(approvalData, learningPath, decisionMaker, this.frontendUrl);
+
+    if (this.sendGridEnabled) {
+      try {
+        await sgMail.send({
+          to: decisionMaker.email,
+          from: this.fromEmail,
+          subject,
+          html: htmlContent
+        });
+        console.log(`✅ Approval request email sent to ${decisionMaker.email}`);
+      } catch (error) {
+        console.error('❌ Failed to send approval request email:', error.message);
+        // Log fallback
+        this._logEmailFallback('Approval Request', decisionMaker.email, subject);
+      }
+    } else {
+      this._logEmailFallback('Approval Request', decisionMaker.email, subject);
+    }
   }
 
   /**
-   * Send approval status notification
+   * Send approval status notification to requester
    * @param {Object} approvalData - Updated approval data
    * @param {Object} learningPath - Learning path data
+   * @param {Object} requester - Requester info { email, name } (optional)
    * @returns {Promise<void>}
    */
-  async sendApprovalStatus(approvalData, learningPath) {
-    console.log('📧 Approval Status Notification:');
-    console.log(`   Status: ${approvalData.status}`);
-    console.log(`   Learning Path ID: ${approvalData.learningPathId}`);
-    if (approvalData.feedback) {
-      console.log(`   Feedback: ${approvalData.feedback}`);
+  async sendApprovalStatus(approvalData, learningPath, requester = null) {
+    // If no requester email, try to get from learning path user_id
+    // Note: In a real system, you'd fetch the learner's email from the database
+    if (!requester || !requester.email) {
+      console.warn('⚠️  Requester email not provided, skipping status notification');
+      return;
     }
+
+    let subject, htmlContent;
+
+    if (approvalData.status === 'approved') {
+      subject = `Learning Path Approved - ${learningPath.pathTitle || learningPath.path_title || 'Your Learning Path'}`;
+      htmlContent = getApprovalStatusApprovedTemplate(approvalData, learningPath, requester, this.frontendUrl);
+    } else if (approvalData.status === 'changes_requested') {
+      subject = `Changes Requested - ${learningPath.pathTitle || learningPath.path_title || 'Your Learning Path'}`;
+      htmlContent = getApprovalStatusChangesRequestedTemplate(approvalData, learningPath, requester, this.frontendUrl);
+    } else {
+      // For rejected status, use changes_requested template
+      subject = `Learning Path Update - ${learningPath.pathTitle || learningPath.path_title || 'Your Learning Path'}`;
+      htmlContent = getApprovalStatusChangesRequestedTemplate(approvalData, learningPath, requester, this.frontendUrl);
+    }
+
+    if (this.sendGridEnabled) {
+      try {
+        await sgMail.send({
+          to: requester.email,
+          from: this.fromEmail,
+          subject,
+          html: htmlContent
+        });
+        console.log(`✅ Approval status email sent to ${requester.email}`);
+      } catch (error) {
+        console.error('❌ Failed to send approval status email:', error.message);
+        this._logEmailFallback('Approval Status', requester.email, subject);
+      }
+    } else {
+      this._logEmailFallback('Approval Status', requester.email, subject);
+    }
+  }
+
+  /**
+   * Log email fallback when SendGrid is not configured
+   * @private
+   */
+  _logEmailFallback(type, to, subject) {
+    console.log(`📧 ${type} Email (SendGrid not configured):`);
+    console.log(`   To: ${to}`);
+    console.log(`   Subject: ${subject}`);
+    console.log(`   Configure SENDGRID_API_KEY to enable email delivery`);
   }
 }
 

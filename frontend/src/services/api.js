@@ -88,20 +88,39 @@ class ApiService {
   }
 
   // Approvals
-  async approvePath(approvalId) {
-    return this.request(`/approvals/${approvalId}/approve`, {
+  async getApprovalDetails(approvalId, userId = null) {
+    const params = userId ? `?userId=${userId}` : '';
+    return this.request(`/approvals/${approvalId}${params}`);
+  }
+
+  async approvePath(approvalId, userId = null) {
+    const params = userId ? `?userId=${userId}` : '';
+    return this.request(`/approvals/${approvalId}/approve${params}`, {
       method: 'POST',
     });
   }
 
-  async rejectPath(approvalId) {
+  async requestChanges(approvalId, feedback, userId = null) {
+    const params = userId ? `?userId=${userId}` : '';
+    return this.request(`/approvals/${approvalId}/request-changes${params}`, {
+      method: 'POST',
+      body: { feedback },
+    });
+  }
+
+  async rejectPath(approvalId, feedback = null) {
     return this.request(`/approvals/${approvalId}/reject`, {
       method: 'POST',
+      body: { feedback },
     });
   }
 
   async getApproval(approvalId) {
     return this.request(`/approvals/${approvalId}`);
+  }
+
+  async getPendingApprovals(decisionMakerId) {
+    return this.request(`/approvals/pending/${decisionMakerId}`);
   }
 
   // Completions
@@ -130,4 +149,5 @@ class ApiService {
 }
 
 export default new ApiService();
+
 

@@ -249,7 +249,12 @@ describe('Feature: Learning Path Generation', () => {
       mockJobRepository.createJob.mockResolvedValue(mockJob);
       mockRepository.getLearningPath.mockResolvedValue(existingCourse);
       // Mock getSkillsGapsByUser to return array with the gap
-      const mockGap = createMockSkillsGap({ examStatus: 'FAIL', gapId: 'gap-123' });
+      // Note: The code filters by competency_target_name (snake_case), so we need to ensure the mock has this property
+      const mockGap = createMockSkillsGap({ 
+        examStatus: 'fail', 
+        gapId: 'gap-123',
+        competency_target_name: skillsGap.competencyTargetName // Add snake_case property for filtering
+      });
       mockSkillsGapRepository.getSkillsGapsByUser.mockResolvedValue([mockGap]);
       mockSkillsGapRepository.getSkillsGapByUserAndCompetency.mockResolvedValue(mockGap);
       // Use mockImplementation to return prompts based on name (supports multiple calls)

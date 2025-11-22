@@ -95,25 +95,25 @@ describe('Feature: API Routes', () => {
     describe('GET /api/v1/skills-gaps', () => {
       it('should get all skills gaps', async () => {
         const mockGaps = [createMockSkillsGap()];
-        // Create a fresh mock repository with the test data
-        const testMockRepository = {
-          ...mockSkillsGapRepository,
-          getAllSkillsGaps: jest.fn().mockResolvedValue(mockGaps)
-        };
-        // Create router with the fresh mock
+        // Override the mock in the existing repository
+        mockSkillsGapRepository.getAllSkillsGaps.mockResolvedValue(mockGaps);
+        
+        // Create router with the mocked repository
         const testRouter = createSkillsGapsRouter({
-          skillsGapRepository: testMockRepository,
+          skillsGapRepository: mockSkillsGapRepository,
           learnerRepository: mockLearnerRepository,
           companyRepository: mockCompanyRepository
         });
 
         const { res } = await testRoute(testRouter, 'get', '/', {});
 
+        // Verify the mock was called
+        expect(mockSkillsGapRepository.getAllSkillsGaps).toHaveBeenCalled();
+        // Verify the response
         expect(res.json).toHaveBeenCalledWith({
-          skillsGaps: mockGaps,
-          count: mockGaps.length
+          count: mockGaps.length,
+          skillsGaps: mockGaps
         });
-        expect(testMockRepository.getAllSkillsGaps).toHaveBeenCalled();
       });
     });
   });
