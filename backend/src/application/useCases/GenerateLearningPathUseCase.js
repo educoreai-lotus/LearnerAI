@@ -318,6 +318,26 @@ export class GenerateLearningPathUseCase {
       const existingCourse = await this.repository.getLearningPathById(competencyTargetName);
       const isUpdateAfterFailure = existingCourse && examStatus === 'fail';
 
+      // Check approval policy to determine if course should be approved immediately
+      let shouldApprove = false;
+      if (!isUpdateAfterFailure && this.checkApprovalPolicyUseCase) {
+        try {
+          const { requiresApproval } = await this.checkApprovalPolicyUseCase.execute(skillsGap.companyId);
+          // If approval is NOT required (auto approval), set approved to true
+          // If approval IS required (manual approval), set approved to false
+          shouldApprove = !requiresApproval;
+        } catch (error) {
+          console.warn(`⚠️  Could not check approval policy, defaulting to false: ${error.message}`);
+          shouldApprove = false; // Default to false (requires approval) if check fails
+        }
+      } else if (isUpdateAfterFailure) {
+        // Updates after exam failure are auto-approved (skip approval workflow)
+        shouldApprove = true;
+      }
+
+      // Set approved status based on approval policy
+      learningPath.status = shouldApprove ? 'approved' : 'pending';
+
       // Save learning path (updates if exists, creates if new)
       const savedPath = await this.repository.saveLearningPath(learningPath);
 

@@ -88,7 +88,7 @@ export class SupabaseRepository {
         user_id: learningPath.userId,
         gap_id: learningPath.gapId || null, // Link to original skills gap
         learning_path: pathData,
-        approved: learningPath.status === 'completed',
+        approved: learningPath.status === 'approved' || learningPath.status === 'completed',
         created_at: learningPath.createdAt,
         last_modified_at: learningPath.updatedAt
       }, {
