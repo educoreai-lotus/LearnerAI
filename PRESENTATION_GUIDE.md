@@ -114,17 +114,109 @@ LearnerAI - Intelligent, Adaptive Learning Path Generation
 **8 Core Tables:**
 
 ```
-companies ──┐
-            ├──► learners ──┐
-skills_gap ─┘               │
-            ┌───────────────┘
-            │
-            ├──► skills_expansions
-            ├──► courses (learning_paths)
-            ├──► path_approvals
-            ├──► recommendations
-            └──► jobs
+companies (1)
+    │
+    └──► learners (many) ──┐
+                            │
+                            ├──► skills_gap (many) ──► skills_expansions
+                            ├──► courses (many) ──► path_approvals
+                            ├──► recommendations (many)
+                            └──► jobs (many)
 ```
+
+**Why This Structure?**
+
+**1. Hierarchical Organization:**
+- **`companies`** → **`learners`**: One company has many learners (1:N relationship)
+- **`learners`** → **`skills_gap`**: One learner can have many skills gaps (1:N relationship)
+  - Each skills gap represents a different competency area the learner needs to improve
+  - Example: A learner might have gaps in "React Development", "GraphQL API", and "TypeScript"
+- This ensures data isolation and proper access control per company/learner
+
+**2. Data Flow Chain:**
+- **`learners`** is the central hub - all learning data connects to a specific learner
+- **`skills_gap`** (many per learner) → **`skills_expansions`**: Each gap is expanded by AI into competencies
+- **`skills_expansions`** → **`courses`**: Expanded data becomes a learning path (one course per gap)
+- **`courses`** (many per learner) → **`path_approvals`**: Each path needs approval before distribution
+- **`courses`** → **`recommendations`**: Completed paths generate recommendations
+- **`jobs`**: Tracks background processing for all operations (multiple jobs per learner)
+
+**3. Referential Integrity:**
+- Foreign keys ensure data consistency (e.g., can't create a gap for non-existent learner)
+- CASCADE deletes clean up related data automatically
+- Prevents orphaned records and data inconsistencies
+
+**4. Business Logic Alignment:**
+- **`companies`** at top: Company-level policies (approval workflows, decision makers)
+- **`learners`** in middle: Individual learner's learning journey
+- Child tables: Specific artifacts (gaps, paths, approvals) tied to learners
+- **`jobs`**: Async processing status for long-running operations
+
+**5. Why Separate `courses` and `path_approvals` Tables?**
+
+**Could they be combined?** Technically yes, but there are important reasons to keep them separate:
+
+**Reasons to Keep Separate:**
+- ✅ **Multiple Approvals Per Course**: A course can be rejected and resubmitted multiple times, creating an approval history
+- ✅ **Null Values Avoidance**: Not all courses need approval (auto-approval policy). Separate table avoids many NULL columns
+- ✅ **Historical Tracking**: Track when approvals were requested, rejected, approved, or changes requested
+- ✅ **Different Lifecycles**: Course exists even before approval; approval is a separate workflow step
+- ✅ **Flexibility**: Can query pending approvals without loading full course data
+- ✅ **Data Normalization**: Follows database normalization principles (1:N relationship)
+
+**If Combined (Not Recommended):**
+- Would need to handle multiple approval attempts differently (maybe JSONB array?)
+- Many NULL values for courses that don't need approval
+- Harder to query "all pending approvals" efficiently
+- Mixes course content (learning_path JSONB) with approval workflow data
+
+**6. What is the `jobs` Table?**
+
+**Purpose:** Tracks background/asynchronous job processing status for long-running operations.
+
+**Why It Exists:**
+- ✅ **Async Operations**: Learning path generation takes 60-100 seconds (3 AI prompts)
+- ✅ **User Experience**: Users get immediate response, can poll job status
+- ✅ **Progress Tracking**: Shows real-time progress (0-100%) and current stage
+- ✅ **Error Handling**: Stores errors if job fails
+- ✅ **Multiple Job Types**: Supports different job types:
+  - `path-generation`: Creating learning paths (3 prompts)
+  - `course-suggestion`: Generating course recommendations (Prompt 4)
+  - `path-distribution`: Distributing paths to Course Builder
+
+**Job Lifecycle:**
+```
+1. User requests learning path → Job created (status: "pending")
+2. Background processing starts → status: "processing"
+3. Progress updates:
+   - 20%: Prompt 1 executing (skill-expansion)
+   - 50%: Prompt 2 executing (competency-identification)
+   - 70%: Prompt 3 executing (path-creation)
+4. Completion → status: "completed" (progress: 100%)
+   OR
+   Failure → status: "failed" (error message stored)
+```
+
+**Example Job Record:**
+```json
+{
+  "id": "job-uuid",
+  "user_id": "learner-uuid",
+  "competency_target_name": "GraphQL API Development",
+  "type": "path-generation",
+  "status": "processing",
+  "progress": 50,
+  "current_stage": "competency-identification",
+  "result": null,
+  "error": null
+}
+```
+
+**API Usage:**
+- **Create Job**: When user requests learning path generation
+- **Poll Status**: `GET /api/v1/jobs/{jobId}/status` (check every 5-10 seconds)
+- **Update Progress**: Backend updates during processing
+- **Final Result**: Job contains `result` JSONB with learning path ID
 
 **Key Features:**
 - 🔗 Foreign key constraints (referential integrity)

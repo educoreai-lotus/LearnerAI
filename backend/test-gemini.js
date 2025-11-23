@@ -93,6 +93,17 @@ async function testGemini() {
     return;
   }
 
+  // Test 4.5: Load Prompt 4
+  console.log('\n📝 Test 4.5: Load Prompt 4 (Course Suggestions)');
+  try {
+    const prompt4 = await promptLoader.loadPrompt('prompt4-course-suggestions');
+    console.log('✅ Prompt 4 loaded');
+    console.log(`   Length: ${prompt4.length} characters`);
+  } catch (error) {
+    console.warn('⚠️  Prompt 4 not found (optional):', error.message);
+    // Don't return, continue with other tests
+  }
+
   // Test 5: Execute Prompt 1 with sample data
   console.log('\n📝 Test 5: Execute Prompt 1 with Sample Data');
   try {
@@ -136,11 +147,34 @@ async function testGemini() {
     console.error('   Full error:', error);
   }
 
+  // Test 6: Verify prompt placeholders
+  console.log('\n📝 Test 6: Verify Prompt Placeholders');
+  try {
+    const prompt1 = await promptLoader.loadPrompt('prompt1-skill-expansion');
+    const prompt2 = await promptLoader.loadPrompt('prompt2-competency-identification');
+    const prompt3 = await promptLoader.loadPrompt('prompt3-path-creation');
+    
+    const checks = {
+      'Prompt 1 has {input}': prompt1.includes('{input}'),
+      'Prompt 2 has {input}': prompt2.includes('{input}'),
+      'Prompt 3 has {initialGap}': prompt3.includes('{initialGap}'),
+      'Prompt 3 has {expandedBreakdown}': prompt3.includes('{expandedBreakdown}')
+    };
+    
+    console.log('   Placeholder checks:');
+    Object.entries(checks).forEach(([check, passed]) => {
+      console.log(`   ${passed ? '✅' : '❌'} ${check}`);
+    });
+  } catch (error) {
+    console.warn('⚠️  Could not verify placeholders:', error.message);
+  }
+
   console.log('\n✅ All tests completed!');
   console.log('\n💡 Next steps:');
   console.log('   1. Check backend logs when generating a learning path');
   console.log('   2. Test the endpoint: POST /api/v1/learning-paths/generate');
   console.log('   3. Check job status: GET /api/v1/jobs/:jobId/status');
+  console.log('   4. Health check: GET /api/v1/ai/health');
 }
 
 // Run tests

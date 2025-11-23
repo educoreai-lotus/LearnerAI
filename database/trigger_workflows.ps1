@@ -144,3 +144,4 @@ Write-Host "   Once completed, learning paths will be available in the courses t
 Write-Host "   Approval requests will be created automatically for manual approval companies."
 Write-Host ""
 
+

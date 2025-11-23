@@ -272,13 +272,13 @@ export default function ApprovalReview() {
                 <span>Back to Approvals</span>
               </button>
             </div>
-            <h1 className="text-3xl font-bold text-primary-800 dark:text-primary-300 mb-2">
-              Learning Path Review
-            </h1>
-            <p className="text-neutral-600 dark:text-neutral-400">
-              Review the learning path and make your decision
-            </p>
-          </div>
+          <h1 className="text-3xl font-bold text-primary-800 dark:text-primary-300 mb-2">
+            Learning Path Review
+          </h1>
+          <p className="text-neutral-600 dark:text-neutral-400">
+            Review the learning path and make your decision
+          </p>
+        </div>
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Main Content */}
@@ -484,7 +484,7 @@ export default function ApprovalReview() {
             </Card>
           </div>
         </div>
-        </div>
+      </div>
       </main>
       {toast && (
         <Toast

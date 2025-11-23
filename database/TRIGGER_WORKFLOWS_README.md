@@ -139,3 +139,4 @@ After all workflows complete, you should have:
 - Verify Gemini API key is set in environment variables
 - Check Skills Engine connection if jobs fail at that stage
 
+

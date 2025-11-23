@@ -315,7 +315,7 @@ export class GenerateLearningPathUseCase {
       });
 
       // Check if this is an update after exam failure (course already exists + exam_status is 'fail')
-      const existingCourse = await this.repository.getLearningPath(competencyTargetName);
+      const existingCourse = await this.repository.getLearningPathById(competencyTargetName);
       const isUpdateAfterFailure = existingCourse && examStatus === 'fail';
 
       // Save learning path (updates if exists, creates if new)
