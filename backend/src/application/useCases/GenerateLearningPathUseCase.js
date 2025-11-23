@@ -396,15 +396,23 @@ export class GenerateLearningPathUseCase {
       if (requiresApproval && company) {
         // Manual approval required - create approval request
         if (this.requestPathApprovalUseCase && company.decisionMaker) {
+          // Use competencyTargetName as learningPathId (it's the primary key in courses table)
+          const learningPathId = learningPath.competencyTargetName || learningPath.id;
           await this.requestPathApprovalUseCase.execute({
-            learningPathId: learningPath.id,
+            learningPathId: learningPathId,
             companyId: skillsGap.companyId,
             decisionMaker: company.decisionMaker,
             learningPath: learningPath.toJSON()
           });
-          console.log(`📋 Approval request created for path ${learningPath.id} (manual approval required)`);
+          console.log(`📋 Approval request created for path ${learningPathId} (manual approval required)`);
         } else {
           console.warn(`⚠️  Manual approval required but decision maker not configured for company ${skillsGap.companyId}`);
+          if (!this.requestPathApprovalUseCase) {
+            console.warn(`⚠️  RequestPathApprovalUseCase is not initialized`);
+          }
+          if (!company.decisionMaker) {
+            console.warn(`⚠️  Company ${skillsGap.companyId} has manual approval but no decisionMaker configured`);
+          }
         }
       } else {
         // Auto approval - distribute directly
