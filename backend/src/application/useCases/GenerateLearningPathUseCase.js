@@ -87,6 +87,13 @@ export class GenerateLearningPathUseCase {
         progress: 10
       });
 
+      // Check if this is an update scenario (learning path exists + expansions exist)
+      const existingCourse = await this.repository.getLearningPathById(competencyTargetName);
+      let isUpdateMode = false;
+      let existingExpansion = null;
+      let existingPrompt1Output = null;
+      let existingPrompt2Output = null;
+
       // Fetch the latest skills_raw_data from database (after Skills Engine update)
       let skillsRawData = null;
       let gapId = null;
@@ -113,120 +120,167 @@ export class GenerateLearningPathUseCase {
         }
       }
 
-      // Create skills expansion record to store prompt outputs
-      let expansionId = uuidv4();
-      let skillsExpansion = null;
-      if (this.skillsExpansionRepository) {
+      // Check if we can use update mode (skip Prompts 1 & 2)
+      if (existingCourse && gapId && this.skillsExpansionRepository) {
         try {
-          // gap_id is optional - if not found, we'll create expansion without it
-          // This can happen if learning path is generated before skills gap is saved
-          if (!gapId) {
-            console.warn(`⚠️ No gap_id found for user ${skillsGap.userId}, creating skills expansion without gap_id link`);
-          }
+          // Try to find existing expansion for this gap
+          existingExpansion = await this.skillsExpansionRepository.getLatestSkillsExpansionByUserAndGap(
+            skillsGap.userId,
+            gapId
+          );
           
-          skillsExpansion = await this.skillsExpansionRepository.createSkillsExpansion({
-            expansion_id: expansionId,
-            gap_id: gapId || null, // Nullable - allows expansion without gap link
-            user_id: skillsGap.userId,
-            prompt_1_output: null,
-            prompt_2_output: null
-          });
-          console.log(`✅ Created skills expansion record: ${expansionId} for gap_id: ${gapId || 'none'}, user_id: ${skillsGap.userId}`);
-        } catch (error) {
-          console.warn(`⚠️ Failed to create skills expansion: ${error.message}`);
-          // Continue without saving to skills_expansions if it fails
-        }
-      }
-
-      // Prompt 1: Skill Expansion
-      // Use updated skills_raw_data from database if available, otherwise use request data
-      const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
-      const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
-      const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
-      const prompt1Result = await this.geminiClient.executePrompt(fullPrompt1, '', {
-        timeout: 60000, // 60 seconds for skill expansion
-        maxRetries: 3
-      });
-
-      // Save Prompt 1 output to skills_expansions table
-      if (this.skillsExpansionRepository && expansionId) {
-        try {
-          // Parse prompt1Result if it's a string
-          const prompt1Output = typeof prompt1Result === 'string' 
-            ? JSON.parse(prompt1Result) 
-            : prompt1Result;
-          
-          await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
-            prompt_1_output: prompt1Output
-          });
-          console.log(`✅ Saved Prompt 1 output to skills_expansions: ${expansionId}`);
-        } catch (error) {
-          console.warn(`⚠️ Failed to save Prompt 1 output: ${error.message}`);
-        }
-      }
-
-      await this.jobRepository.updateJob(job.id, {
-        currentStage: 'competency-identification',
-        progress: 30
-      });
-
-      // Extract competencies from Prompt 1 result (new format includes structured competencies)
-      const prompt1Competencies = this._extractCompetenciesFromPrompt1(prompt1Result);
-
-      // Prompt 2: Prepare standardized queries for Skills Engine
-      // Read Prompt 1 output from skills_expansions table
-      let prompt1OutputFromDB = prompt1Result;
-      if (this.skillsExpansionRepository && expansionId) {
-        try {
-          const savedExpansion = await this.skillsExpansionRepository.getSkillsExpansionById(expansionId);
-          if (savedExpansion && savedExpansion.prompt_1_output) {
-            prompt1OutputFromDB = savedExpansion.prompt_1_output;
-            console.log(`✅ Using Prompt 1 output from skills_expansions table`);
+          if (existingExpansion && existingExpansion.prompt_1_output && existingExpansion.prompt_2_output) {
+            isUpdateMode = true;
+            existingPrompt1Output = existingExpansion.prompt_1_output;
+            existingPrompt2Output = existingExpansion.prompt_2_output;
+            console.log(`🔄 UPDATE MODE: Learning path exists and expansions found - skipping Prompts 1 & 2`);
+            console.log(`   Using existing expansion_id: ${existingExpansion.expansion_id}`);
+            console.log(`   Will only update learning path (Prompt 3) with filtered skills`);
+          } else {
+            console.log(`ℹ️  Learning path exists but no complete expansions found - running full generation`);
           }
         } catch (error) {
-          console.warn(`⚠️ Failed to read Prompt 1 output from DB, using in-memory result: ${error.message}`);
+          console.warn(`⚠️  Could not check for existing expansions: ${error.message}`);
+          // Continue with full generation
         }
       }
 
-      const prompt2 = await this.promptLoader.loadPrompt('prompt2-competency-identification');
-      // Format Prompt 1 result for Prompt 2 input (use data from database)
-      const prompt1CompetenciesFromDB = this._extractCompetenciesFromPrompt1(prompt1OutputFromDB);
-      const prompt2Input = prompt1CompetenciesFromDB.length > 0 
-        ? JSON.stringify({ expanded_competencies_list: prompt1CompetenciesFromDB.map(c => ({
-            competency_name: c.name,
-            ...(c.description ? { justification: c.description } : {})
-          })) }, null, 2)
-        : this._formatPrompt1Result(prompt1OutputFromDB);
-      const fullPrompt2 = prompt2.replace('{input}', prompt2Input);
-      const prompt2Result = await this.geminiClient.executePrompt(fullPrompt2, '', {
-        timeout: 60000, // 60 seconds for competency identification
-        maxRetries: 3
-      });
+      // Determine expansion ID (use existing or create new)
+      let expansionId = existingExpansion?.expansion_id || uuidv4();
+      let prompt1Result = null;
+      let prompt2Result = null;
+      let competencies = [];
 
-      // Save Prompt 2 output to skills_expansions table
-      if (this.skillsExpansionRepository && expansionId) {
-        try {
-          // Parse prompt2Result if it's a string
-          const prompt2Output = typeof prompt2Result === 'string' 
-            ? JSON.parse(prompt2Result) 
-            : prompt2Result;
-          
-          await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
-            prompt_2_output: prompt2Output
-          });
-          console.log(`✅ Saved Prompt 2 output to skills_expansions: ${expansionId}`);
-        } catch (error) {
-          console.warn(`⚠️ Failed to save Prompt 2 output: ${error.message}`);
+      if (isUpdateMode) {
+        // UPDATE MODE: Use existing expansions, filter competencies to match remaining skills
+        console.log(`⚡ UPDATE MODE: Using existing expansions, filtering to match remaining skills`);
+        console.log(`   This preserves existing competencies (no new ones added)`);
+        console.log(`   Will filter competencies to only those relevant to remaining skills`);
+        
+        // Use existing Prompt 1 & 2 outputs (don't regenerate - preserves competencies)
+        prompt1Result = existingPrompt1Output;
+        prompt2Result = existingPrompt2Output;
+        
+        // Extract competencies from existing Prompt 2 output
+        const allCompetencies = this._extractCompetenciesFromPrompt2(prompt2Result);
+        console.log(`📋 Found ${allCompetencies.length} competencies in existing expansion`);
+        
+        // Filter competencies: We'll filter after getting skill breakdown
+        // For now, use all competencies - filtering will happen after Skills Engine breakdown
+        // (We need skill breakdown to know which competencies map to remaining skills)
+        competencies = allCompetencies;
+        
+        console.log(`✅ Using existing competencies (will filter after skill breakdown): ${competencies.length} competencies`);
+        
+        await this.jobRepository.updateJob(job.id, {
+          currentStage: 'skill-breakdown',
+          progress: 50 // Skip directly to skill breakdown
+        });
+      } else {
+        // FULL GENERATION MODE: Run all prompts
+        console.log(`✨ FULL GENERATION MODE: Running all 3 prompts`);
+        
+        // Create skills expansion record to store prompt outputs
+        let skillsExpansion = null;
+        if (this.skillsExpansionRepository && !existingExpansion) {
+          try {
+            // gap_id is optional - if not found, we'll create expansion without it
+            if (!gapId) {
+              console.warn(`⚠️ No gap_id found for user ${skillsGap.userId}, creating skills expansion without gap_id link`);
+            }
+            
+            skillsExpansion = await this.skillsExpansionRepository.createSkillsExpansion({
+              expansion_id: expansionId,
+              gap_id: gapId || null, // Nullable - allows expansion without gap link
+              user_id: skillsGap.userId,
+              prompt_1_output: null,
+              prompt_2_output: null
+            });
+            console.log(`✅ Created skills expansion record: ${expansionId} for gap_id: ${gapId || 'none'}, user_id: ${skillsGap.userId}`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to create skills expansion: ${error.message}`);
+            // Continue without saving to skills_expansions if it fails
+          }
         }
+
+        // Prompt 1: Skill Expansion
+        // Use updated skills_raw_data from database if available, otherwise use request data
+        const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
+        const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
+        const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
+        prompt1Result = await this.geminiClient.executePrompt(fullPrompt1, '', {
+          timeout: 60000, // 60 seconds for skill expansion
+          maxRetries: 3
+        });
+
+        // Save Prompt 1 output to skills_expansions table
+        if (this.skillsExpansionRepository && expansionId) {
+          try {
+            // Parse prompt1Result if it's a string
+            const prompt1Output = typeof prompt1Result === 'string' 
+              ? JSON.parse(prompt1Result) 
+              : prompt1Result;
+            
+            await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
+              prompt_1_output: prompt1Output
+            });
+            console.log(`✅ Saved Prompt 1 output to skills_expansions: ${expansionId}`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to save Prompt 1 output: ${error.message}`);
+          }
+        }
+
+        await this.jobRepository.updateJob(job.id, {
+          currentStage: 'competency-identification',
+          progress: 30
+        });
+
+        // Extract competencies from Prompt 1 result (new format includes structured competencies)
+        const prompt1Competencies = this._extractCompetenciesFromPrompt1(prompt1Result);
+
+        // Prompt 2: Prepare standardized queries for Skills Engine
+        const prompt2 = await this.promptLoader.loadPrompt('prompt2-competency-identification');
+        // Format Prompt 1 result for Prompt 2 input
+        const prompt2Input = prompt1Competencies.length > 0 
+          ? JSON.stringify({ expanded_competencies_list: prompt1Competencies.map(c => ({
+              competency_name: c.name,
+              ...(c.description ? { justification: c.description } : {})
+            })) }, null, 2)
+          : this._formatPrompt1Result(prompt1Result);
+        const fullPrompt2 = prompt2.replace('{input}', prompt2Input);
+        prompt2Result = await this.geminiClient.executePrompt(fullPrompt2, '', {
+          timeout: 60000, // 60 seconds for competency identification
+          maxRetries: 3
+        });
+
+        // Save Prompt 2 output to skills_expansions table
+        if (this.skillsExpansionRepository && expansionId) {
+          try {
+            // Parse prompt2Result if it's a string
+            const prompt2Output = typeof prompt2Result === 'string' 
+              ? JSON.parse(prompt2Result) 
+              : prompt2Result;
+            
+            await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
+              prompt_2_output: prompt2Output
+            });
+            console.log(`✅ Saved Prompt 2 output to skills_expansions: ${expansionId}`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to save Prompt 2 output: ${error.message}`);
+          }
+        }
+
+        // Extract competencies prepared for Skills Engine
+        competencies = this._extractCompetenciesFromPrompt2(prompt2Result);
       }
 
-      // Extract competencies prepared for Skills Engine
-      const competencies = this._extractCompetenciesFromPrompt2(prompt2Result);
-
-      await this.jobRepository.updateJob(job.id, {
-        currentStage: 'skill-breakdown',
-        progress: 50
-      });
+      // Update job progress (already done in update mode, but ensure it's set for full generation)
+      if (!isUpdateMode) {
+        await this.jobRepository.updateJob(job.id, {
+          currentStage: 'skill-breakdown',
+          progress: 50
+        });
+      }
 
       // Request skill breakdown from Skills Engine (with rollback to mock data if fails)
       let skillBreakdown;
@@ -245,6 +299,61 @@ export class GenerateLearningPathUseCase {
           useMockData: true // Force mock data
         });
         console.warn(`⚠️ Using mock skill breakdown due to Skills Engine failure`);
+      }
+
+      // In update mode: Filter skill breakdown and competencies to only include remaining skills
+      if (isUpdateMode && skillBreakdown && skillsRawData) {
+        console.log(`🔍 UPDATE MODE: Filtering skill breakdown to match remaining skills only`);
+        
+        // Extract remaining skill names from updated gap
+        const remainingSkillNames = this._extractSkillNamesFromGap(skillsRawData);
+        console.log(`   Remaining skills in gap: ${remainingSkillNames.length} skills`);
+        
+        // Filter skill breakdown: Keep only competencies that have skills in the remaining gap
+        const filteredSkillBreakdown = {};
+        const filteredCompetencies = [];
+        const allCompetenciesCount = competencies.length;
+        
+        for (const competency of competencies) {
+          const competencyName = competency.name || competency.competency_name || String(competency);
+          const breakdown = skillBreakdown[competencyName];
+          
+          if (breakdown) {
+            // Filter micro and nano skills to only include those in remaining gap
+            const filteredMicro = (breakdown.microSkills || []).filter(skill => {
+              const skillName = typeof skill === 'string' ? skill : (skill.name || skill.id || String(skill));
+              return remainingSkillNames.some(remaining => 
+                remaining.toLowerCase().includes(skillName.toLowerCase()) ||
+                skillName.toLowerCase().includes(remaining.toLowerCase())
+              );
+            });
+            
+            const filteredNano = (breakdown.nanoSkills || []).filter(skill => {
+              const skillName = typeof skill === 'string' ? skill : (skill.name || skill.id || String(skill));
+              return remainingSkillNames.some(remaining => 
+                remaining.toLowerCase().includes(skillName.toLowerCase()) ||
+                skillName.toLowerCase().includes(remaining.toLowerCase())
+              );
+            });
+            
+            // Only keep competency if it has skills after filtering
+            if (filteredMicro.length > 0 || filteredNano.length > 0) {
+              filteredSkillBreakdown[competencyName] = {
+                microSkills: filteredMicro,
+                nanoSkills: filteredNano
+              };
+              filteredCompetencies.push(competency);
+            } else {
+              console.log(`   ⚠️  Removed competency "${competencyName}" - no remaining skills match`);
+            }
+          }
+        }
+        
+        // Update skill breakdown and competencies with filtered versions
+        skillBreakdown = filteredSkillBreakdown;
+        competencies = filteredCompetencies;
+        console.log(`✅ Filtered to ${competencies.length} competencies with remaining skills`);
+        console.log(`   Removed ${allCompetenciesCount - competencies.length} competencies (no remaining skills)`);
       }
 
       // Cache the skill breakdown in Supabase (upsert operation)
@@ -278,14 +387,22 @@ export class GenerateLearningPathUseCase {
         }
       }
 
+      // In update mode: Filter Prompt 2 output to only include competencies with remaining skills
+      if (isUpdateMode && prompt2OutputFromDB && competencies.length > 0) {
+        console.log(`🔍 UPDATE MODE: Filtering Prompt 2 output to match filtered competencies`);
+        const filteredPrompt2Output = this._filterPrompt2OutputByCompetencies(prompt2OutputFromDB, competencies);
+        prompt2OutputFromDB = filteredPrompt2Output;
+        console.log(`✅ Filtered Prompt 2 output to ${competencies.length} competencies`);
+      }
+
       // Use longer timeout for path creation as it generates complex structured output
       const prompt3 = await this.promptLoader.loadPrompt('prompt3-path-creation');
       
       // Format Prompt 3 input: Use prompt_2_output from database (competencies) + skillBreakdown from Skills Engine
       // The expandedBreakdown should combine prompt_2_output (competencies) with skillBreakdown (micro/nano skills)
       const expandedBreakdownForPrompt3 = {
-        competencies: prompt2OutputFromDB, // From prompt_2_output in skills_expansions table
-        skillBreakdown: skillBreakdown // From Skills Engine (micro/nano skills)
+        competencies: prompt2OutputFromDB, // From prompt_2_output (filtered in update mode)
+        skillBreakdown: skillBreakdown // From Skills Engine (filtered in update mode)
       };
       
       const fullPrompt3 = prompt3
@@ -315,7 +432,7 @@ export class GenerateLearningPathUseCase {
       });
 
       // Check if this is an update after exam failure (course already exists + exam_status is 'fail')
-      const existingCourse = await this.repository.getLearningPathById(competencyTargetName);
+      // Note: existingCourse was already checked above for update mode detection
       const isUpdateAfterFailure = existingCourse && examStatus === 'fail';
 
       // Check approval policy to determine if course should be approved immediately
@@ -392,39 +509,57 @@ export class GenerateLearningPathUseCase {
     try {
       // Check company's approval policy
       const { requiresApproval, company } = await this.checkApprovalPolicyUseCase.execute(skillsGap.companyId);
+      
+      console.log(`🔍 Approval policy check for company ${skillsGap.companyId}: requiresApproval=${requiresApproval}, company=${company ? 'found' : 'not found'}`);
 
       if (requiresApproval && company) {
         // Manual approval required - create approval request
+        console.log(`📋 Manual approval required for company ${skillsGap.companyId}`);
+        console.log(`   - requestPathApprovalUseCase: ${this.requestPathApprovalUseCase ? 'initialized' : 'NOT initialized'}`);
+        console.log(`   - company.decisionMaker: ${company.decisionMaker ? 'configured' : 'NOT configured'}`);
+        
         if (this.requestPathApprovalUseCase && company.decisionMaker) {
           // Use competencyTargetName as learningPathId (it's the primary key in courses table)
           const learningPathId = learningPath.competencyTargetName || learningPath.id;
-          await this.requestPathApprovalUseCase.execute({
-            learningPathId: learningPathId,
-            companyId: skillsGap.companyId,
-            decisionMaker: company.decisionMaker,
-            learningPath: learningPath.toJSON()
-          });
-          console.log(`📋 Approval request created for path ${learningPathId} (manual approval required)`);
+          console.log(`   - Creating approval request for learning path: ${learningPathId}`);
+          console.log(`   - Decision maker: ${company.decisionMaker.employee_id} (${company.decisionMaker.name || company.decisionMaker.email || 'no name/email'})`);
+          
+          try {
+            const approval = await this.requestPathApprovalUseCase.execute({
+              learningPathId: learningPathId,
+              companyId: skillsGap.companyId,
+              decisionMaker: company.decisionMaker,
+              learningPath: learningPath.toJSON()
+            });
+            console.log(`✅ Approval request created successfully: ${approval.id} for path ${learningPathId} (manual approval required)`);
+          } catch (approvalError) {
+            console.error(`❌ Failed to create approval request: ${approvalError.message}`);
+            console.error(`   Stack: ${approvalError.stack}`);
+            // Don't fail the entire process, but log the error
+          }
         } else {
-          console.warn(`⚠️  Manual approval required but decision maker not configured for company ${skillsGap.companyId}`);
+          console.warn(`⚠️  Manual approval required but cannot create approval request for company ${skillsGap.companyId}`);
           if (!this.requestPathApprovalUseCase) {
-            console.warn(`⚠️  RequestPathApprovalUseCase is not initialized`);
+            console.warn(`   ❌ RequestPathApprovalUseCase is NOT initialized - check server.js dependencies`);
           }
           if (!company.decisionMaker) {
-            console.warn(`⚠️  Company ${skillsGap.companyId} has manual approval but no decisionMaker configured`);
+            console.warn(`   ❌ Company ${skillsGap.companyId} has manual approval but no decisionMaker configured`);
+            console.warn(`   ❌ Company decision_maker field: ${JSON.stringify(company.decisionMaker)}`);
           }
         }
       } else {
         // Auto approval - distribute directly
+        console.log(`✅ Auto approval for company ${skillsGap.companyId} - distributing directly`);
         if (this.distributePathUseCase) {
-          await this.distributePathUseCase.execute(learningPath.id);
-          console.log(`✅ Learning path ${learningPath.id} distributed (auto approval)`);
+          await this.distributePathUseCase.execute(learningPath.competencyTargetName || learningPath.id);
+          console.log(`✅ Learning path ${learningPath.competencyTargetName || learningPath.id} distributed (auto approval)`);
         } else {
           console.warn('⚠️  DistributePathUseCase not configured, skipping distribution');
         }
       }
     } catch (error) {
-      console.error('Error handling path distribution:', error.message);
+      console.error(`❌ Error handling path distribution: ${error.message}`);
+      console.error(`   Stack: ${error.stack}`);
       // Don't fail the entire process if distribution fails
     }
   }
@@ -681,6 +816,113 @@ export class GenerateLearningPathUseCase {
       order: index + 1,
       description: ''
     }));
+  }
+
+  /**
+   * Extract skill names from gap data structure
+   * Handles different gap formats: missing_skills_map, identifiedGaps, etc.
+   * @private
+   */
+  _extractSkillNamesFromGap(gapData) {
+    const skillNames = [];
+    if (!gapData || typeof gapData !== 'object') return skillNames;
+
+    // Handle missing_skills_map format (from Skills Engine)
+    if (gapData.missing_skills_map) {
+      for (const [competencyName, skills] of Object.entries(gapData.missing_skills_map)) {
+        if (Array.isArray(skills)) {
+          skills.forEach(skill => {
+            if (typeof skill === 'string') {
+              skillNames.push(skill);
+            } else if (skill && (skill.name || skill.id)) {
+              skillNames.push(skill.name || skill.id);
+            }
+          });
+        }
+      }
+    }
+
+    // Handle identifiedGaps format (structured format)
+    if (gapData.identifiedGaps && Array.isArray(gapData.identifiedGaps)) {
+      gapData.identifiedGaps.forEach(gap => {
+        if (gap.microSkills && Array.isArray(gap.microSkills)) {
+          gap.microSkills.forEach(skill => {
+            if (typeof skill === 'string') {
+              skillNames.push(skill);
+            } else if (skill && (skill.name || skill.id || skill.skill_id)) {
+              skillNames.push(skill.name || skill.id || skill.skill_id);
+            }
+          });
+        }
+        if (gap.nanoSkills && Array.isArray(gap.nanoSkills)) {
+          gap.nanoSkills.forEach(skill => {
+            if (typeof skill === 'string') {
+              skillNames.push(skill);
+            } else if (skill && (skill.name || skill.id || skill.skill_id)) {
+              skillNames.push(skill.name || skill.id || skill.skill_id);
+            }
+          });
+        }
+      });
+    }
+
+    // Handle flat array format
+    if (Array.isArray(gapData)) {
+      gapData.forEach(skill => {
+        if (typeof skill === 'string') {
+          skillNames.push(skill);
+        } else if (skill && (skill.name || skill.id)) {
+          skillNames.push(skill.name || skill.id);
+        }
+      });
+    }
+
+    // Remove duplicates and return (keep original case for matching)
+    return [...new Set(skillNames)];
+  }
+
+  /**
+   * Filter Prompt 2 output to only include competencies that are in the filtered list
+   * @private
+   */
+  _filterPrompt2OutputByCompetencies(prompt2Output, filteredCompetencies) {
+    if (!prompt2Output || !filteredCompetencies || filteredCompetencies.length === 0) {
+      return prompt2Output;
+    }
+
+    // Extract competency names from filtered list
+    const filteredCompetencyNames = filteredCompetencies.map(comp => {
+      const name = comp.name || comp.competency_name || String(comp);
+      return name.toLowerCase();
+    });
+
+    // Parse Prompt 2 output
+    let parsed;
+    if (typeof prompt2Output === 'string') {
+      try {
+        parsed = JSON.parse(prompt2Output);
+      } catch {
+        return prompt2Output; // Can't parse, return as-is
+      }
+    } else {
+      parsed = prompt2Output;
+    }
+
+    // Filter competencies_for_skills_engine_processing array
+    if (parsed.competencies_for_skills_engine_processing && Array.isArray(parsed.competencies_for_skills_engine_processing)) {
+      const filtered = parsed.competencies_for_skills_engine_processing.filter(comp => {
+        const compName = (comp.competency_name || comp.name || String(comp)).toLowerCase();
+        return filteredCompetencyNames.includes(compName);
+      });
+
+      return {
+        ...parsed,
+        competencies_for_skills_engine_processing: filtered
+      };
+    }
+
+    // If format is different, return as-is (can't filter)
+    return prompt2Output;
   }
 }
 

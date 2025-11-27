@@ -113,6 +113,43 @@ export class SkillsExpansionRepository {
   }
 
   /**
+   * Get most recent skills expansion for a gap_id (for update scenarios)
+   * @param {string} gapId
+   * @returns {Promise<Object|null>}
+   */
+  async getLatestSkillsExpansionByGapId(gapId) {
+    const expansions = await this.getAllSkillsExpansions({ gap_id: gapId, limit: 1 });
+    return expansions.length > 0 ? expansions[0] : null;
+  }
+
+  /**
+   * Get most recent skills expansion for a user_id and gap_id
+   * Useful for finding existing expansions when updating learning paths
+   * @param {string} userId
+   * @param {string} gapId
+   * @returns {Promise<Object|null>}
+   */
+  async getLatestSkillsExpansionByUserAndGap(userId, gapId) {
+    const { data, error } = await this.client
+      .from('skills_expansions')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('gap_id', gapId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      throw new Error(`Failed to get skills expansion: ${error.message}`);
+    }
+
+    return this._mapToSkillsExpansion(data);
+  }
+
+  /**
    * Update skills expansion
    * @param {string} expansionId
    * @param {Object} updates
