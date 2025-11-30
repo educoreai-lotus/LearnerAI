@@ -54,20 +54,33 @@ export class ProcessSkillsGapUpdateUseCase {
 
     // Step 1: Check if company exists (MUST be done FIRST due to foreign key constraint)
     // Learners table has FK to companies, so company must exist before learner
-    const existingCompany = await this.companyRepository.getCompanyById(company_id);
+    let existingCompany;
+    try {
+      existingCompany = await this.companyRepository.getCompanyById(company_id);
+    } catch (error) {
+      // If company lookup fails, log the error but try to create the company anyway
+      console.error(`⚠️  Error checking company ${company_id}: ${error.message}`);
+      // Continue - we'll try to create it if it doesn't exist
+      existingCompany = null;
+    }
 
     if (!existingCompany) {
       // Step 2: Create company if it doesn't exist
       // Use default decision_maker_policy if not provided
       // Use upsertCompany which will create if not exists, update if exists
-      await this.companyRepository.upsertCompany({
-        company_id,
-        company_name,
-        decision_maker_policy: 'auto', // Default policy
-        decision_maker: null
-      });
+      try {
+        await this.companyRepository.upsertCompany({
+          company_id,
+          company_name,
+          decision_maker_policy: 'auto', // Default policy
+          decision_maker: null
+        });
 
-      console.log(`✅ Created new company: ${company_name} (${company_id})`);
+        console.log(`✅ Created new company: ${company_name} (${company_id})`);
+      } catch (upsertError) {
+        console.error(`❌ Failed to create company ${company_id}: ${upsertError.message}`);
+        throw new Error(`Failed to create company: ${upsertError.message}`);
+      }
     }
 
     // Step 3: Check if learner exists (MUST be done BEFORE skills gap due to FK constraint)

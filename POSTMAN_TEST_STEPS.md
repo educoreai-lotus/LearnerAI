@@ -148,7 +148,9 @@ If the above doesn't work, try this format:
 
 ## 📋 Step 4: Generate Learning Path (Triggers All 3 Prompts)
 
-**Purpose:** This is where Gemini API and all 3 prompts are executed!
+**Purpose:** After skills gap is created, trigger learning path generation. This is where Gemini API and all 3 prompts are executed!
+
+**⚠️ Important:** In production, Skills Engine would automatically call this endpoint after sending the skills gap. For testing, we call it manually.
 
 **Request:**
 - **Method:** `POST`
@@ -176,13 +178,24 @@ If the above doesn't work, try this format:
 
 **✅ Save the `jobId` - you'll use it to check progress**
 
-**What happens now:**
-1. **Prompt 1** executes (Skill Expansion) - ~10-20 seconds
-2. **Prompt 2** executes (Competency Identification) - ~10-20 seconds
-3. **Prompt 3** executes (Path Creation) - ~30-60 seconds
-4. Learning path is saved to database
+**What happens now (Automatic Process):**
+1. **System fetches skills gap** from database (using `userId` + `competencyTargetName`)
+2. **Prompt 1** executes (Skill Expansion) - ~10-20 seconds
+   - Uses `skills_raw_data` from the skills gap
+3. **Prompt 2** executes (Competency Identification) - ~10-20 seconds
+   - Uses Prompt 1 output
+   - **After Prompt 2:** System sends competencies to Skills Engine for breakdown
+4. **Skills Engine returns** Micro/Nano skills breakdown
+5. **Prompt 3** executes (Path Creation) - ~30-60 seconds
+   - Uses: initial gap + Prompt 2 competencies + Skills Engine breakdown
+6. Learning path is saved to database
 
 **💡 Watch your backend console logs to see the prompts executing!**
+
+**Note:** The system automatically:
+- Fetches the skills gap from database (created in Step 2)
+- Sends competencies to Skills Engine after Prompt 2
+- Combines all data for Prompt 3
 
 ---
 
@@ -226,6 +239,19 @@ http://localhost:5000/api/v1/jobs/abc123-def456-ghi789/status
 }
 ```
 
+**Stage 2.5 - Skills Engine Breakdown (After Prompt 2):**
+```json
+{
+  "jobId": "abc123...",
+  "status": "processing",
+  "progress": 50,
+  "currentStage": "skill-breakdown",
+  "result": null,
+  "error": null
+}
+```
+*Note: This stage happens automatically after Prompt 2 - system sends competencies to Skills Engine and receives Micro/Nano breakdown*
+
 **Stage 3 - Prompt 3 Running:**
 ```json
 {
@@ -259,7 +285,22 @@ http://localhost:5000/api/v1/jobs/abc123-def456-ghi789/status
 - Total time: ~60-100 seconds
 - Prompt 1: ~10-20 seconds
 - Prompt 2: ~10-20 seconds
+- Skills Engine breakdown: ~2-5 seconds (after Prompt 2)
 - Prompt 3: ~30-60 seconds
+
+**Complete Flow:**
+```
+Step 2: Skills Gap Created
+    ↓
+Step 4: Generate Learning Path (manual trigger for testing)
+    ↓
+    ├─> Fetch skills gap from database
+    ├─> Prompt 1: Expand skills
+    ├─> Prompt 2: Identify competencies
+    ├─> Send to Skills Engine → Get Micro/Nano breakdown
+    ├─> Prompt 3: Create path (using gap + competencies + breakdown)
+    └─> Save to database
+```
 
 ---
 
@@ -300,6 +341,28 @@ http://localhost:5000/api/v1/jobs/abc123-def456-ghi789/status
 
 **✅ If you see a complete learning path with modules, steps, and subtopics, all prompts worked!**
 
+**📋 What Happens Next (Approval Flow):**
+
+After the learning path is generated, the system automatically checks the company's approval policy:
+
+1. **Auto Approval (`approval_policy: "auto"`):**
+   - ✅ Learning path is **immediately distributed** to Course Builder
+   - ✅ Sent to Reports microservice
+   - ✅ No approval needed
+
+2. **Manual Approval (`approval_policy: "manual"`):**
+   - 📋 Approval request is created in `path_approvals` table (status: `"pending"`)
+   - 📧 Decision maker receives notification (currently logged to console)
+   - ⏳ System waits for decision maker's response
+   - ✅ If approved → Path is distributed to Course Builder
+   - ❌ If rejected → Feedback stored, path not distributed
+   - 🔄 If changes requested → Feedback stored, path can be regenerated
+
+3. **Exception: Updates After Exam Failure:**
+   - 🔄 If path is an **update** after exam failure (existing course + `exam_status: 'fail'`)
+   - ✅ **Skips approval workflow** (even for manual approval companies)
+   - ✅ **Automatically distributed** to Course Builder
+
 ---
 
 ## 📋 Step 7: Check Prompt Outputs in Database (Optional)
@@ -337,7 +400,137 @@ http://localhost:5000/api/v1/jobs/abc123-def456-ghi789/status
 
 ---
 
-## 📋 Step 8: Test Health Check Again (Verify Everything Still Works)
+## 📋 Step 8: Check Approval Status (If Manual Approval Required)
+
+**Purpose:** If the company has `approval_policy: "manual"`, check if an approval request was created
+
+**Request:**
+- **Method:** `GET`
+- **URL:** `http://localhost:5000/api/v1/approvals`
+- **Query Parameters:**
+  - `company_id`: `c1d2e3f4-5678-9012-3456-789012345678` (optional)
+  - `status`: `pending` (optional)
+
+**Expected Response (Manual Approval):**
+```json
+{
+  "count": 1,
+  "approvals": [
+    {
+      "id": "approval-uuid-here",
+      "learning_path_id": "GraphQL API Development",
+      "company_id": "c1d2e3f4-5678-9012-3456-789012345678",
+      "status": "pending",
+      "decision_maker_id": "...",
+      "created_at": "...",
+      "approved_at": null,
+      "rejected_at": null,
+      "feedback": null
+    }
+  ]
+}
+```
+
+**Expected Response (Auto Approval):**
+```json
+{
+  "count": 0,
+  "approvals": []
+}
+```
+*No approval needed - path was distributed directly*
+
+**✅ If you see a pending approval, proceed to Step 9**
+
+---
+
+## 📋 Step 9: Approve/Reject Learning Path (Manual Approval Only)
+
+**Purpose:** Simulate decision maker approving or rejecting the learning path
+
+**Request:**
+- **Method:** `POST`
+- **URL:** `http://localhost:5000/api/v1/approvals/{approvalId}/respond`
+  - Replace `{approvalId}` with the approval ID from Step 8
+- **Headers:**
+  - `Content-Type: application/json`
+- **Body (raw JSON):**
+
+**Option A: Approve**
+```json
+{
+  "response": "approved"
+}
+```
+
+**Option B: Reject**
+```json
+{
+  "response": "rejected",
+  "feedback": "This path doesn't meet our requirements"
+}
+```
+
+**Option C: Request Changes**
+```json
+{
+  "response": "changes_requested",
+  "feedback": "Please add more practical exercises"
+}
+```
+
+**Expected Response (Approved):**
+```json
+{
+  "id": "approval-uuid-here",
+  "status": "approved",
+  "approved_at": "2025-01-22T...",
+  "feedback": null
+}
+```
+
+**What happens after approval:**
+1. ✅ Course is marked as `approved: true` in `courses` table
+2. ✅ Learning path is **distributed to Course Builder**
+3. ✅ Learning path is sent to **Reports microservice**
+4. 📧 Notification sent to requester (currently logged to console)
+
+**What happens after rejection:**
+1. ❌ Approval status set to `"rejected"`
+2. ❌ Feedback stored in database
+3. ❌ Path is **NOT distributed** to Course Builder
+4. 📧 Notification sent to requester
+
+**What happens after changes requested:**
+1. 🔄 Approval status set to `"changes_requested"`
+2. 🔄 Feedback stored in database
+3. ❌ Path is **NOT distributed** (can be regenerated with feedback)
+4. 📧 Notification sent to requester
+
+---
+
+## 📋 Step 10: Verify Path Distribution (After Approval)
+
+**Purpose:** Check if the learning path was sent to Course Builder
+
+**Note:** This step requires Course Builder microservice to be running or configured. The system will use mock data if Course Builder is unavailable.
+
+**What to check:**
+1. **Backend logs** should show:
+   ```
+   ✅ Learning path sent to Course Builder: GraphQL API Development
+   ✅ Learning path sent to Reports: GraphQL API Development
+   ```
+
+2. **If Course Builder is unavailable:**
+   ```
+   ⚠️ Course Builder unavailable, used rollback mock data
+   ```
+   *This is expected if Course Builder microservice is not running*
+
+---
+
+## 📋 Step 11: Test Health Check Again (Verify Everything Still Works)
 
 **Request:**
 - **Method:** `GET`
@@ -358,14 +551,19 @@ http://localhost:5000/api/v1/jobs/abc123-def456-ghi789/status
 
 - [ ] Step 1: Health check returns `"status": "healthy"`
 - [ ] Step 2: Skills gap created successfully
-- [ ] Step 3: Learning path generation started (got `jobId`)
-- [ ] Step 4: Job status shows progress through all stages:
+- [ ] Step 3: Verify skills gap was created
+- [ ] Step 4: Learning path generation started (got `jobId`)
+- [ ] Step 5: Job status shows progress through all stages:
   - [ ] `currentStage: "skill-expansion"` (Prompt 1)
   - [ ] `currentStage: "competency-identification"` (Prompt 2)
+  - [ ] `currentStage: "skill-breakdown"` (Skills Engine)
   - [ ] `currentStage: "path-creation"` (Prompt 3)
   - [ ] `status: "completed"`
-- [ ] Step 5: Learning path retrieved with full structure
-- [ ] Step 6: Prompt outputs visible in skills_expansions
+- [ ] Step 6: Learning path retrieved with full structure
+- [ ] Step 7: Prompt outputs visible in skills_expansions
+- [ ] Step 8: Approval status checked (if manual approval)
+- [ ] Step 9: Approval response processed (if manual approval)
+- [ ] Step 10: Path distribution verified (after approval)
 
 ---
 
@@ -406,11 +604,18 @@ When Step 4 runs, you should see:
 [GenerateLearningPathUseCase] Executing Prompt 2...
 ✅ Prompt 2 executed successfully
 ✅ Saved Prompt 2 output to skills_expansions
-✅ Skills Engine breakdown received
+✅ Extracted competencies for Skills Engine
+✅ Skills Engine breakdown received for X competencies
 ✅ Loaded prompt: prompt3-path-creation
 [GenerateLearningPathUseCase] Executing Prompt 3...
 ✅ Prompt 3 executed successfully
 ✅ Learning path saved to courses table
+✅ Checking approval policy...
+✅ Approval request created for path X (manual approval required)
+   OR
+✅ Learning path X distributed (auto approval)
+✅ Learning path sent to Course Builder: X
+✅ Learning path sent to Reports: X
 ```
 
 ---

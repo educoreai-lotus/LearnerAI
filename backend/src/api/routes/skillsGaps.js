@@ -60,20 +60,33 @@ export function createSkillsGapsRouter(dependencies) {
       // Check if this is a Skills Engine update (has 'gap' field)
       if (gap && processGapUpdateUseCase) {
         // Use the new flow: Process Skills Engine gap update
-        const skillsGap = await processGapUpdateUseCase.execute({
-          user_id,
-          user_name,
-          company_id,
-          company_name,
-          competency_target_name: competency_target_name || competency_name, // Primary field
-          competency_name, // For backward compatibility
-          status,
-          gap
-        });
+        try {
+          const skillsGap = await processGapUpdateUseCase.execute({
+            user_id,
+            user_name,
+            company_id,
+            company_name,
+            competency_target_name: competency_target_name || competency_name, // Primary field
+            competency_name, // For backward compatibility
+            status,
+            gap
+          });
 
-        return res.status(200).json({
-          message: 'Skills gap processed successfully',
-          skillsGap
+          return res.status(200).json({
+            message: 'Skills gap processed successfully',
+            skillsGap
+          });
+        } catch (useCaseError) {
+          // Re-throw with more context
+          throw new Error(`Failed to process skills gap: ${useCaseError.message}`);
+        }
+      }
+      
+      // If gap field is missing but other fields suggest it should be there, provide helpful error
+      if (!gap && (status || competency_target_name || competency_name)) {
+        return res.status(400).json({
+          error: 'Missing required field: gap',
+          message: 'The "gap" field is required for skills gap processing. Please include the gap data with micro/nano skills.'
         });
       }
 

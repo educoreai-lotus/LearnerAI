@@ -18,7 +18,10 @@ export function createLearningPathsRouter(dependencies) {
     promptLoader,
     cacheRepository = null, // Optional - old schema feature
     skillsGapRepository, // Add for fetching updated skills_raw_data
-    skillsExpansionRepository // Add for saving prompt outputs
+    skillsExpansionRepository, // Add for saving prompt outputs
+    checkApprovalPolicyUseCase, // Approval workflow
+    requestPathApprovalUseCase, // Approval workflow
+    distributePathUseCase // Approval workflow
   } = dependencies;
 
   const generatePathUseCase = new GenerateLearningPathUseCase({
@@ -29,7 +32,10 @@ export function createLearningPathsRouter(dependencies) {
     promptLoader,
     cacheRepository,
     skillsGapRepository,
-    skillsExpansionRepository
+    skillsExpansionRepository,
+    checkApprovalPolicyUseCase,
+    requestPathApprovalUseCase,
+    distributePathUseCase
   });
 
   /**

@@ -81,17 +81,30 @@ export class SupabaseRepository {
       status: learningPath.status
     };
 
+    // Build upsert data - let database handle timestamps to avoid timezone issues
+    const upsertData = {
+      competency_target_name: learningPath.competencyTargetName || learningPath.id, // Primary key
+      user_id: learningPath.userId,
+      gap_id: learningPath.gapId || null, // Link to original skills gap
+      learning_path: pathData,
+      approved: learningPath.status === 'approved' || learningPath.status === 'completed'
+    };
+    
+    // Only set created_at if this is a NEW record (not updating existing)
+    // For updates, PostgreSQL will preserve the existing created_at value
+    // For new records, database DEFAULT NOW() will handle it, but we can also preserve
+    // the original created_at if provided (for consistency)
+    // Note: last_modified_at is handled by database trigger automatically
+    
+    // Check if this is an update by checking if record exists
+    // If updating, don't set created_at (preserve original)
+    // If new, let database DEFAULT NOW() handle it (or use provided value)
+    // For simplicity, let database always use DEFAULT NOW() for new records
+    // and preserve existing created_at for updates (by not including it in upsert)
+    
     const { data, error } = await this.client
       .from('courses')
-      .upsert({
-        competency_target_name: learningPath.competencyTargetName || learningPath.id, // Primary key
-        user_id: learningPath.userId,
-        gap_id: learningPath.gapId || null, // Link to original skills gap
-        learning_path: pathData,
-        approved: learningPath.status === 'approved' || learningPath.status === 'completed',
-        created_at: learningPath.createdAt,
-        last_modified_at: learningPath.updatedAt
-      }, {
+      .upsert(upsertData, {
         onConflict: 'competency_target_name'
       })
       .select()

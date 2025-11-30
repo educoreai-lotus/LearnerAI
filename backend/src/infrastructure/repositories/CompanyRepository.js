@@ -46,20 +46,40 @@ export class CompanyRepository {
    * @returns {Promise<Object|null>}
    */
   async getCompanyById(companyId) {
-    const { data, error } = await this.client
-      .from('companies')
-      .select('*')
-      .eq('company_id', companyId)
-      .single();
-
-    if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Not found
-      }
-      throw new Error(`Failed to get company: ${error.message}`);
+    if (!companyId) {
+      throw new Error('Company ID is required');
     }
 
-    return this._mapToCompany(data);
+    try {
+      const { data, error } = await this.client
+        .from('companies')
+        .select('*')
+        .eq('company_id', companyId)
+        .single();
+
+      if (error) {
+        if (error.code === 'PGRST116') {
+          return null; // Not found - this is expected for new companies
+        }
+        // Log full error details for debugging
+        console.error(`[CompanyRepository] Error getting company ${companyId}:`, {
+          code: error.code,
+          message: error.message,
+          details: error.details,
+          hint: error.hint
+        });
+        throw new Error(`Failed to get company: ${error.message || 'Internal server error'}`);
+      }
+
+      return this._mapToCompany(data);
+    } catch (err) {
+      // If it's already our formatted error, re-throw it
+      if (err.message && err.message.startsWith('Failed to get company:')) {
+        throw err;
+      }
+      // Otherwise, wrap it
+      throw new Error(`Failed to get company: ${err.message || 'Internal server error'}`);
+    }
   }
 
   /**

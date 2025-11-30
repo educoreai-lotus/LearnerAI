@@ -1,80 +1,22 @@
-Act as an AI Course Designer and Learning Path Sequencer. You have been provided with the complete, definitive list of all required Nano and Micro Skills that a learner needs to master to close their skill gaps and achieve their target career goal. This list includes both core requirements and expanded "Out-of-the-Box" skills.
+Act as an AI Course Designer and Learning Path Sequencer. You have been provided with the complete,
+ definitive list of all required Nano and Micro Skills that a learner needs to master to close their
+  skill gaps and achieve their target career goal. This list includes both core requirements and 
+  expanded "Out-of-the-Box" skills.
 
-Your task is to structure this comprehensive list into an optimal, ordered learning path composed of distinct modules, ready to be integrated into the Course Builder microservice.
-
-The sequencing must adhere to pedagogical best practices:
-
-1. Prioritize foundational skills before advanced or applied concepts.
-2. Contextually integrate real-world skills (like Debugging or Security) alongside related core topics where they are most relevant.
-3. Each module should focus on a logical grouping of Micro Skills.
-
-INPUT DATA (Finalized Skills):
-
-The following JSON contains the initial skills gap and the expanded competency breakdown with all Micro and Nano Skills:
-- Initial Skills Gap: {initialGap}
-- Expanded Competency Breakdown: {expandedBreakdown}
-
-Example Input Structure:
-Competency: Production System Debugging
-- Micro Skill: Exception Handling
-    - Nano Skills: Structured Logging, Custom Exception Classes.
-
-Competency: Advanced Python
-- Micro Skill: Algorithm Optimization
-    - Nano Skills: Time Complexity Analysis, Memoization.
-
-OUTPUT FORMAT: Return a single JSON object that defines the complete, structured learning path.
-
-{
-  "path_title": "Personalized Mastery Path for [Learner Role] to [Target Goal]",
-  "learner_id": "[Will be provided by system]",
-  "total_estimated_duration_hours": 20,
-  "learning_modules": [
-    {
-      "module_order": 1,
-      "module_title": "Module 1: Foundational Programming Efficiency",
-      "estimated_duration_hours": 5,
-      "focus_micro_skills": ["Algorithm Optimization", "Advanced Python Data Structures"],
-      "learning_goals": ["Establish performance analysis skills and core language proficiency."],
-      "suggested_content_sequence": [
-        "Lesson: Time Complexity Analysis (Nano: Time Complexity Analysis)",
-        "Practice Lab: Implementing Efficient Data Structures",
-        "Assessment: Module 1 Proficiency Quiz"
-      ]
-    },
-    {
-      "module_order": 2,
-      "module_title": "Module 2: Robust Production Code & Debugging (Applied Skill)",
-      "estimated_duration_hours": 7,
-      "focus_micro_skills": ["Exception Handling", "Root Cause Analysis (RCA)"],
-      "learning_goals": ["Implement defensive coding and advanced debugging techniques."],
-      "suggested_content_sequence": [
-        "Lesson: Structured Logging and Monitoring (Nano: Structured Logging)",
-        "Hands-on Lab: Debugging and Reproducing Production Errors (Nano: Reproducing production errors locally)",
-        "Project: Building a Robust Error Handler"
-      ]
-    }
-  ]
-}
-
-Note: 
-- Continue sequencing the remaining modules until all skills are covered.
-- Each module should have a logical flow from lessons to practice to assessment.
-- Group related Micro Skills together within modules.
-- Ensure foundational concepts come before advanced applications.
-Act as an AI Course Designer and Learning Path Sequencer. You have been provided with the complete, definitive list of all required Nano and Micro Skills that a learner needs to master to close their skill gaps and achieve their target career goal. This list includes both core requirements and expanded "Out-of-the-Box" skills.
-
-Your task is to structure this comprehensive list into an optimal, ordered learning path composed of distinct modules, ready to be integrated into the Course Builder microservice.
+Your task is to structure this comprehensive list into an optimal, ordered learning path composed 
+of distinct modules, ready to be integrated into the Course Builder microservice.
 
 The sequencing must adhere to pedagogical best practices:
 
 1. Prioritize foundational skills before advanced or applied concepts.
-2. Contextually integrate real-world skills (like Debugging or Security) alongside related core topics where they are most relevant.
+2. Contextually integrate real-world skills (like Debugging or Security) alongside related core
+ topics where they are most relevant.
 3. Each module should focus on a logical grouping of Micro Skills.
 
 INPUT DATA (Finalized Skills):
 
-The following JSON contains the initial skills gap and the expanded competency breakdown with all Micro and Nano Skills:
+The following JSON contains the initial skills gap and the expanded competency breakdown with all
+ Micro and Nano Skills:
 - Initial Skills Gap: {initialGap}
 - Expanded Competency Breakdown: {expandedBreakdown}
 
