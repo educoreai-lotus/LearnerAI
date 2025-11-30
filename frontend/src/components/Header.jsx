@@ -65,7 +65,7 @@ export default function Header() {
   };
 
   // Navigation button classes - Home button always has green background on all pages
-  const getNavButtonClasses = (isActive) => {
+  const getNavButtonClasses = () => {
     // Home button always has the green background regardless of active state
     return isDayMode
       ? 'bg-primary-100 text-primary-700 hover:bg-primary-200 hover:text-primary-800' // Always green background
@@ -111,9 +111,7 @@ export default function Header() {
                   <button
                     key={item.path}
                     onClick={() => navigate(item.path)}
-                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out flex items-center gap-2 ${getNavButtonClasses(
-                      isActive
-                    )}`}
+                    className={`px-4 py-2 rounded-lg font-medium transition-all duration-300 ease-in-out flex items-center gap-2 ${getNavButtonClasses()}`}
                   >
                     {/* Home Icon */}
                     <svg
@@ -313,9 +311,7 @@ export default function Header() {
                 <button
                   key={item.path}
                   onClick={() => navigate(item.path)}
-                  className={`px-4 py-3 rounded-lg font-medium text-left transition-all duration-300 ease-in-out flex items-center gap-2 ${getNavButtonClasses(
-                    isActive
-                  )}`}
+                  className={`px-4 py-3 rounded-lg font-medium text-left transition-all duration-300 ease-in-out flex items-center gap-2 ${getNavButtonClasses()}`}
                 >
                   {/* Home Icon */}
                   <svg

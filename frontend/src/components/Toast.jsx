@@ -38,6 +38,7 @@ export default function Toast({ message, type = 'success', onClose, duration = 3
  * Toast Container Hook
  * Manages toast state
  */
+// eslint-disable-next-line react-refresh/only-export-components
 export function useToast() {
   const [toast, setToast] = useState(null);
 

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Card from '../components/Card';
@@ -22,11 +22,7 @@ export default function ApprovalsList() {
   // Using a valid UUID from sample data: '550e8400-e29b-41d4-a716-446655440010' (John Manager from TechCorp)
   const [decisionMakerId] = useState('550e8400-e29b-41d4-a716-446655440010'); // Mock decision maker ID (valid UUID)
 
-  useEffect(() => {
-    loadApprovals();
-  }, [decisionMakerId]);
-
-  const loadApprovals = async () => {
+  const loadApprovals = useCallback(async () => {
     try {
       setLoading(true);
       setError(null);
@@ -38,7 +34,11 @@ export default function ApprovalsList() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [decisionMakerId]);
+
+  useEffect(() => {
+    loadApprovals();
+  }, [loadApprovals]);
 
   const formatDate = (dateString) => {
     return new Date(dateString).toLocaleDateString('en-US', {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import Header from '../components/Header';
 import Card from '../components/Card';
 import UserCard from '../components/UserCard';
@@ -21,11 +21,7 @@ export default function CompanyDashboard() {
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
 
-  useEffect(() => {
-    loadCompanyData();
-  }, [companyId]);
-
-  const loadCompanyData = async () => {
+  const loadCompanyData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -118,7 +114,11 @@ export default function CompanyDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [companyId]);
+
+  useEffect(() => {
+    loadCompanyData();
+  }, [loadCompanyData]);
 
   const filteredUsers = users.filter(user =>
     user.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
@@ -387,7 +387,7 @@ export default function CompanyDashboard() {
                       </div>
                       <div className="text-center py-8 text-neutral-500 dark:text-neutral-500">
                         <p>Learning path content is not available yet.</p>
-                        <p className="text-sm mt-2">The learning path may still be processing or hasn't been generated.</p>
+                        <p className="text-sm mt-2">The learning path may still be processing or hasn&apos;t been generated.</p>
                       </div>
                     </div>
                   );
