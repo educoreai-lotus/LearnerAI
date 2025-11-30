@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import Header from '../components/Header';
 import Card from '../components/Card';
@@ -23,7 +23,11 @@ export default function ApprovalReview() {
   const [learningPath, setLearningPath] = useState(null);
   const [error, setError] = useState(null);
 
-  const loadApprovalData = useCallback(async () => {
+  useEffect(() => {
+    loadApprovalData();
+  }, [approvalId]);
+
+  const loadApprovalData = async () => {
     try {
       setLoading(true);
       setError(null);
@@ -69,11 +73,7 @@ export default function ApprovalReview() {
     } finally {
       setLoading(false);
     }
-  }, [approvalId]);
-
-  useEffect(() => {
-    loadApprovalData();
-  }, [loadApprovalData]);
+  };
 
   const handleApprove = async () => {
     try {
@@ -159,7 +159,7 @@ export default function ApprovalReview() {
                 Approval Not Found
               </h2>
               <p className="text-neutral-600 dark:text-neutral-300 mb-6">
-                The approval request you&apos;re looking for doesn&apos;t exist or the learning path hasn&apos;t been created yet.
+                The approval request you're looking for doesn't exist or the learning path hasn't been created yet.
               </p>
               <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
                 Approval ID: {approvalId}

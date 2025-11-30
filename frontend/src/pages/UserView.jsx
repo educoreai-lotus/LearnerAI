@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect } from 'react';
 import Header from '../components/Header';
 import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
@@ -20,7 +20,11 @@ export default function UserView() {
   const [loading, setLoading] = useState(true);
   const [pathLoading, setPathLoading] = useState(false);
 
-  const loadUserData = useCallback(async () => {
+  useEffect(() => {
+    loadUserData();
+  }, [userId]);
+
+  const loadUserData = async () => {
     try {
       setLoading(true);
       const response = await api.getCoursesByUser(userId);
@@ -45,7 +49,6 @@ export default function UserView() {
       
       setCourses(Array.from(courseMap.values()));
       
-      // eslint-disable-next-line react-hooks/exhaustive-deps
       if (coursesData.length > 0 && !selectedCourse) {
         const firstCourse = coursesData[0].competency_target_name || coursesData[0].competencyTargetName;
         if (firstCourse) {
@@ -58,11 +61,7 @@ export default function UserView() {
     } finally {
       setLoading(false);
     }
-  }, [userId]);
-
-  useEffect(() => {
-    loadUserData();
-  }, [loadUserData]);
+  };
 
   const loadLearningPath = async (competencyTargetName, existingCourses = null) => {
     try {
