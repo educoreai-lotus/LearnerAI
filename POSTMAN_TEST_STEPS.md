@@ -42,7 +42,7 @@
 
 ## 📋 Step 2: Create Skills Gap (Simulate Skills Engine)
 
-**Purpose:** Create a skills gap that would normally come from Skills Engine. This is the starting point.
+**Purpose:** Create a skills gap that would normally come from Skills Engine. This is the starting point......
 
 **Request:**
 - **Method:** `POST`
