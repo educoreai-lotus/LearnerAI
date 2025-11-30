@@ -7,7 +7,7 @@ LearnerAI communicates with 4 external microservices through a coordinator:
 1. **Directory** - Company and user management
 2. **Skills Engine** - Skills gap analysis
 3. **Learning Analytics** - Learning analytics and insights
-4. **Course Builder** - Course building
+4. **Course Builder** - Course building.....
 
 ---
 
