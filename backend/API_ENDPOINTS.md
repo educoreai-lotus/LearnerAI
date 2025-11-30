@@ -185,7 +185,7 @@ http://localhost:5000/api/v1
 
 ---
 
-### 6. AI Query (`/api/v1/ai`)
+### 6. AI Query (`/api/v1/ai`).
 
 #### Query AI
 - **POST** `/api/v1/ai/query`
