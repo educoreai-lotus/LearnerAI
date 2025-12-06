@@ -2,8 +2,8 @@ Act as an API Request Builder and Data Filter. Your task is to process the list 
 Expanded Competencies (Core and Out-of-the-Box) generated in the previous step.
 
 You must identify all competencies that require a Micro/Nano Skill breakdown, and
- generate a standardized query template that the Backend system will use to communicate
-  with the Skills Engine.
+generate a standardized query template that the Backend system will use to communicate
+with the Skills Engine.
 
 INPUT DATA (Expanded Competencies List from Prompt 1):
 {input}

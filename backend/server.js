@@ -23,6 +23,9 @@ import { ApprovalRepository } from './src/infrastructure/repositories/ApprovalRe
 import { PromptLoader } from './src/infrastructure/prompts/PromptLoader.js';
 import { NotificationService } from './src/infrastructure/services/NotificationService.js';
 
+// Service Registration
+import { registerService } from './src/registration/register.js';
+
 // Use Cases
 import { DistributePathUseCase } from './src/application/useCases/DistributePathUseCase.js';
 import { DetectCompletionUseCase } from './src/application/useCases/DetectCompletionUseCase.js';
@@ -453,6 +456,11 @@ app.use((req, res) => {
     error: 'Not Found',
     message: `Route ${req.path} not found` 
   });
+});
+
+// Register with Coordinator on startup (non-blocking)
+registerService().catch(error => {
+  console.error('Registration error (non-blocking):', error.message);
 });
 
 // Start server

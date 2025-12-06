@@ -21,17 +21,34 @@ export class RequestPathApprovalUseCase {
    * @returns {Promise<PathApproval>}
    */
   async execute({ learningPathId, companyId, decisionMaker, learningPath }) {
-    // Create approval entity
-    const approval = new PathApproval({
-      id: uuidv4(),
-      learningPathId,
-      companyId,
-      decisionMakerId: decisionMaker.employee_id,
-      status: 'pending'
-    });
+    // Check if an approval already exists for this learning path
+    const existingApproval = await this.approvalRepository.getApprovalByLearningPathId(learningPathId);
+    
+    let savedApproval;
+    
+    if (existingApproval) {
+      // If approval exists, update it to 'pending' status (for path updates/regenerations)
+      console.log(`🔄 Found existing approval ${existingApproval.id} for path ${learningPathId} - updating to pending`);
+      savedApproval = await this.approvalRepository.updateApproval(existingApproval.id, {
+        status: 'pending',
+        feedback: null, // Clear previous feedback
+        approvedAt: null,
+        rejectedAt: null,
+        changesRequestedAt: null
+      });
+    } else {
+      // Create new approval entity
+      const approval = new PathApproval({
+        id: uuidv4(),
+        learningPathId,
+        companyId,
+        decisionMakerId: decisionMaker.employee_id,
+        status: 'pending'
+      });
 
-    // Save to database
-    const savedApproval = await this.approvalRepository.createApproval(approval);
+      // Save to database
+      savedApproval = await this.approvalRepository.createApproval(approval);
+    }
 
     // Send notification to decision maker
     try {

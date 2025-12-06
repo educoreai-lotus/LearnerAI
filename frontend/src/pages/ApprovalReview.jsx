@@ -161,9 +161,6 @@ export default function ApprovalReview() {
               <p className="text-neutral-600 dark:text-neutral-300 mb-6">
                 The approval request you're looking for doesn't exist or the learning path hasn't been created yet.
               </p>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
-                Approval ID: {approvalId}
-              </p>
               <PrimaryButton onClick={() => navigate('/approvals')}>
                 View All Approvals
               </PrimaryButton>
@@ -215,9 +212,6 @@ export default function ApprovalReview() {
               <p className="text-neutral-600 dark:text-neutral-300 mb-6">
                 {!approvalData && 'Approval data is missing.'}
                 {!learningPath && 'Learning path data is missing.'}
-              </p>
-              <p className="text-sm text-neutral-500 dark:text-neutral-400 mb-4">
-                Approval ID: {approvalId}
               </p>
               <PrimaryButton onClick={() => navigate('/approvals')}>
                 View All Approvals
@@ -324,7 +318,7 @@ export default function ApprovalReview() {
 
               {learningPath.requester && (
                 <div className="border-t border-neutral-200 dark:border-neutral-700 pt-4 mt-4">
-                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-1">Requested by</p>
+                  <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-1">Learner:</p>
                   <p className="text-neutral-900 dark:text-white font-medium">
                     {learningPath.requester.name}
                   </p>
@@ -382,7 +376,7 @@ export default function ApprovalReview() {
                 Your Decision
               </h3>
 
-              {approvalData.status !== 'pending' && (
+              {approvalData.status !== 'pending' && approvalData.status !== 'changes_requested' && (
                 <div className="mb-4 p-4 bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg">
                   <p className="text-sm text-yellow-800 dark:text-yellow-200">
                     Status: <strong>{approvalData.status.replace('_', ' ').toUpperCase()}</strong>
@@ -395,7 +389,23 @@ export default function ApprovalReview() {
                 </div>
               )}
 
-              {approvalData.status === 'pending' && (
+              {approvalData.status === 'changes_requested' && (
+                <div className="mb-4 p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800 rounded-lg">
+                  <p className="text-sm text-orange-800 dark:text-orange-200 mb-2">
+                    Status: <strong>CHANGES REQUESTED</strong>
+                  </p>
+                  {approvalData.feedback && (
+                    <p className="text-sm text-orange-700 dark:text-orange-300 mb-3">
+                      <strong>Previous Feedback:</strong> {approvalData.feedback}
+                    </p>
+                  )}
+                  <p className="text-sm text-orange-700 dark:text-orange-300">
+                    Review the updated learning path and approve if changes have been addressed.
+                  </p>
+                </div>
+              )}
+
+              {(approvalData.status === 'pending' || approvalData.status === 'changes_requested') && (
                 <>
                   {!showFeedback ? (
                     <div className="space-y-3">
@@ -460,12 +470,6 @@ export default function ApprovalReview() {
                 Approval Details
               </h4>
               <div className="space-y-2 text-sm">
-                <div>
-                  <span className="text-neutral-600 dark:text-neutral-400">ID:</span>
-                  <span className="ml-2 text-neutral-900 dark:text-white font-mono text-xs">
-                    {approvalData.id}
-                  </span>
-                </div>
                 <div>
                   <span className="text-neutral-600 dark:text-neutral-400">Created:</span>
                   <span className="ml-2 text-neutral-900 dark:text-white">

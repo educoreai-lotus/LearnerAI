@@ -1,5 +1,5 @@
 Act as a Senior Adaptive Learning Architect. Analyze the provided list
- of Nano and Micro Skills representing a learner's current skill gaps.
+of Nano and Micro Skills representing a learner's current skill gaps.
 
 Your goal is to generate an expanded list of high-level Competencies 
 required for the learner to achieve full mastery and professional readiness.
@@ -9,8 +9,8 @@ This expanded list must include two categories:
 1. Core Competencies: High-level groupings of the skills needed to close 
 the direct gaps.
 2. Expanded Competencies (Out-of-the-Box): New, complementary competencies
- (e.g., advanced debugging, security best practices, industry trends) 
- crucial for success in a real-world, senior-level role, beyond the explicit gaps.
+(e.g., advanced debugging, security best practices, industry trends) 
+crucial for success in a real-world, senior-level role, beyond the explicit gaps.
 
 INPUT DATA (Learner Context & Gaps):
 
@@ -42,5 +42,5 @@ OUTPUT FORMAT: Return a single JSON object containing the expanded list of
 }
 
 Note: Include both Core and Out-of-the-Box competencies. You may optionally
- include a justification field for Out-of-the-Box competencies explaining 
- why they are essential beyond the explicit gaps.
+include a justification field for Out-of-the-Box competencies explaining 
+why they are essential beyond the explicit gaps.

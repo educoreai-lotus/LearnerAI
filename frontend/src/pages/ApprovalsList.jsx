@@ -109,7 +109,7 @@ export default function ApprovalsList() {
                 <div className="flex items-center justify-between">
                   <div className="flex-1">
                     <h3 className="text-lg font-semibold text-primary-800 dark:text-primary-300 mb-1">
-                      Learning Path Approval
+                      {approval.learningPathId || 'Learning Path Approval'}
                     </h3>
                     <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-2">
                       Requested on {formatDate(approval.createdAt)}
@@ -118,19 +118,18 @@ export default function ApprovalsList() {
                       <span className={`px-3 py-1 rounded-full text-xs font-medium ${
                         approval.status === 'pending'
                           ? 'bg-yellow-100 dark:bg-yellow-900/30 text-yellow-800 dark:text-yellow-200'
+                          : approval.status === 'changes_requested'
+                          ? 'bg-orange-100 dark:bg-orange-900/30 text-orange-800 dark:text-orange-200'
                           : 'bg-gray-100 dark:bg-gray-700 text-gray-800 dark:text-gray-200'
                       }`}>
                         {approval.status.replace('_', ' ').toUpperCase()}
-                      </span>
-                      <span className="text-neutral-500 dark:text-neutral-400 font-mono text-xs">
-                        ID: {approval.id.substring(0, 8)}...
                       </span>
                     </div>
                   </div>
                   <div>
                     <PrimaryButton
                       onClick={() => navigate(`/approvals/${approval.id}`)}
-                      disabled={approval.status !== 'pending'}
+                      disabled={approval.status === 'approved' || approval.status === 'rejected'}
                     >
                       {approval.status === 'pending' ? 'Review' : 'View'}
                     </PrimaryButton>
