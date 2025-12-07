@@ -490,14 +490,11 @@ export class GenerateLearningPathUseCase {
    */
   async _handlePathDistribution(learningPath, skillsGap, isUpdateAfterFailure = false) {
     // Special case: Skip approval workflow for updates after exam failure
+    // NOTE: We do NOT automatically distribute to Course Builder anymore.
+    // Course Builder will request data when needed via the request endpoint.
     if (isUpdateAfterFailure) {
       console.log(`🔄 Learning path ${learningPath.id} is an update after exam failure - skipping approval workflow`);
-      if (this.distributePathUseCase) {
-        await this.distributePathUseCase.execute(learningPath.id);
-        console.log(`✅ Learning path ${learningPath.id} distributed automatically (update after failure, no approval needed)`);
-      } else {
-        console.warn('⚠️  DistributePathUseCase not configured, skipping distribution');
-      }
+      console.log(`📋 Course Builder can now request this learning path data when needed`);
       return;
     }
 
@@ -548,14 +545,11 @@ export class GenerateLearningPathUseCase {
           }
         }
       } else {
-        // Auto approval - distribute directly
-        console.log(`✅ Auto approval for company ${skillsGap.companyId} - distributing directly`);
-        if (this.distributePathUseCase) {
-          await this.distributePathUseCase.execute(learningPath.competencyTargetName || learningPath.id);
-          console.log(`✅ Learning path ${learningPath.competencyTargetName || learningPath.id} distributed (auto approval)`);
-        } else {
-          console.warn('⚠️  DistributePathUseCase not configured, skipping distribution');
-        }
+        // Auto approval - mark as approved but do NOT distribute
+        // NOTE: We do NOT automatically distribute to Course Builder anymore.
+        // Course Builder will request data when needed via the request endpoint.
+        console.log(`✅ Auto approval for company ${skillsGap.companyId} - learning path marked as approved`);
+        console.log(`📋 Course Builder can now request this learning path data when needed`);
       }
     } catch (error) {
       console.error(`❌ Error handling path distribution: ${error.message}`);

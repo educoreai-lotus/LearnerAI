@@ -11,7 +11,9 @@ export function createEndpointsRouter(dependencies) {
     learnerRepository,
     courseRepository,
     skillsGapRepository,
-    recommendationRepository
+    recommendationRepository,
+    approvalRepository,
+    geminiClient
   } = dependencies;
 
   /**
@@ -22,7 +24,7 @@ export function createEndpointsRouter(dependencies) {
    * "{\"requester_service\":\"content-studio\",\"payload\":{\"action\":\"generate-questions\",...},\"response\":{\"answer\":\"\"}}"
    * 
    * Structure:
-   * - requester_service: service name (assessment, content-studio, analytics, course-builder)
+   * - requester_service: service name (skills-engine, analytics, course-builder, ai)
    * - payload: object with "action" field indicating the action type, plus other data
    * - response: object with "answer" field that will be populated with the result
    * 
@@ -89,11 +91,8 @@ export function createEndpointsRouter(dependencies) {
       let result;
       try {
         switch (requestBody.requester_service) {
-          case "assessment":
-            result = await assessmentHandler(requestBody.payload, dependencies);
-            break;
-          case "content-studio":
-            result = await contentStudioHandler(requestBody.payload, dependencies);
+          case "skills-engine":
+            result = await skillsEngineHandler(requestBody.payload, dependencies);
             break;
           case "analytics":
             result = await analyticsHandler(requestBody.payload, dependencies);
@@ -101,10 +100,14 @@ export function createEndpointsRouter(dependencies) {
           case "course-builder":
             result = await courseBuilderHandler(requestBody.payload, dependencies);
             break;
+          case "ai":
+          case "ai-service":
+            result = await aiHandler(requestBody.payload, dependencies);
+            break;
           default:
             return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
               error: "Unknown requester_service",
-              message: `Unknown service: ${requestBody.requester_service}. Supported services: assessment, content-studio, analytics, course-builder`
+              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, course-builder, ai`
             }));
         }
       } catch (handlerError) {
@@ -385,16 +388,21 @@ export async function fillManagementReportingData(data, { courseRepository, skil
 }
 
 /**
- * Assessment Handler
- * Handles requests from the assessment service (Skills Engine)
+ * Skills Engine Handler
+ * Handles requests from the skills-engine service
  * Payload must contain an "action" field indicating the type of action
+ * 
+ * Action: "update_skills_gap" or "create_skills_gap"
+ * - Requires: user_id, user_name, company_id, company_name, competency_target_name, status, gap
+ * - Processes skills gap and stores in database
+ * - Creates learner if doesn't exist
  */
-async function assessmentHandler(payload, dependencies) {
-  const { courseRepository, skillsGapRepository, learnerRepository, companyRepository } = dependencies;
+async function skillsEngineHandler(payload, dependencies) {
+  const { skillsGapRepository, learnerRepository, companyRepository } = dependencies;
   const { action } = payload;
   
   // Handle skills gap updates from Skills Engine
-  if (action === 'update_skills_gap') {
+  if (action === 'update_skills_gap' || action === 'create_skills_gap') {
     const { ProcessSkillsGapUpdateUseCase } = await import('../../application/useCases/ProcessSkillsGapUpdateUseCase.js');
     const processGapUpdateUseCase = new ProcessSkillsGapUpdateUseCase({
       skillsGapRepository,
@@ -429,50 +437,16 @@ async function assessmentHandler(payload, dependencies) {
     
     return {
       success: true,
-      request_id: `assessment_${Date.now()}`,
       action: action,
       data: {
-        message: 'Skills gap updated successfully',
+        message: 'Skills gap processed successfully',
         skillsGap
       }
     };
   }
   
-  // Default: Process other assessment actions
-  const result = {
-    success: true,
-    request_id: `assessment_${Date.now()}`,
-    action: action,
-    data: {
-      message: `Assessment handler executed for action: ${action}`,
-      payload: payload
-    }
-  };
-  
-  return result;
-}
-
-/**
- * Content Studio Handler
- * Handles requests from the content-studio service
- * Payload must contain an "action" field indicating the type of action (e.g., "generate-questions")
- */
-async function contentStudioHandler(payload, dependencies) {
-  const { courseRepository, skillsGapRepository, companyRepository, learnerRepository } = dependencies;
-  const { action } = payload;
-  
-  // Process content-studio requests based on action
-  const result = {
-    success: true,
-    request_id: `content_studio_${Date.now()}`,
-    action: action,
-    data: {
-      message: `Content Studio handler executed for action: ${action}`,
-      payload: payload
-    }
-  };
-  
-  return result;
+  // Unknown action
+  throw new Error(`Unknown Skills Engine action: ${action}. Supported actions: update_skills_gap, create_skills_gap`);
 }
 
 /**
@@ -501,14 +475,71 @@ async function analyticsHandler(payload, dependencies) {
  * Course Builder Handler
  * Handles requests from the course-builder service
  * Payload must contain an "action" field indicating the type of action
- * Maps to existing fillCourseBuilderData functionality
+ * 
+ * Action: "request_learning_path"
+ * - Requires: userId, competencyTargetName
+ * - Returns learning path data if approved
+ * - Waits for approval if not approved yet (async)
  */
 async function courseBuilderHandler(payload, dependencies) {
-  const { courseRepository, skillsGapRepository } = dependencies;
+  const { 
+    courseRepository, 
+    skillsGapRepository, 
+    approvalRepository,
+    learnerRepository 
+  } = dependencies;
   const { action } = payload;
   
-  // Use existing course builder data filling logic
-  // Extract action from payload, then pass the rest to fillCourseBuilderData
+  // Handle AI queries (allow course-builder to make AI requests)
+  if (action === 'query' || action === 'chat') {
+    return await aiHandler(payload, dependencies);
+  }
+  
+  // Handle learning path request
+  if (action === 'request_learning_path') {
+    const { userId, competencyTargetName } = payload;
+    
+    if (!userId || !competencyTargetName) {
+      throw new Error('userId and competencyTargetName are required for request_learning_path action');
+    }
+
+    // Import and use the new use case
+    const { GetLearningPathForCourseBuilderUseCase } = await import('../../application/useCases/GetLearningPathForCourseBuilderUseCase.js');
+    const getLearningPathUseCase = new GetLearningPathForCourseBuilderUseCase({
+      courseRepository,
+      approvalRepository,
+      skillsGapRepository,
+      learnerRepository
+    });
+
+    // Get learning path data (will wait for approval if needed)
+    const result = await getLearningPathUseCase.execute(userId, competencyTargetName, {
+      maxWaitTime: payload.maxWaitTime || 30000, // 30 seconds default
+      pollInterval: payload.pollInterval || 1000  // 1 second default
+    });
+
+    if (!result.approved) {
+      // Path not approved yet - return pending status
+      return {
+        success: false,
+        action: action,
+        status: 'pending_approval',
+        message: result.message,
+        data: null
+      };
+    }
+
+    // Path is approved - return data
+    return {
+      success: true,
+      action: action,
+      status: 'approved',
+      message: result.message,
+      data: result.data
+    };
+  }
+  
+  // Fallback to existing course builder data filling logic for other actions
   const { action: _, ...dataWithoutAction } = payload;
   const result = await fillCourseBuilderData(dataWithoutAction, { courseRepository, skillsGapRepository });
   
@@ -517,4 +548,135 @@ async function courseBuilderHandler(payload, dependencies) {
     action: action,
     data: result
   };
+}
+
+/**
+ * AI Handler
+ * Handles AI query requests from other microservices
+ * Payload must contain an "action" field indicating the type of action
+ * 
+ * Actions:
+ * - "query": Single AI prompt query
+ * - "chat": Conversation with context
+ */
+async function aiHandler(payload, dependencies) {
+  const { geminiClient } = dependencies;
+  const { action } = payload;
+  
+  if (!geminiClient) {
+    throw new Error('AI service (Gemini) is not available. Please configure GEMINI_API_KEY.');
+  }
+  
+  // Handle AI query action
+  if (action === 'query') {
+    const { prompt, model, temperature, maxTokens, format = 'text' } = payload;
+    
+    if (!prompt || typeof prompt !== 'string' || prompt.trim().length === 0) {
+      throw new Error('prompt is required and must be a non-empty string');
+    }
+    
+    // Validate optional parameters
+    if (temperature !== undefined && (typeof temperature !== 'number' || temperature < 0 || temperature > 1)) {
+      throw new Error('temperature must be a number between 0.0 and 1.0');
+    }
+    
+    if (maxTokens !== undefined && (typeof maxTokens !== 'number' || maxTokens < 1 || maxTokens > 8192)) {
+      throw new Error('maxTokens must be a number between 1 and 8192');
+    }
+    
+    if (format && !['json', 'text'].includes(format)) {
+      throw new Error('format must be either "json" or "text"');
+    }
+    
+    // Prepare options
+    const options = {
+      maxRetries: 3,
+      retryDelay: 1000,
+      timeout: 60000 // 60 seconds for AI queries
+    };
+    
+    // Execute the prompt
+    const startTime = Date.now();
+    const response = await geminiClient.executePrompt(prompt, '', options);
+    const duration = Date.now() - startTime;
+    
+    // Format response based on format parameter
+    let formattedResponse = response;
+    if (format === 'json') {
+      if (typeof response === 'string') {
+        try {
+          formattedResponse = JSON.parse(response);
+        } catch (e) {
+          formattedResponse = {
+            _note: 'Response is not valid JSON, returning as text',
+            text: response
+          };
+        }
+      }
+    }
+    
+    return {
+      success: true,
+      action: action,
+      response: formattedResponse,
+      model: model || process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString()
+    };
+  }
+  
+  // Handle AI chat action (conversation with context)
+  if (action === 'chat') {
+    const { messages, model, temperature } = payload;
+    
+    if (!messages || !Array.isArray(messages) || messages.length === 0) {
+      throw new Error('messages is required and must be a non-empty array');
+    }
+    
+    // Validate message structure
+    for (const msg of messages) {
+      if (!msg.role || !msg.content) {
+        throw new Error('Each message must have "role" and "content" fields');
+      }
+      if (!['user', 'assistant', 'system'].includes(msg.role)) {
+        throw new Error('role must be "user", "assistant", or "system"');
+      }
+    }
+    
+    // Build conversation prompt from messages
+    let conversationPrompt = '';
+    for (const msg of messages) {
+      if (msg.role === 'system') {
+        conversationPrompt += `System: ${msg.content}\n\n`;
+      } else if (msg.role === 'user') {
+        conversationPrompt += `User: ${msg.content}\n\n`;
+      } else if (msg.role === 'assistant') {
+        conversationPrompt += `Assistant: ${msg.content}\n\n`;
+      }
+    }
+    conversationPrompt += 'Assistant:';
+    
+    // Execute the chat prompt
+    const options = {
+      maxRetries: 3,
+      retryDelay: 1000,
+      timeout: 60000
+    };
+    
+    const startTime = Date.now();
+    const response = await geminiClient.executePrompt(conversationPrompt, '', options);
+    const duration = Date.now() - startTime;
+    
+    return {
+      success: true,
+      action: action,
+      response: typeof response === 'string' ? response : JSON.stringify(response),
+      model: model || process.env.GEMINI_MODEL || 'gemini-2.5-flash',
+      duration: `${duration}ms`,
+      timestamp: new Date().toISOString()
+    };
+  }
+  
+  // Unknown action
+  throw new Error(`Unknown AI action: ${action}. Supported actions: query, chat`);
 }
