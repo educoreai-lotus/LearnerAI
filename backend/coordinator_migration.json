@@ -1,0 +1,459 @@
+{
+  "migrationFile": {
+    "version": "1.0.0",
+    "database": {
+      "tables": [
+        {
+          "name": "companies",
+          "schema": {
+            "company_id": "UUID PRIMARY KEY",
+            "company_name": "TEXT NOT NULL",
+            "decision_maker_policy": "TEXT NOT NULL CHECK (decision_maker_policy IN ('auto', 'manual'))",
+            "decision_maker": "JSONB",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "learners",
+          "schema": {
+            "user_id": "UUID PRIMARY KEY",
+            "company_id": "UUID NOT NULL",
+            "company_name": "TEXT NOT NULL",
+            "user_name": "TEXT NOT NULL",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "skills_gap",
+          "schema": {
+            "gap_id": "UUID PRIMARY KEY",
+            "user_id": "UUID NOT NULL",
+            "company_id": "UUID NOT NULL",
+            "company_name": "TEXT NOT NULL",
+            "user_name": "TEXT NOT NULL",
+            "skills_raw_data": "JSONB NOT NULL",
+            "exam_status": "TEXT CHECK (exam_status IN ('pass', 'fail'))",
+            "competency_target_name": "TEXT NOT NULL",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "skills_expansions",
+          "schema": {
+            "expansion_id": "UUID PRIMARY KEY",
+            "gap_id": "UUID",
+            "user_id": "UUID NOT NULL",
+            "prompt_1_output": "JSONB",
+            "prompt_2_output": "JSONB",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "courses",
+          "schema": {
+            "competency_target_name": "TEXT PRIMARY KEY",
+            "user_id": "UUID NOT NULL",
+            "gap_id": "UUID",
+            "learning_path": "JSONB NOT NULL",
+            "approved": "BOOLEAN DEFAULT FALSE",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "recommendations",
+          "schema": {
+            "recommendation_id": "UUID PRIMARY KEY",
+            "user_id": "UUID NOT NULL",
+            "base_course_name": "TEXT NOT NULL",
+            "suggested_courses": "JSONB NOT NULL",
+            "sent_to_rag": "BOOLEAN DEFAULT FALSE",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "jobs",
+          "schema": {
+            "id": "UUID PRIMARY KEY",
+            "user_id": "UUID NOT NULL",
+            "company_id": "UUID",
+            "competency_target_name": "TEXT",
+            "type": "VARCHAR(100) CHECK (type IN ('path-generation', 'course-suggestion', 'path-distribution'))",
+            "status": "VARCHAR(50) CHECK (status IN ('pending', 'processing', 'completed', 'failed'))",
+            "progress": "INTEGER DEFAULT 0",
+            "current_stage": "VARCHAR(100)",
+            "result": "JSONB",
+            "error": "TEXT",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "updated_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        },
+        {
+          "name": "path_approvals",
+          "schema": {
+            "id": "UUID PRIMARY KEY",
+            "learning_path_id": "TEXT NOT NULL",
+            "company_id": "UUID NOT NULL",
+            "decision_maker_id": "UUID NOT NULL",
+            "status": "TEXT CHECK (status IN ('pending', 'approved', 'rejected', 'changes_requested'))",
+            "feedback": "TEXT",
+            "approved_at": "TIMESTAMP WITH TIME ZONE",
+            "rejected_at": "TIMESTAMP WITH TIME ZONE",
+            "changes_requested_at": "TIMESTAMP WITH TIME ZONE",
+            "created_at": "TIMESTAMP WITH TIME ZONE",
+            "updated_at": "TIMESTAMP WITH TIME ZONE"
+          }
+        }
+      ],
+      "migrations": [
+        {
+          "version": "1.0.0",
+          "name": "learner_ai_migration",
+          "file": "database/migrations/learner_ai_migration.sql",
+          "description": "Initial database schema migration for LearnerAI platform",
+          "appliedAt": null,
+          "tables": [
+            "companies",
+            "learners",
+            "skills_gap",
+            "skills_expansions",
+            "courses",
+            "recommendations",
+            "jobs",
+            "path_approvals"
+          ]
+        }
+      ]
+    },
+    "api": {
+      "endpoints": [
+        {
+          "path": "/api/v1/learners",
+          "method": "POST",
+          "description": "Create a new learner",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "user_id": { "type": "string", "format": "uuid" },
+              "company_id": { "type": "string", "format": "uuid", "required": true },
+              "company_name": { "type": "string", "required": true },
+              "user_name": { "type": "string", "required": true }
+            }
+          },
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string" },
+              "data": { "type": "object" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/learners/:userId",
+          "method": "GET",
+          "description": "Get learner by ID"
+        },
+        {
+          "path": "/api/v1/learners/company/:companyId",
+          "method": "GET",
+          "description": "Get all learners by company"
+        },
+        {
+          "path": "/api/v1/learners/:userId",
+          "method": "PUT",
+          "description": "Update learner"
+        },
+        {
+          "path": "/api/v1/learners/:userId",
+          "method": "DELETE",
+          "description": "Delete learner"
+        },
+        {
+          "path": "/api/v1/courses",
+          "method": "POST",
+          "description": "Create a new course/learning path",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "competency_target_name": { "type": "string", "required": true },
+              "user_id": { "type": "string", "format": "uuid", "required": true },
+              "gap_id": { "type": "string", "format": "uuid" },
+              "learning_path": { "type": "object", "required": true },
+              "approved": { "type": "boolean" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/courses/:competencyTargetName",
+          "method": "GET",
+          "description": "Get course by competency target name"
+        },
+        {
+          "path": "/api/v1/courses/user/:userId",
+          "method": "GET",
+          "description": "Get all courses for a user"
+        },
+        {
+          "path": "/api/v1/courses/approved/:status",
+          "method": "GET",
+          "description": "Get courses by approval status"
+        },
+        {
+          "path": "/api/v1/skills-gaps",
+          "method": "POST",
+          "description": "Create a new skills gap",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "gap_id": { "type": "string", "format": "uuid" },
+              "user_id": { "type": "string", "format": "uuid", "required": true },
+              "company_id": { "type": "string", "format": "uuid", "required": true },
+              "company_name": { "type": "string", "required": true },
+              "user_name": { "type": "string", "required": true },
+              "skills_raw_data": { "type": "object", "required": true },
+              "exam_status": { "type": "string", "enum": ["pass", "fail"] },
+              "competency_target_name": { "type": "string", "required": true }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/skills-gaps/:gapId",
+          "method": "GET",
+          "description": "Get skills gap by ID"
+        },
+        {
+          "path": "/api/v1/skills-gaps/user/:userId",
+          "method": "GET",
+          "description": "Get all skills gaps for a user"
+        },
+        {
+          "path": "/api/v1/skills-gaps/company/:companyId",
+          "method": "GET",
+          "description": "Get all skills gaps for a company"
+        },
+        {
+          "path": "/api/v1/learning-paths/generate",
+          "method": "POST",
+          "description": "Generate a learning path asynchronously",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "userId": { "type": "string", "format": "uuid", "required": true },
+              "companyId": { "type": "string", "format": "uuid", "required": true },
+              "competencyTargetName": { "type": "string", "required": true },
+              "microSkills": { "type": "array" },
+              "nanoSkills": { "type": "array" }
+            }
+          },
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "message": { "type": "string" },
+              "jobId": { "type": "string", "format": "uuid" },
+              "status": { "type": "string" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/learning-paths/:userId",
+          "method": "GET",
+          "description": "Get all learning paths for a user"
+        },
+        {
+          "path": "/api/v1/learning-paths/company/:companyId/users",
+          "method": "GET",
+          "description": "Get all learning paths for a company"
+        },
+        {
+          "path": "/api/v1/approvals/:approvalId",
+          "method": "GET",
+          "description": "Get approval details"
+        },
+        {
+          "path": "/api/v1/approvals/:approvalId/approve",
+          "method": "POST",
+          "description": "Approve a learning path",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "feedback": { "type": "string" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/approvals/:approvalId/request-changes",
+          "method": "POST",
+          "description": "Request changes to a learning path",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "feedback": { "type": "string", "required": true }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/approvals/:approvalId/reject",
+          "method": "POST",
+          "description": "Reject a learning path",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "feedback": { "type": "string" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/approvals/pending/:decisionMakerId",
+          "method": "GET",
+          "description": "Get pending approvals for a decision maker"
+        },
+        {
+          "path": "/api/v1/jobs/:jobId/status",
+          "method": "GET",
+          "description": "Get job status for async operations",
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "jobId": { "type": "string", "format": "uuid" },
+              "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
+              "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
+              "currentStage": { "type": "string" },
+              "result": { "type": "object" },
+              "error": { "type": "string" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/completions",
+          "method": "POST",
+          "description": "Process course completion",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "userId": { "type": "string", "format": "uuid", "required": true },
+              "competencyTargetName": { "type": "string", "required": true },
+              "passed": { "type": "boolean", "required": true },
+              "completionDetails": { "type": "object" }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/companies/register",
+          "method": "POST",
+          "description": "Register or update a company (from Directory microservice)",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "company_id": { "type": "string", "format": "uuid", "required": true },
+              "company_name": { "type": "string", "required": true },
+              "approval_policy": { "type": "string", "enum": ["auto", "manual"], "required": true },
+              "decision_maker": {
+                "type": "object",
+                "properties": {
+                  "employee_id": { "type": "string", "format": "uuid", "required": true },
+                  "employee_name": { "type": "string", "required": true },
+                  "employee_email": { "type": "string", "format": "email", "required": true }
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/ai/query",
+          "method": "POST",
+          "description": "Query AI (Gemini) with a prompt",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "prompt": { "type": "string", "required": true },
+              "model": { "type": "string" },
+              "temperature": { "type": "number", "minimum": 0, "maximum": 1 },
+              "maxTokens": { "type": "integer" },
+              "format": { "type": "string", "enum": ["json", "text"] }
+            }
+          }
+        },
+        {
+          "path": "/api/v1/ai/chat",
+          "method": "POST",
+          "description": "Chat with AI with conversation context",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "messages": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "role": { "type": "string", "enum": ["user", "assistant"] },
+                    "content": { "type": "string" }
+                  }
+                }
+              },
+              "model": { "type": "string" },
+              "temperature": { "type": "number" }
+            }
+          }
+        },
+        {
+          "path": "/api/fill-learner-ai-fields",
+          "method": "POST",
+          "description": "Generic endpoint for inter-service communication via Coordinator",
+          "requestSchema": {
+            "type": "object",
+            "properties": {
+              "requester_service": { "type": "string", "enum": ["assessment", "content-studio", "analytics", "course-builder"] },
+              "payload": {
+                "type": "object",
+                "properties": {
+                  "action": { "type": "string", "required": true }
+                }
+              },
+              "response": {
+                "type": "object",
+                "properties": {
+                  "answer": { "type": "string" }
+                }
+              }
+            }
+          }
+        },
+        {
+          "path": "/health",
+          "method": "GET",
+          "description": "Health check endpoint"
+        }
+      ]
+    },
+    "dependencies": [
+      "skills-engine-service",
+      "course-builder-service",
+      "learning-analytics-service",
+      "management-reports-service",
+      "rag-microservice",
+      "directory-service"
+    ],
+    "events": {
+      "publishes": [
+        "learning-path.generated",
+        "learning-path.approved",
+        "learning-path.rejected",
+        "learning-path.changes-requested",
+        "course.completed",
+        "course-suggestions.generated"
+      ],
+      "subscribes": [
+        "skills-gap.detected",
+        "company.registered",
+        "company.updated",
+        "exam.completed"
+      ]
+    }
+  }
+}
+
