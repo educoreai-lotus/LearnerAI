@@ -17,7 +17,7 @@ LearnerAI implements two types of endpoints:
 
 ### **Endpoint (in LearnerAI)**
 ```
-POST /api/fill-learner-ai-fields
+POST /api/fill-content-metrics
 ```
 
 ### **Protocol**
@@ -198,7 +198,7 @@ All clients implement rollback behavior:
 ### **Route Registration**
 - **File**: `backend/src/api/routes/endpoints.js`
 - **Registered in**: `backend/server.js` line 263
-- **Route**: `/api/fill-learner-ai-fields`
+- **Route**: `/api/fill-content-metrics`
 
 ### **Client Files Location**
 - `backend/src/infrastructure/clients/DirectoryClient.js`
@@ -218,7 +218,7 @@ All clients implement rollback behavior:
 ### **Example 1: Directory requests company data from LearnerAI**
 
 ```bash
-curl -X POST http://learner-ai-url/api/fill-learner-ai-fields \
+curl -X POST http://learner-ai-url/api/fill-content-metrics \
   -H "Content-Type: application/json" \
   -d '{
     "serviceName": "Directory",

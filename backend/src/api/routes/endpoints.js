@@ -17,7 +17,7 @@ export function createEndpointsRouter(dependencies) {
   } = dependencies;
 
   /**
-   * POST /api/fill-learner-ai-fields
+   * POST /api/fill-content-metrics
    * Fill fields endpoint - receives stringified JSON body with requester_service, payload (with action), and response
    * 
    * Expected body (as stringified JSON):
@@ -30,7 +30,7 @@ export function createEndpointsRouter(dependencies) {
    * 
    * After processing, returns the full object with response.answer populated, as stringified JSON
    */
-  router.post('/fill-learner-ai-fields', async (req, res) => {
+  router.post('/fill-content-metrics', async (req, res) => {
     try {
       // Step 1: Get request body (express.json() should have already parsed it)
       let requestBody = req.body;

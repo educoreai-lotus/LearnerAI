@@ -153,7 +153,7 @@ See `docs/setup-guide.md` for detailed setup instructions.
 - `GET /api/v1/approvals/pending/:decisionMakerId` - Get pending approvals
 - `POST /api/v1/approvals/:approvalId/approve` - Approve learning path
 - `POST /api/v1/approvals/:approvalId/reject` - Reject learning path
-- `POST /api/fill-learner-ai-fields` - Generic endpoint for microservice data
+- `POST /api/fill-content-metrics` - Generic endpoint for microservice data
 - `POST /api/v1/ai/query` - Generic AI query endpoint
 
 See [API_ENDPOINTS.md](backend/API_ENDPOINTS.md) for complete documentation.
@@ -175,7 +175,7 @@ See [API_ENDPOINTS.md](backend/API_ENDPOINTS.md) for complete documentation.
 ## 🔄 Key Workflows
 
 ### Learning Path Generation Flow
-1. Skills Engine sends skills gap → `POST /api/fill-learner-ai-fields`
+1. Skills Engine sends skills gap → `POST /api/fill-content-metrics`
 2. System processes gap → Updates `skills_gap` table
 3. Background job starts → Generates learning path using 3 AI prompts
 4. Job completes → Learning path stored in `courses` table

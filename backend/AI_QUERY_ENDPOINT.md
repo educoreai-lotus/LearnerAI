@@ -2,11 +2,11 @@
 
 ## Overview
 
-LearnerAI now exposes AI query capabilities through the Coordinator microservice pattern, allowing other microservices to request AI queries via the `/api/fill-learner-ai-fields` endpoint.
+LearnerAI now exposes AI query capabilities through the Coordinator microservice pattern, allowing other microservices to request AI queries via the `/api/fill-content-metrics` endpoint.
 
 ## Endpoint
 
-**URL:** `POST /api/fill-learner-ai-fields`
+**URL:** `POST /api/fill-content-metrics`
 
 **Via Coordinator:** Other microservices should call Coordinator, which will route to this endpoint.
 

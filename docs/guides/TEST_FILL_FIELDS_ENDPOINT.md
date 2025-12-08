@@ -1,10 +1,10 @@
-# Testing `/api/fill-learner-ai-fields` Endpoint in Postman
+# Testing `/api/fill-content-metrics` Endpoint in Postman
 
 ## Overview
 This endpoint allows other microservices to request data from LearnerAI. It follows a protocol where the requesting service sends a `serviceName` and a `payload` (stringified JSON), and LearnerAI fills in the missing fields from its database.
 
 ## Endpoint Details
-- **URL**: `POST http://localhost:5000/api/fill-learner-ai-fields`
+- **URL**: `POST http://localhost:5000/api/fill-content-metrics`
 - **Content-Type**: `application/json`
 
 ## Request Format
@@ -261,7 +261,7 @@ This endpoint allows other microservices to request data from LearnerAI. It foll
 1. Open Postman
 2. Click **New** → **HTTP Request**
 3. Set method to **POST** (from the dropdown on the left)
-4. **Important**: In the URL field, enter ONLY: `http://localhost:5000/api/fill-learner-ai-fields`
+4. **Important**: In the URL field, enter ONLY: `http://localhost:5000/api/fill-content-metrics`
    - Do NOT include "POST" in the URL field
    - Make sure there are no spaces before or after the URL
    - Type it manually or copy-paste carefully
@@ -401,11 +401,11 @@ You can import this into Postman:
           "raw": "{\n  \"serviceName\": \"Directory\",\n  \"payload\": \"{\\\"company_id\\\":\\\"550e8400-e29b-41d4-a716-446655440000\\\"}\"\n}"
         },
         "url": {
-          "raw": "http://localhost:5000/api/fill-learner-ai-fields",
+          "raw": "http://localhost:5000/api/fill-content-metrics",
           "protocol": "http",
           "host": ["localhost"],
           "port": "5000",
-          "path": ["api", "fill-learner-ai-fields"]
+          "path": ["api", "fill-content-metrics"]
         }
       }
     },
@@ -424,11 +424,11 @@ You can import this into Postman:
           "raw": "{\n  \"serviceName\": \"SkillsEngine\",\n  \"payload\": \"{\\\"competency_target_name\\\":\\\"Advanced JavaScript\\\"}\"\n}"
         },
         "url": {
-          "raw": "http://localhost:5000/api/fill-learner-ai-fields",
+          "raw": "http://localhost:5000/api/fill-content-metrics",
           "protocol": "http",
           "host": ["localhost"],
           "port": "5000",
-          "path": ["api", "fill-learner-ai-fields"]
+          "path": ["api", "fill-content-metrics"]
         }
       }
     },
@@ -447,11 +447,11 @@ You can import this into Postman:
           "raw": "{\n  \"serviceName\": \"LearningAnalytics\",\n  \"payload\": \"{\\\"user_id\\\":\\\"123e4567-e89b-12d3-a456-426614174000\\\"}\"\n}"
         },
         "url": {
-          "raw": "http://localhost:5000/api/fill-learner-ai-fields",
+          "raw": "http://localhost:5000/api/fill-content-metrics",
           "protocol": "http",
           "host": ["localhost"],
           "port": "5000",
-          "path": ["api", "fill-learner-ai-fields"]
+          "path": ["api", "fill-content-metrics"]
         }
       }
     }
@@ -472,19 +472,19 @@ This error occurs when Postman misinterprets the URL. Here's how to fix it:
 #### Solution 1: Clear and Re-enter URL
 1. **Select the entire URL field** (Ctrl+A or Cmd+A)
 2. **Delete everything**
-3. **Type the URL manually**: `http://localhost:5000/api/fill-learner-ai-fields`
+3. **Type the URL manually**: `http://localhost:5000/api/fill-content-metrics`
 4. Make sure there are **no spaces** before or after
 5. Press **Enter** or click outside the field
 
 #### Solution 2: Check Method Dropdown
 1. Make sure the **method dropdown** (left of URL) shows **POST**
-2. The URL field should **only** contain: `http://localhost:5000/api/fill-learner-ai-fields`
+2. The URL field should **only** contain: `http://localhost:5000/api/fill-content-metrics`
 3. Do NOT put "POST" in the URL field itself
 
 #### Solution 3: Use Full URL Format
 If the error persists, try:
 1. Click the **Params** tab and make sure it's empty
-2. In the URL field, use the full URL: `http://localhost:5000/api/fill-learner-ai-fields`
+2. In the URL field, use the full URL: `http://localhost:5000/api/fill-content-metrics`
 3. Do NOT use variables or environment variables initially
 
 #### Solution 4: Check Postman Settings
@@ -496,7 +496,7 @@ If the error persists, try:
 #### Solution 5: Create New Request
 1. Create a **completely new request**
 2. Set method to **POST** first
-3. Then enter the URL: `http://localhost:5000/api/fill-learner-ai-fields`
+3. Then enter the URL: `http://localhost:5000/api/fill-content-metrics`
 4. Configure headers and body
 
 ### Error: "Could not get response"

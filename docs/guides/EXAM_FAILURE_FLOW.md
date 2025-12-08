@@ -24,7 +24,7 @@ Skills Engine identifies remaining skills gap
 
 ### Step 2: Skills Engine Sends Exam Result to LearnerAI
 
-**Endpoint:** `POST /api/fill-learner-ai-fields` or `POST /api/v1/skills-gaps`
+**Endpoint:** `POST /api/fill-content-metrics` or `POST /api/v1/skills-gaps`
 
 **Request Body:**
 ```json

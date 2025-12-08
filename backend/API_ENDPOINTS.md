@@ -482,10 +482,10 @@ http://localhost:5000/api/v1
 
 ---
 
-### 12. Generic Microservice Endpoint (`/api/fill-learner-ai-fields`)
+### 12. Generic Microservice Endpoint (`/api/fill-content-metrics`)
 
 #### Fill Learner AI Fields (Generic Handler)
-- **POST** `/api/fill-learner-ai-fields`
+- **POST** `/api/fill-content-metrics`
 - **Body:** (Stringified JSON)
   ```json
   {

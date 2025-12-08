@@ -401,7 +401,7 @@
           }
         },
         {
-          "path": "/api/fill-learner-ai-fields",
+          "path": "/api/fill-content-metrics",
           "method": "POST",
           "description": "Generic endpoint for inter-service communication via Coordinator",
           "requestSchema": {

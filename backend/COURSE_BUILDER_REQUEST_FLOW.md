@@ -27,7 +27,7 @@ Mark as approved (NO automatic distribution)
 
 When Course Builder needs learning path data, it calls:
 
-**Endpoint:** `POST /api/fill-learner-ai-fields`
+**Endpoint:** `POST /api/fill-content-metrics`
 
 **Request Body:**
 ```json
@@ -112,7 +112,7 @@ When Course Builder needs learning path data, it calls:
 ### Example Request
 
 ```bash
-curl -X POST https://learner-ai-backend-production.up.railway.app/api/fill-learner-ai-fields \
+curl -X POST https://learner-ai-backend-production.up.railway.app/api/fill-content-metrics \
   -H "Content-Type: application/json" \
   -d '{
     "requester_service": "course-builder",
