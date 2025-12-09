@@ -1,0 +1,109 @@
+# Docker Compose file using local pre-built images
+# Make sure images are built locally before running: docker-compose build
+# Or use: docker build -t learnerai-backend:0.0.1 ./backend
+#         docker build -t learnerai-frontend:0.0.1 ./frontend
+
+version: '3.8'
+
+services:
+  # Backend API Service
+  backend:
+    image: learnerai-backend:0.0.1
+    container_name: learnerai-backend
+    ports:
+      - "5000:5000"
+    environment:
+      # Server Configuration
+      - NODE_ENV=${NODE_ENV:-production}
+      - PORT=5000
+      
+      # Supabase Configuration
+      - SUPABASE_URL=${SUPABASE_URL}
+      - SUPABASE_KEY=${SUPABASE_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - SUPABASE_DB_HOST=${SUPABASE_DB_HOST}
+      - SUPABASE_DB_PORT=${SUPABASE_DB_PORT:-5432}
+      - SUPABASE_DB_USER=${SUPABASE_DB_USER:-postgres}
+      - SUPABASE_DB_PASSWORD=${SUPABASE_DB_PASSWORD}
+      - SUPABASE_DB_NAME=${SUPABASE_DB_NAME:-postgres}
+      
+      # Gemini API Configuration
+      - GEMINI_API_KEY=${GEMINI_API_KEY}
+      
+      # Microservice Configuration
+      - LEARNER_AI_SERVICE_TOKEN=${LEARNER_AI_SERVICE_TOKEN}
+      - SKILLS_ENGINE_TOKEN=${SKILLS_ENGINE_TOKEN}
+      - SKILLS_ENGINE_URL=${SKILLS_ENGINE_URL:-http://skills-engine:5001}
+      - COURSE_BUILDER_TOKEN=${COURSE_BUILDER_TOKEN}
+      - COURSE_BUILDER_URL=${COURSE_BUILDER_URL:-http://course-builder:5002}
+      - RAG_MICROSERVICE_TOKEN=${RAG_MICROSERVICE_TOKEN}
+      - RAG_MICROSERVICE_URL=${RAG_MICROSERVICE_URL:-http://rag-service:5004}
+      - ANALYTICS_TOKEN=${ANALYTICS_TOKEN}
+      - ANALYTICS_URL=${ANALYTICS_URL:-http://analytics:5003}
+      - REPORTS_TOKEN=${REPORTS_TOKEN}
+      - REPORTS_URL=${REPORTS_URL:-http://reports:5005}
+      
+      # Coordinator Configuration
+      - COORDINATOR_URL=${COORDINATOR_URL}
+      - COORDINATOR_PUBLIC_KEY=${COORDINATOR_PUBLIC_KEY}
+      - LEARNERAI_DOMAIN=${LEARNERAI_DOMAIN:-http://backend:5000}
+      - LEARNERAI_PRIVATE_KEY=${LEARNERAI_PRIVATE_KEY}
+      - SERVICE_NAME=${SERVICE_NAME:-learnerAI-service}
+      - SERVICE_VERSION=${SERVICE_VERSION:-1.0.0}
+      - SERVICE_DESCRIPTION=${SERVICE_DESCRIPTION:-LearnerAI Backend Service}
+      - SERVICE_TEAM=${SERVICE_TEAM}
+      - SERVICE_OWNER=${SERVICE_OWNER:-system}
+      - SERVICE_CAPABILITIES=${SERVICE_CAPABILITIES}
+      
+      # API Configuration
+      - API_VERSION=${API_VERSION:-v1}
+      - FRONTEND_URL=${FRONTEND_URL:-http://localhost:3000}
+      
+      # Job Processing
+      - JOB_TIMEOUT_MS=${JOB_TIMEOUT_MS:-300000}
+      - MAX_RETRIES=${MAX_RETRIES:-3}
+      
+      # Rate Limiting
+      - RATE_LIMIT_WINDOW_MS=${RATE_LIMIT_WINDOW_MS:-60000}
+      - RATE_LIMIT_MAX_REQUESTS=${RATE_LIMIT_MAX_REQUESTS:-100}
+      
+      # Railway Asset Access
+      - RAILWAY_ASSET_KEY=${RAILWAY_ASSET_KEY}
+      
+      # SendGrid (optional)
+      - SENDGRID_API_KEY=${SENDGRID_API_KEY}
+    env_file:
+      - ./backend/.env
+    networks:
+      - learnerai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:5000/health', (r) => {process.exit(r.statusCode === 200 ? 0 : 1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Frontend Service
+  frontend:
+    image: learnerai-frontend:0.0.1
+    container_name: learnerai-frontend
+    ports:
+      - "3000:80"
+    env_file:
+      - ./frontend/.env
+    networks:
+      - learnerai-network
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 3s
+      retries: 3
+      start_period: 10s
+
+networks:
+  learnerai-network:
+    driver: bridge
+    name: learnerai-network
+
