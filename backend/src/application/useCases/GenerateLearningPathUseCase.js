@@ -283,20 +283,23 @@ export class GenerateLearningPathUseCase {
       }
 
       // Request skill breakdown from Skills Engine (with rollback to mock data if fails)
+      // Explicitly request lowest level skills (expansions competencies) for each competency
       let skillBreakdown;
       try {
         skillBreakdown = await this.skillsEngineClient.requestSkillBreakdown(competencies, {
           maxRetries: 3,
           retryDelay: 1000,
-          useMockData: false // Will automatically use mock data if all retries fail
+          useMockData: false, // Will automatically use mock data if all retries fail
+          includeExpansions: true // Explicitly request lowest level skills (expansions competencies)
         });
-        console.log(`✅ Skills Engine breakdown received for ${competencies.length} competencies`);
+        console.log(`✅ Skills Engine breakdown received for ${competencies.length} competencies (lowest level skills/expansions)`);
       } catch (error) {
         console.error(`❌ Skills Engine request failed: ${error.message}`);
         // SkillsEngineClient already falls back to mock data, but log the error
         // Continue with mock data breakdown
         skillBreakdown = await this.skillsEngineClient.requestSkillBreakdown(competencies, {
-          useMockData: true // Force mock data
+          useMockData: true, // Force mock data
+          includeExpansions: true // Still request expansions even in mock mode
         });
         console.warn(`⚠️ Using mock skill breakdown due to Skills Engine failure`);
       }
@@ -399,14 +402,25 @@ export class GenerateLearningPathUseCase {
       const prompt3 = await this.promptLoader.loadPrompt('prompt3-path-creation');
       
       // Format Prompt 3 input: Use prompt_2_output from database (competencies) + skillBreakdown from Skills Engine
-      // The expandedBreakdown should combine prompt_2_output (competencies) with skillBreakdown (micro/nano skills)
+      // The expandedBreakdown should combine prompt_2_output (competencies) with skillBreakdown (lowest level skills)
       const expandedBreakdownForPrompt3 = {
         competencies: prompt2OutputFromDB, // From prompt_2_output (filtered in update mode)
-        skillBreakdown: skillBreakdown // From Skills Engine (filtered in update mode)
+        skillBreakdown: skillBreakdown // From Skills Engine (filtered in update mode) - List of skills at lowest level (expansions)
       };
       
+      // Format initial gap for Prompt 3: Use skills_raw_data (lowest level skills) from database
+      // This ensures we use the actual list of skills at the lowest level that Skills Engine sent
+      const initialGapForPrompt3 = skillsRawData 
+        ? {
+            userId: skillsGap.userId,
+            companyId: skillsGap.companyId,
+            competencyTargetName: skillsGap.competencyTargetName,
+            skills_raw_data: skillsRawData  // Use lowest level skills from database (list of skills at lowest level in Skills Engine hierarchy)
+          }
+        : skillsGap.toJSON(); // Fallback if skillsRawData not available (backward compatibility)
+      
       const fullPrompt3 = prompt3
-        .replace('{initialGap}', JSON.stringify(skillsGap.toJSON(), null, 2))
+        .replace('{initialGap}', JSON.stringify(initialGapForPrompt3, null, 2))
         .replace('{expandedBreakdown}', JSON.stringify(expandedBreakdownForPrompt3, null, 2));
       // Path creation needs more time - use 90 seconds timeout (default is 30s)
       const prompt3Result = await this.geminiClient.executePrompt(fullPrompt3, '', {

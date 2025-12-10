@@ -1,6 +1,7 @@
 {
   "migrationFile": {
     "version": "1.0.0",
+    "description": "LearnerAI microservice - AI-powered personalized learning path generation, skills gap analysis, and course recommendations",
     "database": {
       "tables": [
         {
@@ -133,300 +134,46 @@
     "api": {
       "endpoints": [
         {
-          "path": "/api/v1/learners",
-          "method": "POST",
-          "description": "Create a new learner",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "user_id": { "type": "string", "format": "uuid" },
-              "company_id": { "type": "string", "format": "uuid", "required": true },
-              "company_name": { "type": "string", "required": true },
-              "user_name": { "type": "string", "required": true }
-            }
-          },
-          "responseSchema": {
-            "type": "object",
-            "properties": {
-              "message": { "type": "string" },
-              "data": { "type": "object" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/learners/:userId",
-          "method": "GET",
-          "description": "Get learner by ID"
-        },
-        {
-          "path": "/api/v1/learners/company/:companyId",
-          "method": "GET",
-          "description": "Get all learners by company"
-        },
-        {
-          "path": "/api/v1/learners/:userId",
-          "method": "PUT",
-          "description": "Update learner"
-        },
-        {
-          "path": "/api/v1/learners/:userId",
-          "method": "DELETE",
-          "description": "Delete learner"
-        },
-        {
-          "path": "/api/v1/courses",
-          "method": "POST",
-          "description": "Create a new course/learning path",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "competency_target_name": { "type": "string", "required": true },
-              "user_id": { "type": "string", "format": "uuid", "required": true },
-              "gap_id": { "type": "string", "format": "uuid" },
-              "learning_path": { "type": "object", "required": true },
-              "approved": { "type": "boolean" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/courses/:competencyTargetName",
-          "method": "GET",
-          "description": "Get course by competency target name"
-        },
-        {
-          "path": "/api/v1/courses/user/:userId",
-          "method": "GET",
-          "description": "Get all courses for a user"
-        },
-        {
-          "path": "/api/v1/courses/approved/:status",
-          "method": "GET",
-          "description": "Get courses by approval status"
-        },
-        {
-          "path": "/api/v1/skills-gaps",
-          "method": "POST",
-          "description": "Create a new skills gap",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "gap_id": { "type": "string", "format": "uuid" },
-              "user_id": { "type": "string", "format": "uuid", "required": true },
-              "company_id": { "type": "string", "format": "uuid", "required": true },
-              "company_name": { "type": "string", "required": true },
-              "user_name": { "type": "string", "required": true },
-              "skills_raw_data": { "type": "object", "required": true },
-              "exam_status": { "type": "string", "enum": ["pass", "fail"] },
-              "competency_target_name": { "type": "string", "required": true }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/skills-gaps/:gapId",
-          "method": "GET",
-          "description": "Get skills gap by ID"
-        },
-        {
-          "path": "/api/v1/skills-gaps/user/:userId",
-          "method": "GET",
-          "description": "Get all skills gaps for a user"
-        },
-        {
-          "path": "/api/v1/skills-gaps/company/:companyId",
-          "method": "GET",
-          "description": "Get all skills gaps for a company"
-        },
-        {
-          "path": "/api/v1/learning-paths/generate",
-          "method": "POST",
-          "description": "Generate a learning path asynchronously",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "userId": { "type": "string", "format": "uuid", "required": true },
-              "companyId": { "type": "string", "format": "uuid", "required": true },
-              "competencyTargetName": { "type": "string", "required": true },
-              "microSkills": { "type": "array" },
-              "nanoSkills": { "type": "array" }
-            }
-          },
-          "responseSchema": {
-            "type": "object",
-            "properties": {
-              "message": { "type": "string" },
-              "jobId": { "type": "string", "format": "uuid" },
-              "status": { "type": "string" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/learning-paths/:userId",
-          "method": "GET",
-          "description": "Get all learning paths for a user"
-        },
-        {
-          "path": "/api/v1/learning-paths/company/:companyId/users",
-          "method": "GET",
-          "description": "Get all learning paths for a company"
-        },
-        {
-          "path": "/api/v1/approvals/:approvalId",
-          "method": "GET",
-          "description": "Get approval details"
-        },
-        {
-          "path": "/api/v1/approvals/:approvalId/approve",
-          "method": "POST",
-          "description": "Approve a learning path",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "feedback": { "type": "string" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/approvals/:approvalId/request-changes",
-          "method": "POST",
-          "description": "Request changes to a learning path",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "feedback": { "type": "string", "required": true }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/approvals/:approvalId/reject",
-          "method": "POST",
-          "description": "Reject a learning path",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "feedback": { "type": "string" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/approvals/pending/:decisionMakerId",
-          "method": "GET",
-          "description": "Get pending approvals for a decision maker"
-        },
-        {
-          "path": "/api/v1/jobs/:jobId/status",
-          "method": "GET",
-          "description": "Get job status for async operations",
-          "responseSchema": {
-            "type": "object",
-            "properties": {
-              "jobId": { "type": "string", "format": "uuid" },
-              "status": { "type": "string", "enum": ["pending", "processing", "completed", "failed"] },
-              "progress": { "type": "integer", "minimum": 0, "maximum": 100 },
-              "currentStage": { "type": "string" },
-              "result": { "type": "object" },
-              "error": { "type": "string" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/completions",
-          "method": "POST",
-          "description": "Process course completion",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "userId": { "type": "string", "format": "uuid", "required": true },
-              "competencyTargetName": { "type": "string", "required": true },
-              "passed": { "type": "boolean", "required": true },
-              "completionDetails": { "type": "object" }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/companies/register",
-          "method": "POST",
-          "description": "Register or update a company (from Directory microservice)",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "company_id": { "type": "string", "format": "uuid", "required": true },
-              "company_name": { "type": "string", "required": true },
-              "approval_policy": { "type": "string", "enum": ["auto", "manual"], "required": true },
-              "decision_maker": {
-                "type": "object",
-                "properties": {
-                  "employee_id": { "type": "string", "format": "uuid", "required": true },
-                  "employee_name": { "type": "string", "required": true },
-                  "employee_email": { "type": "string", "format": "email", "required": true }
-                }
-              }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/ai/query",
-          "method": "POST",
-          "description": "Query AI (Gemini) with a prompt",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "prompt": { "type": "string", "required": true },
-              "model": { "type": "string" },
-              "temperature": { "type": "number", "minimum": 0, "maximum": 1 },
-              "maxTokens": { "type": "integer" },
-              "format": { "type": "string", "enum": ["json", "text"] }
-            }
-          }
-        },
-        {
-          "path": "/api/v1/ai/chat",
-          "method": "POST",
-          "description": "Chat with AI with conversation context",
-          "requestSchema": {
-            "type": "object",
-            "properties": {
-              "messages": {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "role": { "type": "string", "enum": ["user", "assistant"] },
-                    "content": { "type": "string" }
-                  }
-                }
-              },
-              "model": { "type": "string" },
-              "temperature": { "type": "number" }
-            }
-          }
-        },
-        {
           "path": "/api/fill-content-metrics",
           "method": "POST",
-          "description": "Generic endpoint for inter-service communication via Coordinator",
+          "description": "Unified endpoint for inter-service communication via Coordinator",
           "requestSchema": {
             "type": "object",
             "properties": {
-              "requester_service": { "type": "string", "enum": ["assessment", "content-studio", "analytics", "course-builder"] },
+              "requester_service": { 
+                "type": "string", 
+                "required": true,
+                "description": "Name of the service making the request (e.g., 'course-builder', 'analytics', 'skills-engine', 'ai')"
+              },
               "payload": {
                 "type": "object",
+                "required": true,
+                "description": "Service-specific data based on the action",
                 "properties": {
-                  "action": { "type": "string", "required": true }
+                  "action": { 
+                    "type": "string", 
+                    "required": true,
+                    "description": "Action to perform (e.g., 'request_learning_path', 'query', 'chat', 'update_skills_gap')"
+                  }
                 }
               },
               "response": {
                 "type": "object",
-                "properties": {
-                  "answer": { "type": "string" }
-                }
+                "required": true,
+                "description": "Template defining expected response structure"
               }
+            },
+            "required": ["requester_service", "payload", "response"]
+          },
+          "responseSchema": {
+            "type": "object",
+            "properties": {
+              "success": { "type": "boolean" },
+              "data": { "type": "object" },
+              "error": { "type": "string" },
+              "message": { "type": "string" }
             }
           }
-        },
-        {
-          "path": "/health",
-          "method": "GET",
-          "description": "Health check endpoint"
         }
       ]
     },
@@ -437,6 +184,26 @@
       "management-reports-service",
       "rag-microservice",
       "directory-service"
+    ],
+    "capabilities": [
+      "learning path generation",
+      "personalized learning paths",
+      "skills gap analysis",
+      "skills gap detection",
+      "course recommendations",
+      "course suggestions",
+      "path approvals",
+      "approval workflow",
+      "AI queries",
+      "AI chat",
+      "Gemini AI integration",
+      "inter-service communication",
+      "learner management",
+      "company management",
+      "competency tracking",
+      "exam status tracking",
+      "async job processing",
+      "learning path distribution"
     ],
     "events": {
       "publishes": [

@@ -31,7 +31,7 @@ export class ProcessSkillsGapUpdateUseCase {
    * @param {string} gapData.company_name
    * @param {string} gapData.competency_target_name - Primary field (competency_name also accepted for backward compatibility)
    * @param {string} gapData.status
-   * @param {Object} gapData.gap - JSONB with micro/nano skills (lowest layer of skills gap hierarchy)
+   * @param {Object} gapData.gap - JSONB with list of skills at the lowest level in Skills Engine hierarchy
    * @returns {Promise<Object>} Updated skills gap
    */
   async execute(gapData) {
@@ -43,7 +43,7 @@ export class ProcessSkillsGapUpdateUseCase {
       competency_target_name, // Primary field
       competency_name, // Accepted for backward compatibility
       status,
-      gap // JSONB with micro/nano skills (lowest layer - saved directly to skills_raw_data)
+      gap // JSONB with list of skills at the lowest level in Skills Engine hierarchy (saved directly to skills_raw_data)
     } = gapData;
 
     // Validate required fields

@@ -11,18 +11,18 @@ export class SkillsEngineClient {
 
   /**
    * Request skill breakdown for competencies
-   * Requests the LOWEST LAYER (nano/micro skills) for the given competencies.
-   * This matches the level of the initial skills gap (nano/micro skills).
+   * Explicitly requests the LOWEST LEVEL skills for the given competencies,
+   * including expansions competencies. This matches the level of the initial skills gap.
    * 
    * @param {Array} competencies - Array of competency names (strings) or objects with 'name' property
-   * @param {object} options - Request options (maxRetries, retryDelay, useMockData)
-   * @returns {Promise<object>} Skill breakdown with micro/nano divisions (lowest layer)
+   * @param {object} options - Request options (maxRetries, retryDelay, useMockData, includeExpansions)
+   * @param {boolean} options.includeExpansions - Whether to include expansions competencies (default: true)
+   * @returns {Promise<object>} Skill breakdown with lowest level skills (list of skills at the lowest level in Skills Engine hierarchy)
    * 
    * Response format:
    * {
    *   "Competency_Name": {
-   *     "microSkills": [...],  // Lowest layer - mid level
-   *     "nanoSkills": [...]    // Lowest layer - most granular
+   *     "skills": [...]  // List of skills at the lowest level in Skills Engine hierarchy
    *   }
    * }
    */
@@ -30,7 +30,8 @@ export class SkillsEngineClient {
     const {
       maxRetries = 3,
       retryDelay = 1000,
-      useMockData = false
+      useMockData = false,
+      includeExpansions = true // Default to true: always request lowest layer (expansions)
     } = options;
 
     if (useMockData) {
@@ -49,16 +50,21 @@ export class SkillsEngineClient {
     let lastError;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
-        // Send simple array of competency names (strings)
-        // Note: Skills Engine returns the LOWEST LAYER (nano/micro skills) by default
-        // This matches the level of the initial skills gap
+        // Explicitly request the lowest level skills (expansions competencies) from Skills Engine
+        // This ensures we get the list of skills at the lowest level in Skills Engine hierarchy for each competency
+        const requestBody = {
+          competencies: competencyNames,
+          // Explicitly request lowest level skills (expansions competencies)
+          level: "lowest",           // Request lowest level in hierarchy
+          include_expansions: includeExpansions,  // Include expansions competencies
+          granularity: "lowest"     // Request lowest level granularity
+        };
+
+        console.log(`📤 Requesting skill breakdown for ${competencyNames.length} competencies (lowest level/expansions: ${includeExpansions})`);
+
         const response = await this.httpClient.post(
           `${this.baseUrl}/api/skills/breakdown`,
-          {
-            competencies: competencyNames
-            // If Skills Engine requires a parameter to specify lowest layer, add it here:
-            // level: "lowest" or granularity: "nano" or depth: "full"
-          },
+          requestBody,
           {
             headers: {
               'Authorization': `Bearer ${this.serviceToken}`,
@@ -67,6 +73,7 @@ export class SkillsEngineClient {
           }
         );
 
+        console.log(`✅ Skills Engine returned breakdown for ${Object.keys(response.data || {}).length} competencies`);
         return response.data;
       } catch (error) {
         lastError = error;
@@ -86,6 +93,7 @@ export class SkillsEngineClient {
 
   /**
    * Get mock skill breakdown (fallback)
+   * Returns a list of skills at the lowest level for each competency
    */
   _getMockSkillBreakdown(competencies) {
     const breakdown = {};
@@ -95,14 +103,12 @@ export class SkillsEngineClient {
         ? comp 
         : (comp.name || comp.competency_name || `Competency ${index + 1}`);
       
+      // Return list of skills at the lowest level (not categorized as micro/nano)
       breakdown[compName] = {
-        microSkills: [
-          { id: `micro-${index}-1`, name: `${compName} - Micro Skill 1` },
-          { id: `micro-${index}-2`, name: `${compName} - Micro Skill 2` }
-        ],
-        nanoSkills: [
-          { id: `nano-${index}-1`, name: `${compName} - Nano Skill 1` },
-          { id: `nano-${index}-2`, name: `${compName} - Nano Skill 2` }
+        skills: [
+          { id: `skill-${index}-1`, name: `${compName} - Skill 1` },
+          { id: `skill-${index}-2`, name: `${compName} - Skill 2` },
+          { id: `skill-${index}-3`, name: `${compName} - Skill 3` }
         ]
       };
     });
