@@ -31,8 +31,9 @@ const REQUEST_BODY = {
   }
 };
 
-// Get service name from requester_service (must match body)
-const SERVICE_NAME = REQUEST_BODY.requester_service || 'learnerAI-service';
+// Service name for signature (X-Service-Name header)
+// Note: This should be "learnerAI-service" even if requester_service in body is "learnerAI"
+const SERVICE_NAME = 'learnerAI-service';
 
 // Get private key
 function getPrivateKey() {

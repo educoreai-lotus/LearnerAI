@@ -340,3 +340,4 @@ docker push YOUR_ACCOUNT_ID.dkr.ecr.us-east-1.amazonaws.com/learnerai-frontend:0
 6. **Costs:** Monitor AWS costs regularly; set up billing alerts
 
 
+
