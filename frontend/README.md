@@ -2,7 +2,7 @@
 
 React + Vite frontend for the LearnerAI microservice.
 
-## 🚀 Quick Start
+## 🚀 Quick Start.
 
 ### Prerequisites
 - Node.js 18+

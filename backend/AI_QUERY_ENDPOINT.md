@@ -10,7 +10,7 @@ LearnerAI now exposes AI query capabilities through the Coordinator microservice
 
 **Via Coordinator:** Other microservices should call Coordinator, which will route to this endpoint.
 
-## Supported Service Names
+## Supported Service Names.
 
 You can use either of these `requester_service` values for AI queries:
 - `"ai"` - Recommended for general AI queries
