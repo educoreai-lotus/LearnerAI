@@ -24,11 +24,12 @@ export function buildMessage(serviceName, payload) {
 }
 
 /**
- * Generate ECDSA P-256 signature
+ * Generate ECDSA P-256 signature using DER encoding
+ * Matches Coordinator's signature format (createSign().sign() defaults to DER)
  * @param {string} serviceName - Service name
  * @param {string} privateKeyPem - Private key in PEM format
  * @param {Object} payload - Payload object to sign
- * @returns {string} Base64-encoded signature
+ * @returns {string} Base64-encoded signature (DER format, no whitespace)
  */
 export function generateSignature(serviceName, privateKeyPem, payload) {
   if (!privateKeyPem || typeof privateKeyPem !== 'string') {
@@ -40,7 +41,7 @@ export function generateSignature(serviceName, privateKeyPem, payload) {
   }
 
   try {
-    // Build message for signing
+    // Build message for signing (unchanged - keep format identical)
     const message = buildMessage(serviceName, payload);
     
     // Create private key object from PEM string
@@ -49,25 +50,29 @@ export function generateSignature(serviceName, privateKeyPem, payload) {
       format: 'pem'
     });
     
-    // Sign the message using ECDSA P-256
-    const signature = crypto.sign('sha256', Buffer.from(message, 'utf8'), {
-      key: privateKey,
-      dsaEncoding: 'ieee-p1363' // ECDSA P-256 uses IEEE P1363 encoding
-    });
+    // Sign using createSign() method (defaults to DER encoding)
+    // This matches Coordinator's implementation: createSign("SHA256") → sign(privateKey, "base64")
+    const sign = crypto.createSign('SHA256');
+    sign.update(message, 'utf8');
+    sign.end();
     
-    // Return Base64-encoded signature
-    return signature.toString('base64');
+    // Generate signature in DER format (default), Base64 encoded
+    // Remove any whitespace/newlines to ensure clean output
+    const signature = sign.sign(privateKey, 'base64').replace(/\s/g, '');
+    
+    return signature;
   } catch (error) {
     throw new Error(`Signature generation failed: ${error.message}`);
   }
 }
 
 /**
- * Verify ECDSA P-256 signature (optional)
+ * Verify ECDSA P-256 signature using DER encoding
+ * Matches Coordinator's signature verification format
  * @param {string} serviceName - Service name
  * @param {string} publicKeyPem - Public key in PEM format
  * @param {Object} payload - Payload object that was signed
- * @param {string} signature - Base64-encoded signature to verify
+ * @param {string} signature - Base64-encoded signature to verify (DER format)
  * @returns {boolean} True if signature is valid
  */
 export function verifySignature(serviceName, publicKeyPem, payload, signature) {
@@ -76,22 +81,27 @@ export function verifySignature(serviceName, publicKeyPem, payload, signature) {
   }
 
   try {
+    // Build message (unchanged - keep format identical)
     const message = buildMessage(serviceName, payload);
+    
+    // Create public key object from PEM string
     const publicKey = crypto.createPublicKey({
       key: publicKeyPem,
       format: 'pem'
     });
     
-    const signatureBuffer = Buffer.from(signature, 'base64');
-    return crypto.verify(
-      'sha256',
-      Buffer.from(message, 'utf8'),
-      {
-        key: publicKey,
-        dsaEncoding: 'ieee-p1363'
-      },
-      signatureBuffer
-    );
+    // Verify using createVerify() method (defaults to DER encoding)
+    // This matches Coordinator's verification implementation
+    const verify = crypto.createVerify('SHA256');
+    verify.update(message, 'utf8');
+    verify.end();
+    
+    // Remove whitespace from signature before verification
+    const cleanSignature = signature.replace(/\s/g, '');
+    const signatureBuffer = Buffer.from(cleanSignature, 'base64');
+    
+    // Verify signature (DER format is default)
+    return verify.verify(publicKey, signatureBuffer);
   } catch (error) {
     logger.debug('Signature verification failed', { error: error.message });
     return false;
