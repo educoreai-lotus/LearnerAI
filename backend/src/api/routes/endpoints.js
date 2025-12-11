@@ -228,7 +228,7 @@ export async function fillSkillsEngineData(data, { skillsGapRepository, courseRe
  * 2. If only user_id is provided, return all courses for that user (without learning_path).
  * 3. If user_id + competency_target_name is provided, return that specific course (with learning_path if requested).
  */
-export async function fillLearningAnalyticsData(data, { courseRepository, skillsGapRepository }) {
+export async function fillLearningAnalyticsData(data, { courseRepository, skillsGapRepository, learnerRepository }) {
   // Handle batch ingestion requests
   if (data.type === 'batch' || data.date_range) {
     try {
@@ -276,7 +276,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
       for (const course of courses || []) {
         console.log(`[FillLearningAnalyticsData] Processing course: ${course.competency_target_name} for user: ${course.user_id}`);
         
-        // Get skills gap for each course
+        // Get skills gap for each course (contains user_name, company_name, company_id, skills_raw_data, exam_status)
         let skillsGap = null;
         if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
           try {
@@ -287,6 +287,17 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
             console.log(`[FillLearningAnalyticsData] Found skills gap for ${course.competency_target_name}:`, skillsGap ? 'yes' : 'no');
           } catch (error) {
             console.warn(`[Endpoints] Could not fetch skills gap for ${course.competency_target_name}:`, error.message);
+          }
+        }
+        
+        // Fallback: Get learner data if skills gap doesn't have user/company info
+        let learner = null;
+        if ((!skillsGap || !skillsGap.user_name || !skillsGap.company_name) && learnerRepository && typeof learnerRepository.getLearnerById === 'function') {
+          try {
+            learner = await learnerRepository.getLearnerById(course.user_id);
+            console.log(`[FillLearningAnalyticsData] Found learner for ${course.user_id}:`, learner ? 'yes' : 'no');
+          } catch (error) {
+            console.warn(`[Endpoints] Could not fetch learner for ${course.user_id}:`, error.message);
           }
         }
         
@@ -333,15 +344,23 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           }
         }
         
+        // Collect data with fallback priority: skillsGap > learner > empty
+        const user_name = skillsGap?.user_name || learner?.user_name || '';
+        const company_id = skillsGap?.company_id || learner?.company_id || '';
+        const company_name = skillsGap?.company_name || learner?.company_name || '';
+        const gap_id = skillsGap?.gap_id || course.gap_id || '';
+        const skills_raw_data = skillsGap?.skills_raw_data || {};
+        const exam_status = skillsGap?.exam_status || '';
+        
         learningPaths.push({
           user_id: course.user_id || '',
-          user_name: skillsGap?.user_name || '',
-          company_id: skillsGap?.company_id || '',
-          company_name: skillsGap?.company_name || '',
+          user_name: user_name,
+          company_id: company_id,
+          company_name: company_name,
           competency_target_name: course.competency_target_name || '',
-          gap_id: skillsGap?.gap_id || course.gap_id || '',
-          skills_raw_data: skillsGap?.skills_raw_data || {},
-          exam_status: skillsGap?.exam_status || '',
+          gap_id: gap_id,
+          skills_raw_data: skills_raw_data,
+          exam_status: exam_status,
           learning_path: {
             steps: learningPathSteps,
             estimatedCompletion: estimatedCompletion,
@@ -366,6 +385,16 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
       if (courseRepository && typeof courseRepository.getCoursesByUser === 'function') {
         const courses = await courseRepository.getCoursesByUser(data.user_id);
         
+        // Get learner data as fallback for user/company info
+        let learner = null;
+        if (learnerRepository && typeof learnerRepository.getLearnerById === 'function') {
+          try {
+            learner = await learnerRepository.getLearnerById(data.user_id);
+          } catch (error) {
+            console.warn(`[Endpoints] Could not fetch learner for ${data.user_id}:`, error.message);
+          }
+        }
+        
         // Build response array with all courses for this user (without learning_path)
         const userData = [];
         for (const course of courses || []) {
@@ -382,11 +411,12 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
             }
           }
           
+          // Use fallback: skillsGap > learner > empty
           userData.push({
             user_id: course.user_id,
-            user_name: skillsGap?.user_name || '',
-            company_id: skillsGap?.company_id || '',
-            company_name: skillsGap?.company_name || '',
+            user_name: skillsGap?.user_name || learner?.user_name || '',
+            company_id: skillsGap?.company_id || learner?.company_id || '',
+            company_name: skillsGap?.company_name || learner?.company_name || '',
             competency_target_name: course.competency_target_name,
             gap_id: skillsGap?.gap_id || null,
             skills_raw_data: skillsGap?.skills_raw_data || null,
@@ -409,8 +439,9 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
 
     try {
       // Get skills gap for analytics
+      let skillsGap = null;
       if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
-        const skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(
+        skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(
           data.user_id,
           data.competency_target_name
         );
@@ -421,6 +452,20 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           filled.user_name = skillsGap.user_name || filled.user_name || '';
           filled.company_id = skillsGap.company_id || filled.company_id || '';
           filled.company_name = skillsGap.company_name || filled.company_name || '';
+        }
+      }
+      
+      // Fallback: Get learner data if skills gap doesn't have user/company info
+      if ((!skillsGap || !skillsGap.user_name || !skillsGap.company_name) && learnerRepository && typeof learnerRepository.getLearnerById === 'function') {
+        try {
+          const learner = await learnerRepository.getLearnerById(data.user_id);
+          if (learner) {
+            filled.user_name = filled.user_name || learner.user_name || '';
+            filled.company_id = filled.company_id || learner.company_id || '';
+            filled.company_name = filled.company_name || learner.company_name || '';
+          }
+        } catch (error) {
+          console.warn(`[Endpoints] Could not fetch learner for ${data.user_id}:`, error.message);
         }
       }
 
@@ -590,13 +635,13 @@ async function skillsEngineHandler(payload, dependencies) {
  * Maps to existing fillLearningAnalyticsData functionality
  */
 async function analyticsHandler(payload, dependencies) {
-  const { courseRepository, skillsGapRepository } = dependencies;
+  const { courseRepository, skillsGapRepository, learnerRepository } = dependencies;
   const { action } = payload;
   
   // Use existing analytics data filling logic
   // Extract action from payload, then pass the rest to fillLearningAnalyticsData
   const { action: _, ...dataWithoutAction } = payload;
-  const result = await fillLearningAnalyticsData(dataWithoutAction, { courseRepository, skillsGapRepository });
+  const result = await fillLearningAnalyticsData(dataWithoutAction, { courseRepository, skillsGapRepository, learnerRepository });
   
   // For batch requests, format response according to LearningAnalytics expectations
   if (payload.type === 'batch' || payload.date_range) {

@@ -344,7 +344,8 @@ if (dependencies.repository && dependencies.jobRepository) {
         case "LearningAnalytics":
           data = await fillLearningAnalyticsData(data, { 
             courseRepository: dependencies.courseRepository, 
-            skillsGapRepository: dependencies.skillsGapRepository 
+            skillsGapRepository: dependencies.skillsGapRepository,
+            learnerRepository: dependencies.learnerRepository
           });
           break;
         case "CourseBuilder":

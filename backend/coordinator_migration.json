@@ -1,237 +1,234 @@
 {
-  "migrationFile": {
-    "api": {
-      "endpoints": [
-        {
-          "path": "/api/fill-content-metrics",
-          "method": "POST",
-          "description": "Unified endpoint for inter-service communication via Coordinator",
-          "requestSchema": {
-            "type": "object",
-            "required": [
-              "requester_service",
-              "payload",
-              "response"
-            ],
-            "properties": {
-              "payload": {
-                "type": "object",
-                "required": true,
-                "properties": {
-                  "action": {
-                    "type": "string",
-                    "required": true,
-                    "description": "Action to perform (e.g., 'request_learning_path', 'query', 'chat', 'update_skills_gap')"
-                  }
-                },
-                "description": "Service-specific data based on the action"
-              },
-              "response": {
-                "type": "object",
-                "required": true,
-                "description": "Template defining expected response structure"
-              },
-              "requester_service": {
-                "type": "string",
-                "required": true,
-                "description": "Name of the service making the request (e.g., 'course-builder', 'analytics', 'skills-engine', 'ai')"
-              }
-            }
-          },
-          "responseSchema": {
-            "type": "object",
-            "properties": {
-              "data": {
-                "type": "object"
-              },
-              "error": {
-                "type": "string"
-              },
-              "message": {
-                "type": "string"
-              },
-              "success": {
-                "type": "boolean"
-              }
-            }
-          }
-        }
-      ]
-    },
-    "events": {
-      "publishes": [
-        "learning-path.generated",
-        "learning-path.approved",
-        "learning-path.rejected",
-        "learning-path.changes-requested",
-        "course.completed",
-        "course-suggestions.generated"
-      ],
-      "subscribes": [
-        "skills-gap.detected",
-        "company.registered",
-        "company.updated",
-        "exam.completed"
-      ]
-    },
-    "version": "1.0.0",
-    "database": {
-      "tables": [
-        {
-          "name": "companies",
-          "schema": {
-            "company_id": "UUID PRIMARY KEY",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "company_name": "TEXT NOT NULL",
-            "decision_maker": "JSONB",
-            "last_modified_at": "TIMESTAMP WITH TIME ZONE",
-            "decision_maker_policy": "TEXT NOT NULL CHECK (decision_maker_policy IN ('auto', 'manual'))"
-          }
-        },
-        {
-          "name": "learners",
-          "schema": {
-            "user_id": "UUID PRIMARY KEY",
-            "user_name": "TEXT NOT NULL",
-            "company_id": "UUID NOT NULL",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "company_name": "TEXT NOT NULL",
-            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
-          }
-        },
-        {
-          "name": "skills_gap",
-          "schema": {
-            "gap_id": "UUID PRIMARY KEY",
-            "user_id": "UUID NOT NULL",
-            "user_name": "TEXT NOT NULL",
-            "company_id": "UUID NOT NULL",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "exam_status": "TEXT CHECK (exam_status IN ('pass', 'fail'))",
-            "company_name": "TEXT NOT NULL",
-            "skills_raw_data": "JSONB NOT NULL",
-            "last_modified_at": "TIMESTAMP WITH TIME ZONE",
-            "competency_target_name": "TEXT NOT NULL"
-          }
-        },
-        {
-          "name": "skills_expansions",
-          "schema": {
-            "gap_id": "UUID",
-            "user_id": "UUID NOT NULL",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "expansion_id": "UUID PRIMARY KEY",
-            "prompt_1_output": "JSONB",
-            "prompt_2_output": "JSONB",
-            "last_modified_at": "TIMESTAMP WITH TIME ZONE"
-          }
-        },
-        {
-          "name": "courses",
-          "schema": {
-            "gap_id": "UUID",
-            "user_id": "UUID NOT NULL",
-            "approved": "BOOLEAN DEFAULT FALSE",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "learning_path": "JSONB NOT NULL",
-            "last_modified_at": "TIMESTAMP WITH TIME ZONE",
-            "competency_target_name": "TEXT PRIMARY KEY"
-          }
-        },
-        {
-          "name": "recommendations",
-          "schema": {
-            "user_id": "UUID NOT NULL",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "sent_to_rag": "BOOLEAN DEFAULT FALSE",
-            "base_course_name": "TEXT NOT NULL",
-            "last_modified_at": "TIMESTAMP WITH TIME ZONE",
-            "recommendation_id": "UUID PRIMARY KEY",
-            "suggested_courses": "JSONB NOT NULL"
-          }
-        },
-        {
-          "name": "jobs",
-          "schema": {
-            "id": "UUID PRIMARY KEY",
-            "type": "VARCHAR(100) CHECK (type IN ('path-generation', 'course-suggestion', 'path-distribution'))",
-            "error": "TEXT",
-            "result": "JSONB",
-            "status": "VARCHAR(50) CHECK (status IN ('pending', 'processing', 'completed', 'failed'))",
-            "user_id": "UUID NOT NULL",
-            "progress": "INTEGER DEFAULT 0",
-            "company_id": "UUID",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "updated_at": "TIMESTAMP WITH TIME ZONE",
-            "current_stage": "VARCHAR(100)",
-            "competency_target_name": "TEXT"
-          }
-        },
-        {
-          "name": "path_approvals",
-          "schema": {
-            "id": "UUID PRIMARY KEY",
-            "status": "TEXT CHECK (status IN ('pending', 'approved', 'rejected', 'changes_requested'))",
-            "feedback": "TEXT",
-            "company_id": "UUID NOT NULL",
-            "created_at": "TIMESTAMP WITH TIME ZONE",
-            "updated_at": "TIMESTAMP WITH TIME ZONE",
-            "approved_at": "TIMESTAMP WITH TIME ZONE",
-            "rejected_at": "TIMESTAMP WITH TIME ZONE",
-            "learning_path_id": "TEXT NOT NULL",
-            "decision_maker_id": "UUID NOT NULL",
-            "changes_requested_at": "TIMESTAMP WITH TIME ZONE"
-          }
-        }
-      ],
-      "migrations": [
-        {
-          "file": "database/migrations/learner_ai_migration.sql",
-          "name": "learner_ai_migration",
-          "tables": [
-            "companies",
-            "learners",
-            "skills_gap",
-            "skills_expansions",
-            "courses",
-            "recommendations",
-            "jobs",
-            "path_approvals"
+  "api": {
+    "endpoints": [
+      {
+        "path": "/api/fill-content-metrics",
+        "method": "POST",
+        "description": "Unified endpoint for inter-service communication via Coordinator",
+        "requestSchema": {
+          "type": "object",
+          "required": [
+            "requester_service",
+            "payload",
+            "response"
           ],
-          "version": "1.0.0",
-          "appliedAt": null,
-          "description": "Initial database schema migration for LearnerAI platform"
+          "properties": {
+            "payload": {
+              "type": "object",
+              "required": true,
+              "properties": {
+                "action": {
+                  "type": "string",
+                  "required": true,
+                  "description": "Action to perform (e.g., 'request_learning_path', 'query', 'chat', 'update_skills_gap')"
+                }
+              },
+              "description": "Service-specific data based on the action"
+            },
+            "response": {
+              "type": "object",
+              "required": true,
+              "description": "Template defining expected response structure"
+            },
+            "requester_service": {
+              "type": "string",
+              "required": true,
+              "description": "Name of the service making the request (e.g., 'course-builder', 'analytics', 'skills-engine', 'ai')"
+            }
+          }
+        },
+        "responseSchema": {
+          "type": "object",
+          "properties": {
+            "data": {
+              "type": "object"
+            },
+            "error": {
+              "type": "string"
+            },
+            "message": {
+              "type": "string"
+            },
+            "success": {
+              "type": "boolean"
+            }
+          }
         }
-      ]
-    },
-    "description": "LearnerAI is an intelligent microservice that generates personalized, adaptive learning paths using Google Gemini AI. It receives skills gap data from Skills Engine, processes it through a sophisticated 3-stage AI prompt pipeline (skill expansion, competency identification, and path creation), and produces detailed step-by-step learning paths tailored to individual learners. The service manages company approval workflows (supporting both auto and manual approval policies), tracks learner progress, handles async job processing for path generation, and seamlessly integrates with Course Builder, Learning Analytics, Management Reports, and other microservices. LearnerAI serves as the central intelligence layer for personalized learning experiences, transforming skills gaps into actionable, structured learning journeys with objectives, resources, and time estimates.",
-    "capabilities": [
-      "learning path generation",
-      "personalized learning paths",
-      "skills gap analysis",
-      "skills gap detection",
-      "course recommendations",
-      "course suggestions",
-      "path approvals",
-      "approval workflow",
-      "AI queries",
-      "AI chat",
-      "Gemini AI integration",
-      "inter-service communication",
-      "learner management",
-      "company management",
-      "competency tracking",
-      "exam status tracking",
-      "async job processing",
-      "learning path distribution"
-    ],
-    "dependencies": [
-      "skills-engine-service",
-      "course-builder-service",
-      "learning-analytics-service",
-      "management-reports-service",
-      "rag-microservice",
-      "directory-service"
+      }
     ]
-  }
+  },
+  "events": {
+    "publishes": [
+      "learning-path.generated",
+      "learning-path.approved",
+      "learning-path.rejected",
+      "learning-path.changes-requested",
+      "course.completed",
+      "course-suggestions.generated"
+    ],
+    "subscribes": [
+      "skills-gap.detected",
+      "company.registered",
+      "company.updated",
+      "exam.completed"
+    ]
+  },
+  "version": "1.0.0",
+  "database": {
+    "tables": [
+      {
+        "name": "companies",
+        "schema": {
+          "company_id": "UUID PRIMARY KEY",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "company_name": "TEXT NOT NULL",
+          "decision_maker": "JSONB",
+          "last_modified_at": "TIMESTAMP WITH TIME ZONE",
+          "decision_maker_policy": "TEXT NOT NULL CHECK (decision_maker_policy IN ('auto', 'manual'))"
+        }
+      },
+      {
+        "name": "learners",
+        "schema": {
+          "user_id": "UUID PRIMARY KEY",
+          "user_name": "TEXT NOT NULL",
+          "company_id": "UUID NOT NULL",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "company_name": "TEXT NOT NULL",
+          "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+        }
+      },
+      {
+        "name": "skills_gap",
+        "schema": {
+          "gap_id": "UUID PRIMARY KEY",
+          "user_id": "UUID NOT NULL",
+          "user_name": "TEXT NOT NULL",
+          "company_id": "UUID NOT NULL",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "exam_status": "TEXT CHECK (exam_status IN ('pass', 'fail'))",
+          "company_name": "TEXT NOT NULL",
+          "skills_raw_data": "JSONB NOT NULL",
+          "last_modified_at": "TIMESTAMP WITH TIME ZONE",
+          "competency_target_name": "TEXT NOT NULL"
+        }
+      },
+      {
+        "name": "skills_expansions",
+        "schema": {
+          "gap_id": "UUID",
+          "user_id": "UUID NOT NULL",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "expansion_id": "UUID PRIMARY KEY",
+          "prompt_1_output": "JSONB",
+          "prompt_2_output": "JSONB",
+          "last_modified_at": "TIMESTAMP WITH TIME ZONE"
+        }
+      },
+      {
+        "name": "courses",
+        "schema": {
+          "gap_id": "UUID",
+          "user_id": "UUID NOT NULL",
+          "approved": "BOOLEAN DEFAULT FALSE",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "learning_path": "JSONB NOT NULL",
+          "last_modified_at": "TIMESTAMP WITH TIME ZONE",
+          "competency_target_name": "TEXT PRIMARY KEY"
+        }
+      },
+      {
+        "name": "recommendations",
+        "schema": {
+          "user_id": "UUID NOT NULL",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "sent_to_rag": "BOOLEAN DEFAULT FALSE",
+          "base_course_name": "TEXT NOT NULL",
+          "last_modified_at": "TIMESTAMP WITH TIME ZONE",
+          "recommendation_id": "UUID PRIMARY KEY",
+          "suggested_courses": "JSONB NOT NULL"
+        }
+      },
+      {
+        "name": "jobs",
+        "schema": {
+          "id": "UUID PRIMARY KEY",
+          "type": "VARCHAR(100) CHECK (type IN ('path-generation', 'course-suggestion', 'path-distribution'))",
+          "error": "TEXT",
+          "result": "JSONB",
+          "status": "VARCHAR(50) CHECK (status IN ('pending', 'processing', 'completed', 'failed'))",
+          "user_id": "UUID NOT NULL",
+          "progress": "INTEGER DEFAULT 0",
+          "company_id": "UUID",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "updated_at": "TIMESTAMP WITH TIME ZONE",
+          "current_stage": "VARCHAR(100)",
+          "competency_target_name": "TEXT"
+        }
+      },
+      {
+        "name": "path_approvals",
+        "schema": {
+          "id": "UUID PRIMARY KEY",
+          "status": "TEXT CHECK (status IN ('pending', 'approved', 'rejected', 'changes_requested'))",
+          "feedback": "TEXT",
+          "company_id": "UUID NOT NULL",
+          "created_at": "TIMESTAMP WITH TIME ZONE",
+          "updated_at": "TIMESTAMP WITH TIME ZONE",
+          "approved_at": "TIMESTAMP WITH TIME ZONE",
+          "rejected_at": "TIMESTAMP WITH TIME ZONE",
+          "learning_path_id": "TEXT NOT NULL",
+          "decision_maker_id": "UUID NOT NULL",
+          "changes_requested_at": "TIMESTAMP WITH TIME ZONE"
+        }
+      }
+    ],
+    "migrations": [
+      {
+        "file": "database/migrations/learner_ai_migration.sql",
+        "name": "learner_ai_migration",
+        "tables": [
+          "companies",
+          "learners",
+          "skills_gap",
+          "skills_expansions",
+          "courses",
+          "recommendations",
+          "jobs",
+          "path_approvals"
+        ],
+        "version": "1.0.0",
+        "appliedAt": null,
+        "description": "Initial database schema migration for LearnerAI platform"
+      }
+    ]
+  },
+  "description": "LearnerAI is an intelligent microservice that generates personalized, adaptive learning paths using Google Gemini AI. It receives skills gap data from Skills Engine, processes it through a sophisticated 3-stage AI prompt pipeline (skill expansion, competency identification, and path creation), and produces detailed step-by-step learning paths tailored to individual learners. The service manages company approval workflows (supporting both auto and manual approval policies), tracks learner progress, handles async job processing for path generation, and seamlessly integrates with Course Builder, Learning Analytics, and other microservices. LearnerAI serves as the central intelligence layer for personalized learning experiences, transforming skills gaps into actionable, structured learning journeys with objectives, resources, and time estimates.",
+  "capabilities": [
+    "learning path generation",
+    "personalized learning paths",
+    "skills gap analysis",
+    "skills gap detection",
+    "course recommendations",
+    "course suggestions",
+    "path approvals",
+    "approval workflow",
+    "AI queries",
+    "AI chat",
+    "Gemini AI integration",
+    "inter-service communication",
+    "learner management",
+    "company management",
+    "competency tracking",
+    "exam status tracking",
+    "async job processing",
+    "learning path distribution"
+  ],
+  "dependencies": [
+    "skills-engine-service",
+    "course-builder-service",
+    "learning-analytics-service",
+    "rag-microservice",
+    "directory-service"
+  ]
 }
