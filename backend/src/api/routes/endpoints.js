@@ -235,25 +235,47 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
       const startDate = data.date_range?.start_date || null;
       const endDate = data.date_range?.end_date || null;
       
+      console.log('[FillLearningAnalyticsData] Batch request received:', {
+        type: data.type,
+        date_range: data.date_range,
+        startDate,
+        endDate
+      });
+      
       // Get all courses (we'll filter by date if provided)
       let courses = [];
       if (courseRepository && typeof courseRepository.getAllCourses === 'function') {
         courses = await courseRepository.getAllCourses();
+        console.log(`[FillLearningAnalyticsData] Found ${courses.length} total courses`);
         
         // Filter by date range if provided
         if (startDate && endDate) {
           const start = new Date(startDate);
           const end = new Date(endDate);
+          // Set end date to end of day (23:59:59)
+          end.setHours(23, 59, 59, 999);
+          
+          const beforeFilter = courses.length;
           courses = courses.filter(course => {
+            if (!course.created_at) return false;
             const courseDate = new Date(course.created_at);
-            return courseDate >= start && courseDate <= end;
+            const isInRange = courseDate >= start && courseDate <= end;
+            if (!isInRange) {
+              console.log(`[FillLearningAnalyticsData] Course ${course.competency_target_name} excluded: ${courseDate.toISOString()} not in range ${start.toISOString()} - ${end.toISOString()}`);
+            }
+            return isInRange;
           });
+          console.log(`[FillLearningAnalyticsData] After date filter: ${courses.length} courses (filtered from ${beforeFilter})`);
+        } else {
+          console.log('[FillLearningAnalyticsData] No date range provided, returning all courses');
         }
       }
       
       // Build response array with all courses and their skills gap data
       const learningPaths = [];
       for (const course of courses || []) {
+        console.log(`[FillLearningAnalyticsData] Processing course: ${course.competency_target_name} for user: ${course.user_id}`);
+        
         // Get skills gap for each course
         let skillsGap = null;
         if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
@@ -262,6 +284,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
               course.user_id,
               course.competency_target_name
             );
+            console.log(`[FillLearningAnalyticsData] Found skills gap for ${course.competency_target_name}:`, skillsGap ? 'yes' : 'no');
           } catch (error) {
             console.warn(`[Endpoints] Could not fetch skills gap for ${course.competency_target_name}:`, error.message);
           }
@@ -292,6 +315,24 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           }
         }
         
+        // Calculate estimated completion from learning path
+        let estimatedCompletion = '';
+        if (course.learning_path?.estimated_duration_hours) {
+          estimatedCompletion = `${course.learning_path.estimated_duration_hours} hours`;
+        } else if (course.learning_path?.estimatedCompletion) {
+          estimatedCompletion = course.learning_path.estimatedCompletion;
+        } else if (learningPathSteps.length > 0) {
+          // Calculate from steps if available
+          const totalMinutes = learningPathSteps.reduce((sum, step) => {
+            const duration = step.duration || step.estimatedTime || '';
+            const minutes = parseInt(duration) || 0;
+            return sum + minutes;
+          }, 0);
+          if (totalMinutes > 0) {
+            estimatedCompletion = `${Math.round(totalMinutes / 60 * 10) / 10} hours`;
+          }
+        }
+        
         learningPaths.push({
           user_id: course.user_id || '',
           user_name: skillsGap?.user_name || '',
@@ -303,9 +344,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           exam_status: skillsGap?.exam_status || '',
           learning_path: {
             steps: learningPathSteps,
-            estimatedCompletion: course.learning_path?.estimated_duration_hours 
-              ? `${course.learning_path.estimated_duration_hours} hours` 
-              : course.learning_path?.estimatedCompletion || '',
+            estimatedCompletion: estimatedCompletion,
             totalSteps: learningPathSteps.length,
             createdAt: course.created_at || '',
             updatedAt: course.last_modified_at || ''
@@ -313,6 +352,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         });
       }
       
+      console.log(`[FillLearningAnalyticsData] Returning ${learningPaths.length} learning paths`);
       return learningPaths;
     } catch (error) {
       console.warn(`[Endpoints] Could not fetch batch analytics data:`, error.message);
@@ -560,20 +600,27 @@ async function analyticsHandler(payload, dependencies) {
   
   // For batch requests, format response according to LearningAnalytics expectations
   if (payload.type === 'batch' || payload.date_range) {
+    const formattedResult = {
+      version: "1.0.0",
+      fetched_at: new Date().toISOString(),
+      pagination: {
+        total_learning_paths: Array.isArray(result) ? result.length : 0,
+        returned_learning_paths: Array.isArray(result) ? result.length : 0,
+        next_cursor: "",
+        has_more: false
+      },
+      learning_paths: Array.isArray(result) ? result : []
+    };
+    
+    console.log('[AnalyticsHandler] Batch response formatted:', {
+      total_learning_paths: formattedResult.pagination.total_learning_paths,
+      learning_paths_count: formattedResult.learning_paths.length
+    });
+    
     return {
       success: true,
       action: action,
-      data: {
-        version: "1.0.0",
-        fetched_at: new Date().toISOString(),
-        pagination: {
-          total_learning_paths: Array.isArray(result) ? result.length : 0,
-          returned_learning_paths: Array.isArray(result) ? result.length : 0,
-          next_cursor: "",
-          has_more: false
-        },
-        learning_paths: Array.isArray(result) ? result : []
-      }
+      data: formattedResult
     };
   }
   
