@@ -693,9 +693,24 @@ export async function fillManagementReportingData(data, { courseRepository, skil
  * - Requires: user_id, user_name, company_id, company_name, competency_target_name, status, gap
  * - Processes skills gap and stores in database
  * - Creates learner if doesn't exist
+ * - Automatically triggers learning path generation after processing
  */
 async function skillsEngineHandler(payload, dependencies) {
-  const { skillsGapRepository, learnerRepository, companyRepository } = dependencies;
+  const { 
+    skillsGapRepository, 
+    learnerRepository, 
+    companyRepository,
+    geminiClient,
+    skillsEngineClient,
+    repository,
+    jobRepository,
+    promptLoader,
+    cacheRepository,
+    skillsExpansionRepository,
+    checkApprovalPolicyUseCase,
+    requestPathApprovalUseCase,
+    distributePathUseCase
+  } = dependencies;
   const { action } = payload;
   
   // Handle skills gap updates from Skills Engine
@@ -720,24 +735,69 @@ async function skillsEngineHandler(payload, dependencies) {
       gap
     } = payload;
     
+    const finalStatus = status || (exam_status === 'PASS' ? 'pass' : exam_status === 'FAIL' ? 'fail' : null);
+    const competencyTargetName = competency_target_name || competency_name;
+    
     // Process the skills gap update
     const skillsGap = await processGapUpdateUseCase.execute({
       user_id,
       user_name,
       company_id,
       company_name,
-      competency_target_name: competency_target_name || competency_name,
+      competency_target_name: competencyTargetName,
       competency_name,
-      status: status || (exam_status === 'PASS' ? 'pass' : exam_status === 'FAIL' ? 'fail' : null),
+      status: finalStatus,
       gap
     });
+    
+    // Automatically trigger learning path generation after skills gap is processed
+    let jobId = null;
+    try {
+      if (geminiClient && repository && jobRepository && promptLoader) {
+        const { GenerateLearningPathUseCase } = await import('../../application/useCases/GenerateLearningPathUseCase.js');
+        const { SkillsGap } = await import('../../domain/entities/SkillsGap.js');
+        
+        const generatePathUseCase = new GenerateLearningPathUseCase({
+          geminiClient,
+          skillsEngineClient,
+          repository,
+          jobRepository,
+          promptLoader,
+          cacheRepository,
+          skillsGapRepository,
+          skillsExpansionRepository,
+          checkApprovalPolicyUseCase,
+          requestPathApprovalUseCase,
+          distributePathUseCase
+        });
+        
+        // Create SkillsGap entity for learning path generation
+        const skillsGapEntity = new SkillsGap({
+          userId: user_id,
+          companyId: company_id,
+          competencyTargetName: competencyTargetName
+        });
+        
+        // Trigger learning path generation (async - fire and forget)
+        const result = await generatePathUseCase.execute(skillsGapEntity);
+        jobId = result.jobId;
+        
+        console.log(`✅ Learning path generation triggered for user ${user_id}, competency ${competencyTargetName}, jobId: ${jobId}`);
+      } else {
+        console.warn('⚠️  Cannot trigger learning path generation: missing dependencies');
+      }
+    } catch (error) {
+      // Log error but don't fail the skills gap update
+      console.error(`❌ Failed to trigger learning path generation: ${error.message}`, error);
+    }
     
     return {
       success: true,
       action: action,
       data: {
         message: 'Skills gap processed successfully',
-        skillsGap
+        skillsGap,
+        ...(jobId && { jobId, learningPathGenerationStarted: true })
       }
     };
   }

@@ -14,17 +14,38 @@ dotenv.config();
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
-// Request body
+// Request body - Skills Engine update_skills_gap request
 const REQUEST_BODY = {
-  "requester_service": "learnerAI",
+  "requester_service": "skills-engine",
   "payload": {
-    "action": "send_learning_path",
-    "competency_target_name": "dd",
-    "company_id": "550e8400-e29b-41d4-a716-446655440000",
+    "action": "update_skills_gap",
+    "user_id": "b2b400ed-bc11-4aa9-a89e-f4a00d0f6321",
+    "user_name": "Noam Levi",
+    "company_id": "c1d2e3f4-5678-9012-3456-789012345678",
     "company_name": "TechCorp Inc.",
-    "user_name": "John Doe",
-    "user_id": "123e4567-e89b-12d3-a456-426614174000",
-    "learning_path": {}
+    "competency_target_name": "C++ basics Noam",
+    "status": "fail",
+    "gap": {
+      "missing_skills_map": {
+        "Competency_C++_Basics": [
+          "Variables and Data Types",
+          "Input and Output (cin, cout)",
+          "Control Flow (if, switch, loops)",
+          "Functions and Parameters",
+          "Scope and Lifetime of Variables",
+          "Arrays and Strings",
+          "Structs vs Classes",
+          "Basic Object-Oriented Programming Concepts",
+          "Constructors and Destructors",
+          "Function Overloading",
+          "Pointers (basic usage & referencing)",
+          "Passing by Value vs Passing by Reference",
+          "Header Files and Compilation Units",
+          "std::vector and basic STL usage",
+          "Basic Error Handling with try/catch"
+        ]
+      }
+    }
   },
   "response": {
     "answer": ""
@@ -32,7 +53,7 @@ const REQUEST_BODY = {
 };
 
 // Service name for signature (X-Service-Name header)
-// Note: This should be "learnerAI-service" even if requester_service in body is "learnerAI"
+// Note: This should be "learnerAI-service" (the service receiving the request)
 const SERVICE_NAME = 'learnerAI-service';
 
 // Get private key
