@@ -463,7 +463,9 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`🚀 LearnerAI Backend server running on ${HOST}:${PORT}`);
   console.log(`📍 Health check: http://${HOST}:${PORT}/health`);
   console.log(`📍 API endpoint: http://${HOST}:${PORT}/api`);
+  console.log(`📍 Coordinator endpoint: http://${HOST}:${PORT}/api/fill-content-metrics`);
   console.log(`✅ Server is ready and listening for connections`);
+  console.log(`📊 Coordinator request logging is ENABLED - all requests will be logged`);
 });
 
 // Graceful shutdown handling for Railway
