@@ -31,9 +31,41 @@ export function createEndpointsRouter(dependencies) {
    * After processing, returns the full object with response.answer populated, as stringified JSON
    */
   router.post('/fill-content-metrics', async (req, res) => {
+    const requestStartTime = Date.now();
+    const requestId = `req-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`;
+    
     try {
+      // Log incoming request from Coordinator
+      console.log(`\n${'='.repeat(80)}`);
+      console.log(`[Coordinator Request] ${requestId} - ${new Date().toISOString()}`);
+      console.log(`[Coordinator Request] ${requestId} - IP: ${req.ip || req.connection.remoteAddress || 'unknown'}`);
+      console.log(`[Coordinator Request] ${requestId} - Method: ${req.method} ${req.path}`);
+      console.log(`[Coordinator Request] ${requestId} - Headers:`, {
+        'content-type': req.headers['content-type'],
+        'x-service-name': req.headers['x-service-name'],
+        'x-signature': req.headers['x-signature'] ? 'present' : 'missing',
+        'user-agent': req.headers['user-agent'],
+        'authorization': req.headers['authorization'] ? 'present' : 'missing'
+      });
+      
       // Step 1: Get request body (express.json() should have already parsed it)
       let requestBody = req.body;
+      
+      // Log request body (sanitized - don't log sensitive data)
+      if (requestBody) {
+        const sanitizedBody = {
+          requester_service: requestBody.requester_service,
+          payload: {
+            action: requestBody.payload?.action,
+            type: requestBody.payload?.type,
+            date_range: requestBody.payload?.date_range,
+            // Log other payload keys but not full values for large objects
+            payload_keys: requestBody.payload ? Object.keys(requestBody.payload) : []
+          },
+          has_response: !!requestBody.response
+        };
+        console.log(`[Coordinator Request] ${requestId} - Request Body:`, JSON.stringify(sanitizedBody, null, 2));
+      }
       
       // If body is undefined or null, return error
       if (!requestBody) {
@@ -88,6 +120,9 @@ export function createEndpointsRouter(dependencies) {
       }
 
       // Step 3: Route based on requester_service
+      console.log(`[Coordinator Request] ${requestId} - Routing to handler: ${requestBody.requester_service}`);
+      console.log(`[Coordinator Request] ${requestId} - Action: ${requestBody.payload?.action || 'none'}`);
+      
       let result;
       try {
         switch (requestBody.requester_service) {
@@ -106,13 +141,36 @@ export function createEndpointsRouter(dependencies) {
             result = await aiHandler(requestBody.payload, dependencies);
             break;
           default:
+            console.warn(`[Coordinator Request] ${requestId} - Unknown service: ${requestBody.requester_service}`);
             return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
               error: "Unknown requester_service",
               message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, LearningAnalytics, course-builder, ai`
             }));
         }
+        
+        const processingTime = Date.now() - requestStartTime;
+        console.log(`[Coordinator Request] ${requestId} - Handler completed successfully in ${processingTime}ms`);
+        
+        // Log result summary (not full result for large responses)
+        if (result) {
+          const resultSummary = {
+            success: result.success,
+            action: result.action,
+            data_type: typeof result.data,
+            data_keys: result.data && typeof result.data === 'object' ? Object.keys(result.data) : null,
+            data_length: Array.isArray(result.data) ? result.data.length : 
+                         (result.data && typeof result.data === 'object' ? Object.keys(result.data).length : null)
+          };
+          console.log(`[Coordinator Request] ${requestId} - Result Summary:`, JSON.stringify(resultSummary, null, 2));
+        }
       } catch (handlerError) {
-        console.error(`[FillFields] Error in ${requestBody.requester_service} handler:`, handlerError);
+        const processingTime = Date.now() - requestStartTime;
+        console.error(`[Coordinator Request] ${requestId} - Handler Error after ${processingTime}ms:`, {
+          service: requestBody.requester_service,
+          action: requestBody.payload?.action,
+          error: handlerError.message,
+          stack: handlerError.stack
+        });
         return res.status(500).setHeader('Content-Type', 'application/json').send(JSON.stringify({
           error: "Handler execution failed",
           details: handlerError.message,
@@ -124,9 +182,19 @@ export function createEndpointsRouter(dependencies) {
       requestBody.response.answer = typeof result === 'string' ? result : JSON.stringify(result);
 
       // Step 5: Return the full object as stringified JSON (preserving requester_service, payload, and response)
+      const totalTime = Date.now() - requestStartTime;
+      const responseSize = JSON.stringify(requestBody).length;
+      console.log(`[Coordinator Request] ${requestId} - Response: ${res.statusCode} | Size: ${responseSize} bytes | Total time: ${totalTime}ms`);
+      console.log(`${'='.repeat(80)}\n`);
+      
       return res.setHeader('Content-Type', 'application/json').send(JSON.stringify(requestBody));
     } catch (error) {
-      console.error('[FillFields] Unexpected error:', error);
+      const totalTime = Date.now() - requestStartTime;
+      console.error(`[Coordinator Request] ${requestId} - Unexpected error after ${totalTime}ms:`, {
+        error: error.message,
+        stack: error.stack
+      });
+      console.log(`${'='.repeat(80)}\n`);
       return res.status(500).setHeader('Content-Type', 'application/json').send(JSON.stringify({
         error: "Internal server error",
         details: error.message
