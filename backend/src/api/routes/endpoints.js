@@ -129,7 +129,6 @@ export function createEndpointsRouter(dependencies) {
           case "skills-engine":
             result = await skillsEngineHandler(requestBody.payload, dependencies);
             break;
-          case "analytics":
           case "LearningAnalytics":
             result = await analyticsHandler(requestBody.payload, dependencies);
             break;
@@ -140,11 +139,62 @@ export function createEndpointsRouter(dependencies) {
           case "ai-service":
             result = await aiHandler(requestBody.payload, dependencies);
             break;
+          case "directory":
+          case "Directory":
+            // Directory requests company/learner data
+            const { action: _, ...dataWithoutAction } = requestBody.payload;
+            result = {
+              success: true,
+              action: requestBody.payload.action || 'fill_directory_data',
+              data: await fillDirectoryData(dataWithoutAction, { 
+                companyRepository, 
+                learnerRepository 
+              })
+            };
+            break;
+          case "rag":
+          case "rag-microservice":
+          case "rag-service":
+            // RAG microservice might request course recommendations, learning paths, or user data
+            const { action: ragAction, ...ragDataWithoutAction } = requestBody.payload;
+            
+            // If RAG requests recommendations, fetch them
+            if (ragAction === 'get_recommendations' && ragDataWithoutAction.user_id && recommendationRepository) {
+              try {
+                const recommendations = await recommendationRepository.getRecommendationsByUser(ragDataWithoutAction.user_id);
+                result = {
+                  success: true,
+                  action: ragAction,
+                  data: {
+                    recommendations: recommendations || [],
+                    user_id: ragDataWithoutAction.user_id
+                  }
+                };
+              } catch (error) {
+                console.warn(`[Endpoints] Could not fetch recommendations for RAG:`, error.message);
+                result = {
+                  success: true,
+                  action: ragAction,
+                  data: {
+                    recommendations: [],
+                    user_id: ragDataWithoutAction.user_id
+                  }
+                };
+              }
+            } else {
+              // Default: return the data as-is (RAG can request other data in the future)
+              result = {
+                success: true,
+                action: ragAction || 'fill_rag_data',
+                data: ragDataWithoutAction
+              };
+            }
+            break;
           default:
             console.warn(`[Coordinator Request] ${requestId} - Unknown service: ${requestBody.requester_service}`);
             return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
               error: "Unknown requester_service",
-              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, LearningAnalytics, course-builder, ai`
+              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, LearningAnalytics, course-builder, ai, directory, Directory, rag, rag-microservice, rag-service`
             }));
         }
         
