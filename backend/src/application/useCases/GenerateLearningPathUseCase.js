@@ -758,12 +758,45 @@ export class GenerateLearningPathUseCase {
       const pathTitle = parsed.path_title || parsed.pathTitle || 'Personalized Learning Path';
       const totalDuration = parsed.total_estimated_duration_hours || parsed.totalDurationHours || null;
       
+      // Process modules: handle both new format (with steps) and old format (with suggested_content_sequence)
+      const processedModules = parsed.learning_modules.map(module => {
+        // Support both new format (skills_in_module) and old format (focus_micro_skills)
+        const skillsInModule = module.skills_in_module || module.focus_micro_skills || [];
+        
+        // Support both new format (steps array) and old format (suggested_content_sequence)
+        const hasSteps = module.steps && Array.isArray(module.steps) && module.steps.length > 0;
+        const hasSuggestedSequence = module.suggested_content_sequence && Array.isArray(module.suggested_content_sequence);
+        
+        // If new format has steps, use them; otherwise keep suggested_content_sequence for backward compatibility
+        const moduleData = {
+          module_order: module.module_order,
+          module_title: module.module_title,
+          estimated_duration_hours: module.estimated_duration_hours,
+          skills_in_module: skillsInModule,
+          // Keep both for backward compatibility
+          focus_micro_skills: skillsInModule, // Alias for backward compatibility
+          learning_goals: module.learning_goals || []
+        };
+        
+        // Add steps if present (new format)
+        if (hasSteps) {
+          moduleData.steps = module.steps;
+        }
+        
+        // Add suggested_content_sequence if present (old format) or if no steps
+        if (hasSuggestedSequence || !hasSteps) {
+          moduleData.suggested_content_sequence = module.suggested_content_sequence || [];
+        }
+        
+        return moduleData;
+      });
+      
       return {
         // Keep snake_case for internal processing (used by LearningPath entity)
         path_title: pathTitle,
         learner_id: parsed.learner_id || userId,
         total_estimated_duration_hours: totalDuration,
-        learning_modules: parsed.learning_modules,
+        learning_modules: processedModules,
         // Add camelCase versions for storage (used by repository)
         pathTitle: pathTitle,
         pathGoal: parsed.pathGoal || parsed.path_goal,
