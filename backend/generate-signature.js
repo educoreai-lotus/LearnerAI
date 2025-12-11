@@ -18,39 +18,17 @@ const __dirname = path.dirname(__filename);
 const REQUEST_BODY = {
   "requester_service": "learnerAI",
   "payload": {
-    "action": "send_learning_path_to_build_course",
+    "action": "send_learning_path",
     "competency_target_name": "dd",
     "company_id": "550e8400-e29b-41d4-a716-446655440000",
     "company_name": "TechCorp Inc.",
     "user_name": "John Doe",
-    "user_id": "10000000-0000-0000-0000-000000000001",
-    "learning_path": {
-      "modules": [
-        {
-          "module_id": "module-001",
-          "module_name": "Introduction to Fundamentals",
-          "module_order": 1,
-          "lessons": [
-            {
-              "lesson_id": "lesson-001",
-              "lesson_name": "Getting Started",
-              "lesson_order": 1,
-              "content_type": "video",
-              "duration_minutes": 15,
-              "description": "Introduction to the fundamentals"
-            }
-          ],
-          "objectives": [
-            "Understand the basics",
-            "Learn core concepts"
-          ]
-        }
-      ],
-      "total_modules": 1,
-      "estimated_duration_hours": 0.25
-    }
+    "user_id": "123e4567-e89b-12d3-a456-426614174000",
+    "learning_path": {}
   },
-  "response": {}
+  "response": {
+    "answer": ""
+  }
 };
 
 // Service name for signature (X-Service-Name header)

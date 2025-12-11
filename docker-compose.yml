@@ -8,7 +8,7 @@ version: '3.8'
 services:
   # Backend API Service
   backend:
-    image: learnerai-backend:0.0.1
+    image: wijdanes/learnerai-backend:0.0.1
     container_name: learnerai-backend
     ports:
       - "5000:5000"
@@ -86,7 +86,7 @@ services:
 
   # Frontend Service
   frontend:
-    image: learnerai-frontend:0.0.1
+    image: wijdanes/learnerai-frontend:0.0.1
     container_name: learnerai-frontend
     ports:
       - "3000:80"

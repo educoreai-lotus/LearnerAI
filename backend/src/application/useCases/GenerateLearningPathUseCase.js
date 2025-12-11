@@ -106,8 +106,8 @@ export class GenerateLearningPathUseCase {
           
           if (relevantGap) {
             if (relevantGap.skills_raw_data) {
-              skillsRawData = relevantGap.skills_raw_data;
-              console.log(`✅ Using updated skills_raw_data from database for user ${skillsGap.userId}`);
+            skillsRawData = relevantGap.skills_raw_data;
+            console.log(`✅ Using updated skills_raw_data from database for user ${skillsGap.userId}`);
             }
             // Get gap_id for linking to skills_expansions
             gapId = relevantGap.gap_id;
@@ -200,18 +200,18 @@ export class GenerateLearningPathUseCase {
           } catch (error) {
             console.warn(`⚠️ Failed to create skills expansion: ${error.message}`);
             // Continue without saving to skills_expansions if it fails
-          }
         }
+      }
 
-        // Prompt 1: Skill Expansion
-        // Use updated skills_raw_data from database if available, otherwise use request data
-        const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
-        const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
-        const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
+      // Prompt 1: Skill Expansion
+      // Use updated skills_raw_data from database if available, otherwise use request data
+      const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
+      const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
+      const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
         prompt1Result = await this.geminiClient.executePrompt(fullPrompt1, '', {
-          timeout: 60000, // 60 seconds for skill expansion
-          maxRetries: 3
-        });
+        timeout: 60000, // 60 seconds for skill expansion
+        maxRetries: 3
+      });
 
         // Save Prompt 1 output to skills_expansions table
         if (this.skillsExpansionRepository && expansionId) {
@@ -230,28 +230,28 @@ export class GenerateLearningPathUseCase {
           }
         }
 
-        await this.jobRepository.updateJob(job.id, {
-          currentStage: 'competency-identification',
-          progress: 30
-        });
+      await this.jobRepository.updateJob(job.id, {
+        currentStage: 'competency-identification',
+        progress: 30
+      });
 
-        // Extract competencies from Prompt 1 result (new format includes structured competencies)
-        const prompt1Competencies = this._extractCompetenciesFromPrompt1(prompt1Result);
+      // Extract competencies from Prompt 1 result (new format includes structured competencies)
+      const prompt1Competencies = this._extractCompetenciesFromPrompt1(prompt1Result);
 
-        // Prompt 2: Prepare standardized queries for Skills Engine
-        const prompt2 = await this.promptLoader.loadPrompt('prompt2-competency-identification');
-        // Format Prompt 1 result for Prompt 2 input
-        const prompt2Input = prompt1Competencies.length > 0 
-          ? JSON.stringify({ expanded_competencies_list: prompt1Competencies.map(c => ({
-              competency_name: c.name,
+      // Prompt 2: Prepare standardized queries for Skills Engine
+      const prompt2 = await this.promptLoader.loadPrompt('prompt2-competency-identification');
+      // Format Prompt 1 result for Prompt 2 input
+      const prompt2Input = prompt1Competencies.length > 0 
+        ? JSON.stringify({ expanded_competencies_list: prompt1Competencies.map(c => ({
+            competency_name: c.name,
               ...(c.description ? { justification: c.description } : {})
-            })) }, null, 2)
-          : this._formatPrompt1Result(prompt1Result);
-        const fullPrompt2 = prompt2.replace('{input}', prompt2Input);
+          })) }, null, 2)
+        : this._formatPrompt1Result(prompt1Result);
+      const fullPrompt2 = prompt2.replace('{input}', prompt2Input);
         prompt2Result = await this.geminiClient.executePrompt(fullPrompt2, '', {
-          timeout: 60000, // 60 seconds for competency identification
-          maxRetries: 3
-        });
+        timeout: 60000, // 60 seconds for competency identification
+        maxRetries: 3
+      });
 
         // Save Prompt 2 output to skills_expansions table
         if (this.skillsExpansionRepository && expansionId) {
@@ -270,16 +270,16 @@ export class GenerateLearningPathUseCase {
           }
         }
 
-        // Extract competencies prepared for Skills Engine
+      // Extract competencies prepared for Skills Engine
         competencies = this._extractCompetenciesFromPrompt2(prompt2Result);
       }
 
       // Update job progress (already done in update mode, but ensure it's set for full generation)
       if (!isUpdateMode) {
-        await this.jobRepository.updateJob(job.id, {
-          currentStage: 'skill-breakdown',
-          progress: 50
-        });
+      await this.jobRepository.updateJob(job.id, {
+        currentStage: 'skill-breakdown',
+        progress: 50
+      });
       }
 
       // Request skill breakdown from Skills Engine (with rollback to mock data if fails)
@@ -538,17 +538,17 @@ export class GenerateLearningPathUseCase {
           try {
             const approval = await this.requestPathApprovalUseCase.execute({
               learningPathId: learningPathId,
-              companyId: skillsGap.companyId,
-              decisionMaker: company.decisionMaker,
-              learningPath: learningPath.toJSON()
-            });
+            companyId: skillsGap.companyId,
+            decisionMaker: company.decisionMaker,
+            learningPath: learningPath.toJSON()
+          });
             console.log(`✅ Approval request created successfully: ${approval.id} for path ${learningPathId} (manual approval required)`);
           } catch (approvalError) {
             console.error(`❌ Failed to create approval request: ${approvalError.message}`);
             console.error(`   Stack: ${approvalError.stack}`);
             // Don't fail the entire process, but log the error
-          }
-        } else {
+        }
+      } else {
           console.warn(`⚠️  Manual approval required but cannot create approval request for company ${skillsGap.companyId}`);
           if (!this.requestPathApprovalUseCase) {
             console.warn(`   ❌ RequestPathApprovalUseCase is NOT initialized - check server.js dependencies`);

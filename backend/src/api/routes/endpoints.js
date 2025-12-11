@@ -95,6 +95,7 @@ export function createEndpointsRouter(dependencies) {
             result = await skillsEngineHandler(requestBody.payload, dependencies);
             break;
           case "analytics":
+          case "LearningAnalytics":
             result = await analyticsHandler(requestBody.payload, dependencies);
             break;
           case "course-builder":
@@ -107,7 +108,7 @@ export function createEndpointsRouter(dependencies) {
           default:
             return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
               error: "Unknown requester_service",
-              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, course-builder, ai`
+              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, LearningAnalytics, course-builder, ai`
             }));
         }
       } catch (handlerError) {
@@ -217,15 +218,108 @@ export async function fillSkillsEngineData(data, { skillsGapRepository, courseRe
 
 /**
  * Fill Learning Analytics data
- * Learning Analytics requests data for a specific user (on-demand mode)
+ * Learning Analytics requests data for a specific user (on-demand mode) or batch ingestion
  * 
  * Note: LearnerAI does NOT send learning_path unless Learning Analytics specifically requests it
  * by including competency_target_name in the request.
  * 
- * If only user_id is provided, return all courses for that user (without learning_path).
- * If user_id + competency_target_name is provided, return that specific course (with learning_path if requested).
+ * Modes:
+ * 1. Batch ingestion: If type="batch" or date_range is provided, return all courses within date range
+ * 2. If only user_id is provided, return all courses for that user (without learning_path).
+ * 3. If user_id + competency_target_name is provided, return that specific course (with learning_path if requested).
  */
 export async function fillLearningAnalyticsData(data, { courseRepository, skillsGapRepository }) {
+  // Handle batch ingestion requests
+  if (data.type === 'batch' || data.date_range) {
+    try {
+      const startDate = data.date_range?.start_date || null;
+      const endDate = data.date_range?.end_date || null;
+      
+      // Get all courses (we'll filter by date if provided)
+      let courses = [];
+      if (courseRepository && typeof courseRepository.getAllCourses === 'function') {
+        courses = await courseRepository.getAllCourses();
+        
+        // Filter by date range if provided
+        if (startDate && endDate) {
+          const start = new Date(startDate);
+          const end = new Date(endDate);
+          courses = courses.filter(course => {
+            const courseDate = new Date(course.created_at);
+            return courseDate >= start && courseDate <= end;
+          });
+        }
+      }
+      
+      // Build response array with all courses and their skills gap data
+      const learningPaths = [];
+      for (const course of courses || []) {
+        // Get skills gap for each course
+        let skillsGap = null;
+        if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
+          try {
+            skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(
+              course.user_id,
+              course.competency_target_name
+            );
+          } catch (error) {
+            console.warn(`[Endpoints] Could not fetch skills gap for ${course.competency_target_name}:`, error.message);
+          }
+        }
+        
+        // Map learning path structure (steps-based format)
+        let learningPathSteps = [];
+        if (course.learning_path) {
+          if (course.learning_path.steps && Array.isArray(course.learning_path.steps)) {
+            learningPathSteps = course.learning_path.steps;
+          } else if (course.learning_path.modules && Array.isArray(course.learning_path.modules)) {
+            // Convert modules format to steps format
+            let stepIndex = 0;
+            course.learning_path.modules.forEach(module => {
+              if (module.lessons && Array.isArray(module.lessons)) {
+                module.lessons.forEach(lesson => {
+                  learningPathSteps.push({
+                    step: stepIndex++,
+                    title: lesson.lesson_name || '',
+                    duration: lesson.duration_minutes ? `${lesson.duration_minutes} minutes` : '',
+                    resources: [],
+                    objectives: module.objectives || [],
+                    estimatedTime: lesson.duration_minutes ? `${lesson.duration_minutes} minutes` : ''
+                  });
+                });
+              }
+            });
+          }
+        }
+        
+        learningPaths.push({
+          user_id: course.user_id || '',
+          user_name: skillsGap?.user_name || '',
+          company_id: skillsGap?.company_id || '',
+          company_name: skillsGap?.company_name || '',
+          competency_target_name: course.competency_target_name || '',
+          gap_id: skillsGap?.gap_id || course.gap_id || '',
+          skills_raw_data: skillsGap?.skills_raw_data || {},
+          exam_status: skillsGap?.exam_status || '',
+          learning_path: {
+            steps: learningPathSteps,
+            estimatedCompletion: course.learning_path?.estimated_duration_hours 
+              ? `${course.learning_path.estimated_duration_hours} hours` 
+              : course.learning_path?.estimatedCompletion || '',
+            totalSteps: learningPathSteps.length,
+            createdAt: course.created_at || '',
+            updatedAt: course.last_modified_at || ''
+          }
+        });
+      }
+      
+      return learningPaths;
+    } catch (error) {
+      console.warn(`[Endpoints] Could not fetch batch analytics data:`, error.message);
+      return [];
+    }
+  }
+  
   // If only user_id is provided, return all courses for that user (without learning_path)
   if (data.user_id && !data.competency_target_name) {
     try {
@@ -463,6 +557,25 @@ async function analyticsHandler(payload, dependencies) {
   // Extract action from payload, then pass the rest to fillLearningAnalyticsData
   const { action: _, ...dataWithoutAction } = payload;
   const result = await fillLearningAnalyticsData(dataWithoutAction, { courseRepository, skillsGapRepository });
+  
+  // For batch requests, format response according to LearningAnalytics expectations
+  if (payload.type === 'batch' || payload.date_range) {
+    return {
+      success: true,
+      action: action,
+      data: {
+        version: "1.0.0",
+        fetched_at: new Date().toISOString(),
+        pagination: {
+          total_learning_paths: Array.isArray(result) ? result.length : 0,
+          returned_learning_paths: Array.isArray(result) ? result.length : 0,
+          next_cursor: "",
+          has_more: false
+        },
+        learning_paths: Array.isArray(result) ? result : []
+      }
+    };
+  }
   
   return {
     success: true,
