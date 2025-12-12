@@ -30,7 +30,15 @@ You will receive two objects:
 
 Both contain only lowest-level skills inside their competencies.
 
-📤 OUTPUT FORMAT (General + Mandatory)
+📤 OUTPUT FORMAT (CRITICAL - MUST FOLLOW EXACTLY)
+
+⚠️ IMPORTANT: You MUST return ONLY a JSON object with these EXACT field names (snake_case):
+- "path_title" (NOT "pathTitle")
+- "learner_id" (NOT "learnerId")
+- "total_estimated_duration_hours" (NOT "totalDurationHours")
+- "learning_modules" (NOT "learningModules" or "pathSteps")
+
+DO NOT include any other fields like "status", "metadata", "companyId", "competencyTargetName", "pathSteps", etc.
 
 Return a single JSON object structured exactly as follows:
 
@@ -87,7 +95,42 @@ Rules for steps:
 📝 Additional Requirements
 
 - Output must be valid JSON only.
-- Do not reference the example.
+- Use ONLY snake_case field names as specified above.
 - Ensure all skills from both inputs are included.
 - The total duration should sum from module durations.
 - Minimize module count—but keep logical structure.
+
+✅ CORRECT OUTPUT EXAMPLE:
+
+{
+  "path_title": "Personalized Learning Path for Software Developer – Master JavaScript",
+  "learner_id": "123e4567-e89b-12d3-a456-426614174000",
+  "total_estimated_duration_hours": 40,
+  "learning_modules": [
+    {
+      "module_order": 1,
+      "module_title": "JavaScript Fundamentals",
+      "estimated_duration_hours": 10,
+      "skills_in_module": ["Variables", "Functions", "Control Flow"],
+      "steps": [
+        {
+          "step": 1,
+          "title": "Introduction to Variables",
+          "step_type": "lesson",
+          "content_type": "text",
+          "description": "Learn how to declare and use variables",
+          "estimatedTime": 2,
+          "resources": [],
+          "objectives": ["Understand variable declaration", "Use let, const, var"],
+          "skills_covered": ["Variables"]
+        }
+      ]
+    }
+  ]
+}
+
+❌ WRONG - DO NOT USE:
+- "pathTitle" (use "path_title")
+- "learningModules" (use "learning_modules")
+- "totalDurationHours" (use "total_estimated_duration_hours")
+- "status", "metadata", "companyId", "pathSteps" (do not include these fields)

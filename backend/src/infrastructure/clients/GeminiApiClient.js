@@ -56,12 +56,44 @@ export class GeminiApiClient {
       } catch (error) {
         lastError = error;
         
+        // Check if this is a 429 Quota Exceeded error
+        const is429 = error.message?.includes('429') || 
+                     error.message?.includes('Too Many Requests') ||
+                     error.message?.includes('quota') ||
+                     error.message?.includes('Quota exceeded');
+        
         // Check if this is a 503 Service Unavailable error
         const is503 = error.message?.includes('503') || 
                      error.message?.includes('Service Unavailable') ||
                      error.message?.includes('overloaded');
         
-        if (is503) {
+        if (is429) {
+          // For 429 errors, extract retry delay from error message if available
+          const retryDelayMatch = error.message?.match(/Please retry in ([\d.]+)s/i);
+          let delay = 30000; // Default 30 seconds for quota errors
+          
+          if (retryDelayMatch) {
+            const delaySeconds = parseFloat(retryDelayMatch[1]);
+            delay = Math.ceil(delaySeconds * 1000); // Convert to milliseconds
+            console.warn(`Gemini API attempt ${attempt}/${actualMaxRetries} failed (429 Quota Exceeded). API suggests retry in ${delaySeconds}s`);
+          } else {
+            console.warn(`Gemini API attempt ${attempt}/${actualMaxRetries} failed (429 Quota Exceeded):`, error.message);
+          }
+          
+          // Check if it's free tier quota (user needs to enable billing)
+          if (error.message?.includes('free_tier')) {
+            console.error(`⚠️  FREE TIER QUOTA EXCEEDED: Your API key is on free tier. To use paid account:`);
+            console.error(`   1. Go to https://ai.google.dev/`);
+            console.error(`   2. Enable billing on your Google Cloud project`);
+            console.error(`   3. Make sure your API key is from a project with billing enabled`);
+            console.error(`   4. Update GEMINI_API_KEY in your environment variables`);
+          }
+          
+          if (attempt < actualMaxRetries) {
+            console.log(`⏳ Waiting ${delay / 1000} seconds before retry (as suggested by API)...`);
+            await this._sleep(delay);
+          }
+        } else if (is503) {
           is503Error = true;
           // For 503 errors, increase retries to at least 5 and use longer delays
           if (actualMaxRetries < 5) {
@@ -80,7 +112,7 @@ export class GeminiApiClient {
             await this._sleep(delay);
           }
         } else {
-          // For non-503 errors, use standard retry logic
+          // For other errors, use standard retry logic
           console.warn(`Gemini API attempt ${attempt}/${actualMaxRetries} failed:`, error.message);
           
           if (attempt < actualMaxRetries) {
@@ -92,7 +124,15 @@ export class GeminiApiClient {
       }
     }
 
-    // If we had 503 errors, provide a more helpful error message
+    // Provide helpful error messages based on error type
+    if (lastError?.message?.includes('429') || lastError?.message?.includes('quota')) {
+      if (lastError?.message?.includes('free_tier')) {
+        throw new Error(`Gemini API failed: Free tier quota exceeded. Your API key is on free tier. Please enable billing on your Google Cloud project and use a paid account API key. See: https://ai.google.dev/ Original error: ${lastError?.message || 'Unknown error'}`);
+      } else {
+        throw new Error(`Gemini API failed after ${actualMaxRetries} attempts: Quota exceeded (429). Please check your billing and rate limits. Original error: ${lastError?.message || 'Unknown error'}`);
+      }
+    }
+    
     if (is503Error) {
       throw new Error(`Gemini API failed after ${actualMaxRetries} attempts due to service overload (503). The model is currently overloaded. Please try again later. Original error: ${lastError?.message || 'Unknown error'}`);
     }
