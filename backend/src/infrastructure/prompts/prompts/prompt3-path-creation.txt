@@ -1,136 +1,77 @@
 Act as an AI Course Designer and Learning Path Sequencer.
 
-You are given the full set of lowest-level skills that a learner must master. These skills come from two inputs:
+Your task is to create a personalized, ordered learning path from a learner's lowest-level skills (from two inputs):
 
-- Initial Skills Gap (skills the learner failed)
-- Expanded Competency Breakdown (AI-generated additional skills)
+Initial Skills Gap: lowest-level skills the learner has not yet mastered.
 
-Your job is to convert this complete list of lowest-level skills into a structured, ordered learning path, organized into modules and learning steps that follow instructional design best practices.
+Expanded Competency Breakdown: additional lowest-level skills needed to meet the target competency.
 
-🎓 Pedagogical Rules to Follow
+Objectives
 
-1. Foundational → Intermediate → Advanced
-   Always teach prerequisite skills before more complex ones.
+Build a learning path with up to 10 modules.
 
-2. Group Related Skills Together
-   Skills belonging to the same conceptual area should appear in the same module—unless dependencies require otherwise.
+Each module groups related skills/topics.
 
-3. Theory + Application Integration
-   Where relevant, pair conceptual learning (e.g., memory fundamentals) with applied practice (e.g., debugging memory errors).
+Each module contains steps that teach the skills/topics.
 
-4. Each skill must appear exactly once
-   No duplicates, no missing skills.
+Each skill must appear exactly once in the entire path.
 
-📥 INPUT DATA (Provided by the System)
+Order the skills by priority and difficulty, from foundational → intermediate → advanced, across modules and steps.
 
-You will receive two objects:
+Assign estimated time to every step and module.
 
-- Initial Skills Gap: {initialGap}
-- Expanded Competency Breakdown: {expandedBreakdown}
+The total duration must equal the sum of all module durations.
 
-Both contain only lowest-level skills inside their competencies.
+Input Format (provided by system)
 
-📤 OUTPUT FORMAT (CRITICAL - MUST FOLLOW EXACTLY)
+You will receive two objects that will be inserted below:
 
-⚠️ IMPORTANT: You MUST return ONLY a JSON object with these EXACT field names (snake_case):
-- "path_title" (NOT "pathTitle")
-- "learner_id" (NOT "learnerId")
-- "total_estimated_duration_hours" (NOT "totalDurationHours")
-- "learning_modules" (NOT "learningModules" or "pathSteps")
+Initial Skills Gap: {initialGap}
 
-DO NOT include any other fields like "status", "metadata", "companyId", "competencyTargetName", "pathSteps", etc.
+Expanded Competency Breakdown: {expandedBreakdown}
 
-Return a single JSON object structured exactly as follows:
+Both contain ONLY lowest-level skills.
+
+Output Format (STRICT)
+
+Return ONLY a JSON object with snake_case fields:
 
 {
   "path_title": "Personalized Learning Path for [Learner Role] – [Target Goal]",
-  "learner_id": "[Provided by system]",
+  "learner_id": "[provided by system]",
   "total_estimated_duration_hours": 0,
-  "learning_modules": []
-}
-
-📚 Module Structure
-
-Each module must follow this structure:
-
-{
-  "module_order": 1,
-  "module_title": "Module Name",
-  "estimated_duration_hours": 0,
-  "skills_in_module": [
-    "List of lowest-level skills included in this module"
-  ],
-  "steps": []
-}
-
-Notes:
-- Only include skills in their lowest hierarchy level.
-- Skills must appear once across all modules.
-
-🧩 Learning Step Structure (Simplified Final Version)
-
-Each step must follow exactly this JSON shape:
-
-{
-  "step": 1,
-  "title": "",
-  "step_type": "", 
-  "content_type": "",
-  "description": "",
-  "estimatedTime": 0,
-  "resources": [],
-  "objectives": [],
-  "skills_covered": []
-}
-
-Accepted values:
-- step_type: "lesson", "lab", "quiz", "project", "exercise", "video"
-- content_type: "text", "code", "video", "interactive"
-
-Rules for steps:
-- Each step must cover at least one skill.
-- Steps should progress from explanation → application → assessment.
-- Titles must be clear and educational.
-
-📝 Additional Requirements
-
-- Output must be valid JSON only.
-- Use ONLY snake_case field names as specified above.
-- Ensure all skills from both inputs are included.
-- The total duration should sum from module durations.
-- Minimize module count—but keep logical structure.
-
-✅ CORRECT OUTPUT EXAMPLE:
-
-{
-  "path_title": "Personalized Learning Path for Software Developer – Master JavaScript",
-  "learner_id": "123e4567-e89b-12d3-a456-426614174000",
-  "total_estimated_duration_hours": 40,
   "learning_modules": [
     {
       "module_order": 1,
-      "module_title": "JavaScript Fundamentals",
-      "estimated_duration_hours": 10,
-      "skills_in_module": ["Variables", "Functions", "Control Flow"],
+      "module_title": "Module Name",
+      "estimated_duration_hours": 0,
+      "skills_in_module": [
+        "list of lowest-level skills"
+      ],
       "steps": [
         {
           "step": 1,
-          "title": "Introduction to Variables",
-          "step_type": "lesson",
-          "content_type": "text",
-          "description": "Learn how to declare and use variables",
-          "estimatedTime": 2,
-          "resources": [],
-          "objectives": ["Understand variable declaration", "Use let, const, var"],
-          "skills_covered": ["Variables"]
+          "title": "",
+          "description": "",
+          "estimatedTime": 0,
+          "skills_covered": []
         }
       ]
     }
   ]
 }
 
-❌ WRONG - DO NOT USE:
-- "pathTitle" (use "path_title")
-- "learningModules" (use "learning_modules")
-- "totalDurationHours" (use "total_estimated_duration_hours")
-- "status", "metadata", "companyId", "pathSteps" (do not include these fields)
+
+Important Rules:
+
+Use snake_case field names only.
+
+Each skill must appear exactly once.
+
+Skills must be sequenced by priority and difficulty — foundational first, advanced later.
+
+Steps must progress logically through the skills within the module.
+
+Module durations should sum to total_estimated_duration_hours.
+
+Steps can have fractional hours (e.g., 1.5).
