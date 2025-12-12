@@ -752,7 +752,17 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
-   * Extract learning path data from Prompt 3 result (new module-based format)
+   * Extract learning path data from Prompt 3 result (module-based format)
+   * 
+   * Expected format from Prompt 3:
+   * - path_title, learner_id, total_estimated_duration_hours (snake_case)
+   * - learning_modules array with:
+   *   - module_order, module_title, estimated_duration_hours
+   *   - skills_in_module (array of skill strings)
+   *   - steps array with: step, title, description, estimatedTime, skills_covered
+   * 
+   * Note: Steps use simplified format (no step_type, content_type, resources, objectives required)
+   * but these fields may be present in older formats for backward compatibility.
    */
   _extractPathData(prompt3Result, userId) {
     // Handle different response formats
@@ -788,45 +798,43 @@ export class GenerateLearningPathUseCase {
         const hasSteps = module.steps && Array.isArray(module.steps) && module.steps.length > 0;
         const hasSuggestedSequence = module.suggested_content_sequence && Array.isArray(module.suggested_content_sequence);
         
-        // If new format has steps, use them; otherwise keep suggested_content_sequence for backward compatibility
+        // Build module structure matching Prompt 3 EXACTLY - no extra fields!
         const moduleData = {
+          // Core fields from Prompt 3 (required)
           module_order: module.module_order,
           module_title: module.module_title,
           estimated_duration_hours: module.estimated_duration_hours,
           skills_in_module: skillsInModule,
-          // Keep both for backward compatibility
-          focus_micro_skills: skillsInModule, // Alias for backward compatibility
-          learning_goals: module.learning_goals || []
+          steps: hasSteps ? module.steps.map(step => {
+            // Clean step to match Prompt 3 structure exactly
+            return {
+              step: step.step,
+              title: step.title,
+              description: step.description,
+              estimatedTime: step.estimatedTime,
+              skills_covered: step.skills_covered || []
+            };
+          }) : []
         };
         
-        // Add steps if present (new format)
-        if (hasSteps) {
-          moduleData.steps = module.steps;
+        // Remove empty arrays
+        if (moduleData.skills_in_module.length === 0) {
+          delete moduleData.skills_in_module;
         }
-        
-        // Add suggested_content_sequence if present (old format) or if no steps
-        if (hasSuggestedSequence || !hasSteps) {
-          moduleData.suggested_content_sequence = module.suggested_content_sequence || [];
+        if (moduleData.steps.length === 0) {
+          delete moduleData.steps;
         }
         
         return moduleData;
       });
       
+      // Return structure matching Prompt 3 EXACTLY - only the 4 required fields!
       return {
-        // Keep snake_case for internal processing (used by LearningPath entity)
+        // Core fields from Prompt 3 (required - snake_case) - NO OTHER FIELDS!
         path_title: pathTitle,
         learner_id: parsed.learner_id || userId,
         total_estimated_duration_hours: totalDuration,
-        learning_modules: processedModules,
-        // Add camelCase versions for storage (used by repository)
-        pathTitle: pathTitle,
-        pathGoal: parsed.pathGoal || parsed.path_goal,
-        pathDescription: parsed.pathDescription || parsed.path_description,
-        totalDurationHours: totalDuration,
-        difficulty: parsed.difficulty,
-        audience: parsed.audience,
-        estimatedCompletion: parsed.estimatedCompletion || parsed.estimated_completion,
-        metadata: parsed.metadata
+        learning_modules: processedModules
       };
     }
 

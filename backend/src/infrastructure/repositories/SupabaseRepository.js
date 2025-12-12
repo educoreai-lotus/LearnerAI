@@ -60,26 +60,54 @@ export class SupabaseRepository {
    */
   async saveLearningPath(learningPath) {
     // Store complete path data in JSONB format (courses table uses learning_path column)
-    // Convert from internal format (pathMetadata may have snake_case from prompt) to camelCase for storage
+    // CRITICAL: Save ONLY the exact structure from Prompt 3 - EXACTLY 4 fields, nothing else!
     const pathMetadata = learningPath.pathMetadata || {};
+    
+    // Extract and clean learning_modules to remove ALL extra fields
+    const learningModules = (pathMetadata.learning_modules || learningPath.pathSteps || []).map(module => {
+      // Return ONLY the 5 fields from Prompt 3 module structure
+      const cleanModule = {
+        module_order: module.module_order,
+        module_title: module.module_title,
+        estimated_duration_hours: module.estimated_duration_hours,
+        skills_in_module: Array.isArray(module.skills_in_module) ? module.skills_in_module : [],
+        steps: Array.isArray(module.steps) ? module.steps.map(step => {
+          // Return ONLY the 5 fields from Prompt 3 step structure
+          return {
+            step: step.step,
+            title: step.title,
+            description: step.description,
+            estimatedTime: step.estimatedTime,
+            skills_covered: Array.isArray(step.skills_covered) ? step.skills_covered : []
+          };
+        }) : []
+      };
+      
+      // Remove empty arrays (but keep them if they have content)
+      if (cleanModule.skills_in_module.length === 0) {
+        delete cleanModule.skills_in_module;
+      }
+      if (cleanModule.steps.length === 0) {
+        delete cleanModule.steps;
+      }
+      
+      return cleanModule;
+    });
+    
+    // Build pathData with EXACT Prompt 3 structure - ONLY these 4 fields!
     const pathData = {
-      // Use camelCase format for storage (convert from snake_case if needed)
-      pathTitle: learningPath.pathTitle || pathMetadata.pathTitle || pathMetadata.path_title,
-      pathGoal: pathMetadata.pathGoal || pathMetadata.path_goal,
-      pathDescription: pathMetadata.pathDescription || pathMetadata.path_description,
-      totalDurationHours: learningPath.totalDurationHours || pathMetadata.totalDurationHours || pathMetadata.total_estimated_duration_hours,
-      difficulty: pathMetadata.difficulty,
-      audience: pathMetadata.audience,
-      learning_modules: pathMetadata.learning_modules || learningPath.pathSteps || [],
-      estimatedCompletion: pathMetadata.estimatedCompletion || pathMetadata.estimated_completion,
-      metadata: pathMetadata.metadata || {},
-      // Keep legacy fields for backward compatibility
-      pathSteps: learningPath.pathSteps || pathMetadata.learning_modules || [],
-      learningModules: pathMetadata.learning_modules || null,
-      companyId: learningPath.companyId,
-      competencyTargetName: learningPath.competencyTargetName,
-      status: learningPath.status
+      path_title: pathMetadata.path_title || learningPath.pathTitle || pathMetadata.pathTitle || 'Learning Path',
+      learner_id: pathMetadata.learner_id || learningPath.userId,
+      total_estimated_duration_hours: pathMetadata.total_estimated_duration_hours || learningPath.totalDurationHours || pathMetadata.totalDurationHours || 0,
+      learning_modules: learningModules
     };
+    
+    // NO OTHER FIELDS! Remove any undefined/null values just to be safe
+    Object.keys(pathData).forEach(key => {
+      if (pathData[key] === undefined || pathData[key] === null) {
+        delete pathData[key];
+      }
+    });
 
     // Build upsert data - let database handle timestamps to avoid timezone issues
     const upsertData = {
@@ -156,21 +184,28 @@ export class SupabaseRepository {
   /**
    * Map database record to LearningPath entity
    * Maps from courses table structure to LearningPath entity
+   * Reads from Prompt 3 structure (snake_case) in learning_path JSONB
    */
   _mapToLearningPath(record) {
     const pathData = record.learning_path || {};
+    
+    // Read from Prompt 3 structure (snake_case) - primary format
+    const pathTitle = pathData.path_title || pathData.pathTitle || null;
+    const totalDurationHours = pathData.total_estimated_duration_hours || pathData.totalDurationHours || null;
+    const learningModules = pathData.learning_modules || pathData.pathSteps || [];
+    
     return new LearningPath({
       id: record.competency_target_name, // Primary key is competency_target_name
-      userId: record.user_id,
-      companyId: pathData.companyId || null, // May be stored in learning_path JSONB
+      userId: record.user_id || pathData.learner_id || null,
+      companyId: null, // NOT stored in learning_path JSONB (stored in courses table via user_id -> learners table)
       competencyTargetName: record.competency_target_name,
       gapId: record.gap_id || null, // Link to original skills gap
-      pathSteps: pathData.pathSteps || [],
-      pathTitle: pathData.pathTitle || null,
-      totalDurationHours: pathData.totalDurationHours || null,
-      pathMetadata: pathData.metadata || pathData,
+      pathSteps: learningModules, // learning_modules array
+      pathTitle: pathTitle,
+      totalDurationHours: totalDurationHours,
+      pathMetadata: pathData, // Store the exact Prompt 3 structure
       learning_path: record.learning_path, // Direct access to learning_path JSONB
-      status: record.approved ? 'completed' : (pathData.status || 'pending'),
+      status: record.approved ? 'approved' : 'pending', // Status comes from courses.approved, not learning_path JSONB
       createdAt: record.created_at,
       updatedAt: record.last_modified_at || record.created_at
     });

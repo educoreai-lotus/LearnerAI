@@ -51,13 +51,15 @@ export class DistributePathUseCase {
       }
       
       // Build Course Builder payload with required fields
+      // Use learning_path JSONB directly (contains exact Prompt 3 structure)
+      const learningPathData = learningPath.learning_path || learningPath.pathMetadata || {};
       const courseBuilderPayload = {
         user_id: learningPath.userId,
         user_name: skillsGap.user_name, // From skills_gap table
         company_id: skillsGap.company_id, // From skills_gap table
         company_name: skillsGap.company_name, // From skills_gap table
         competency_target_name: competencyTargetName,
-        learning_path: learningPath.pathMetadata || learningPath.learning_path || learningPath.toJSON()
+        learning_path: learningPathData // Use exact Prompt 3 structure from database
       };
       
       // Send with rollback enabled (will return mock data if fails)
@@ -82,10 +84,11 @@ export class DistributePathUseCase {
       results.errors.push({ service: 'courseBuilder', error: error.message });
       // Even if error, try to get rollback data
       try {
+        const learningPathData = learningPath.learning_path || learningPath.pathMetadata || {};
         const courseBuilderPayload = {
           user_id: learningPath.userId,
           competency_target_name: competencyTargetName,
-          learning_path: learningPath.pathMetadata || learningPath.learning_path || learningPath.toJSON()
+          learning_path: learningPathData // Use exact Prompt 3 structure from database
         };
         results.courseBuilder = this.courseBuilderClient.getRollbackMockData(courseBuilderPayload);
         console.warn(`⚠️ Using rollback mock data for Course Builder`);
@@ -104,8 +107,10 @@ export class DistributePathUseCase {
 
     // Send to Reports (with rollback)
     try {
+      // Use learning_path JSONB directly (contains exact Prompt 3 structure)
+      const learningPathData = learningPath.learning_path || learningPath.pathMetadata || {};
       // Send with rollback enabled (will return mock data if fails)
-      results.reports = await this.reportsClient.updatePathReports(learningPath.toJSON(), {
+      results.reports = await this.reportsClient.updatePathReports(learningPathData, {
         maxRetries: 3,
         retryDelay: 1000,
         useRollback: true
@@ -126,7 +131,8 @@ export class DistributePathUseCase {
       results.errors.push({ service: 'reports', error: error.message });
       // Even if error, try to get rollback data
       try {
-        results.reports = this.reportsClient.getRollbackMockData(learningPath.toJSON());
+        const learningPathData = learningPath.learning_path || learningPath.pathMetadata || {};
+        results.reports = this.reportsClient.getRollbackMockData(learningPathData);
         console.warn(`⚠️ Using rollback mock data for Reports`);
       } catch (rollbackError) {
         console.error(`❌ Failed to get rollback data: ${rollbackError.message}`);

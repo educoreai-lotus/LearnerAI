@@ -142,11 +142,30 @@ export function createCoursesRouter(dependencies) {
   /**
    * PUT /api/v1/courses/:competencyTargetName
    * Update course
+   * Note: If learning_path is provided, it should match Prompt 3 structure exactly
    */
   router.put('/:competencyTargetName', async (req, res) => {
     try {
       const { competencyTargetName } = req.params;
       const updates = req.body;
+
+      // If learning_path is being updated, validate it matches Prompt 3 structure
+      if (updates.learning_path) {
+        const lp = updates.learning_path;
+        // Ensure it has the 4 required fields from Prompt 3
+        if (!lp.path_title && !lp.pathTitle) {
+          console.warn('⚠️  learning_path missing path_title - should match Prompt 3 structure');
+        }
+        if (!lp.learner_id && !lp.userId) {
+          console.warn('⚠️  learning_path missing learner_id - should match Prompt 3 structure');
+        }
+        if (lp.total_estimated_duration_hours === undefined && lp.totalDurationHours === undefined) {
+          console.warn('⚠️  learning_path missing total_estimated_duration_hours - should match Prompt 3 structure');
+        }
+        if (!lp.learning_modules && !lp.pathSteps) {
+          console.warn('⚠️  learning_path missing learning_modules - should match Prompt 3 structure');
+        }
+      }
 
       const course = await courseRepository.updateCourse(competencyTargetName, updates);
 

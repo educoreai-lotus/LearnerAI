@@ -182,46 +182,30 @@ The `learning_path` object contains the complete learning path structure. It may
   "steps": [
     {
       "step": 1,
-      "title": "Variables and Data Types",
-      "step_type": "lesson",
-      "content_type": "text",
-      "description": "Learn about C++ variable declarations and data types",
-      "estimatedTime": 60,
-      "resources": ["C++ Variables Guide", "Data Types Reference"],
-      "objectives": ["Understand variable declarations", "Learn about data types"],
+      "title": "Introduction to Variables",
+      "description": "Learn how to declare and use variables",
+      "estimatedTime": 1.5,
       "skills_covered": ["Variables and Data Types"]
     },
     {
       "step": 2,
-      "title": "Input and Output (cin, cout)",
-      "step_type": "lesson",
-      "content_type": "interactive",
-      "description": "Master console I/O operations",
-      "estimatedTime": 45,
-      "resources": ["I/O Tutorial"],
-      "objectives": ["Use cin for input", "Use cout for output"],
+      "title": "Input and Output Operations",
+      "description": "Master console I/O operations using cin and cout",
+      "estimatedTime": 1,
       "skills_covered": ["Input and Output (cin, cout)"]
     },
     {
       "step": 3,
-      "title": "Implementing Foundational C++ Programs",
-      "step_type": "lab",
-      "content_type": "code",
-      "description": "Practice lab for foundational concepts",
-      "estimatedTime": 90,
-      "resources": ["Lab Instructions"],
-      "objectives": ["Apply variables and I/O", "Write basic C++ programs"],
-      "skills_covered": ["Variables and Data Types", "Input and Output (cin, cout)"]
+      "title": "Control Flow Structures",
+      "description": "Learn conditional statements and loops",
+      "estimatedTime": 2,
+      "skills_covered": ["Control Flow (if, switch, loops)"]
     },
     {
       "step": 4,
-      "title": "Module 1 Proficiency Quiz",
-      "step_type": "quiz",
-      "content_type": "interactive",
-      "description": "Assessment for Module 1",
-      "estimatedTime": 30,
-      "resources": [],
-      "objectives": ["Test understanding of foundational concepts"],
+      "title": "Module 1 Assessment",
+      "description": "Assessment for Module 1 foundational concepts",
+      "estimatedTime": 0.5,
       "skills_covered": ["Variables and Data Types", "Input and Output (cin, cout)", "Control Flow (if, switch, loops)"]
     }
   ]
@@ -258,19 +242,39 @@ The `learning_path` object contains the complete learning path structure. It may
 
 **Note:** Steps are now nested inside modules (new format) or at the root level (legacy format).
 
+**⚠️ Format Change:** As of the latest Prompt 3 update, steps use a simplified format with only required fields. Optional fields (`step_type`, `content_type`, `resources`, `objectives`) may still be present in older learning paths for backward compatibility.
+
+**Current Format (Simplified - from Prompt 3):**
+
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `step` | Number | ✅ Yes | Step number within the module (1, 2, 3...) |
 | `title` | String | ✅ Yes | Step title/name |
-| `step_type` | String | ✅ Yes | Type of step: `"lesson"`, `"lab"`, `"quiz"`, `"project"`, `"exercise"`, `"video"` |
-| `content_type` | String | ✅ Yes | Content format: `"text"`, `"code"`, `"video"`, `"interactive"` |
 | `description` | String | ✅ Yes | Description of what the step covers |
-| `estimatedTime` | Number | ✅ Yes | Estimated time in minutes (not hours) |
-| `resources` | Array of Strings | ⚠️ Optional | Learning resources for this step |
-| `objectives` | Array of Strings | ✅ Yes | Learning objectives for this step |
+| `estimatedTime` | Number | ✅ Yes | Estimated time in hours (can be fractional, e.g., 1.5) |
 | `skills_covered` | Array of Strings | ✅ Yes | List of skills covered by this step |
 
-**Example Step:**
+**Optional Fields (may be present in older formats):**
+
+| Field | Type | Required | Description |
+|-------|------|----------|-------------|
+| `step_type` | String | ⚠️ Optional | Type of step: `"lesson"`, `"lab"`, `"quiz"`, `"project"`, `"exercise"`, `"video"` |
+| `content_type` | String | ⚠️ Optional | Content format: `"text"`, `"code"`, `"video"`, `"interactive"` |
+| `resources` | Array of Strings | ⚠️ Optional | Learning resources for this step |
+| `objectives` | Array of Strings | ⚠️ Optional | Learning objectives for this step |
+
+**Example Step (Current Format - Simplified):**
+```json
+{
+  "step": 1,
+  "title": "Introduction to Variables",
+  "description": "Learn how to declare and use variables",
+  "estimatedTime": 1.5,
+  "skills_covered": ["Variables"]
+}
+```
+
+**Example Step (Legacy Format - with optional fields):**
 ```json
 {
   "step": 1,
