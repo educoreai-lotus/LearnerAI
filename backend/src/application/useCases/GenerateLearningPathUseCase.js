@@ -203,15 +203,16 @@ export class GenerateLearningPathUseCase {
         }
       }
 
-      // Prompt 1: Skill Expansion
-      // Use updated skills_raw_data from database if available, otherwise use request data
-      const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
-      const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
-      const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
+      // Prompt 1: Skill Expansion (only if not in update mode)
+      if (!isUpdateMode) {
+        // Use updated skills_raw_data from database if available, otherwise use request data
+        const prompt1 = await this.promptLoader.loadPrompt('prompt1-skill-expansion');
+        const prompt1Input = this._formatSkillsGapForPrompt(skillsGap, skillsRawData);
+        const fullPrompt1 = prompt1.replace('{input}', prompt1Input);
         prompt1Result = await this.geminiClient.executePrompt(fullPrompt1, '', {
-        timeout: 60000, // 60 seconds for skill expansion
-        maxRetries: 3
-      });
+          timeout: 60000, // 60 seconds for skill expansion
+          maxRetries: 3
+        });
 
         // Save Prompt 1 output to skills_expansions table
         if (this.skillsExpansionRepository && expansionId) {
@@ -227,8 +228,28 @@ export class GenerateLearningPathUseCase {
             console.log(`✅ Saved Prompt 1 output to skills_expansions: ${expansionId}`);
           } catch (error) {
             console.warn(`⚠️ Failed to save Prompt 1 output: ${error.message}`);
+            console.error(`   Error details:`, error);
+          }
+        } else {
+          console.warn(`⚠️ Cannot save Prompt 1 output: skillsExpansionRepository=${!!this.skillsExpansionRepository}, expansionId=${expansionId}`);
+        }
+      } else {
+        // In update mode, ensure existing Prompt 1 output is saved if not already
+        if (this.skillsExpansionRepository && expansionId && prompt1Result) {
+          try {
+            const prompt1Output = typeof prompt1Result === 'string' 
+              ? JSON.parse(prompt1Result) 
+              : prompt1Result;
+            
+            await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
+              prompt_1_output: prompt1Output
+            });
+            console.log(`✅ Saved existing Prompt 1 output to skills_expansions: ${expansionId}`);
+          } catch (error) {
+            console.warn(`⚠️ Failed to save existing Prompt 1 output: ${error.message}`);
           }
         }
+      }
 
       await this.jobRepository.updateJob(job.id, {
         currentStage: 'competency-identification',
