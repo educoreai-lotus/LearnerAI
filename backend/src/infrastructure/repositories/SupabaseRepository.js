@@ -64,43 +64,58 @@ export class SupabaseRepository {
     const pathMetadata = learningPath.pathMetadata || {};
     
     // Extract and clean learning_modules to remove ALL extra fields
+    // CRITICAL: Enforce field order from Prompt 3: module_order → module_title → estimated_duration_hours → skills_in_module → steps
     const learningModules = (pathMetadata.learning_modules || learningPath.pathSteps || []).map(module => {
-      // Return ONLY the 5 fields from Prompt 3 module structure
-      const cleanModule = {
-        module_order: module.module_order,
-        module_title: module.module_title,
-        estimated_duration_hours: module.estimated_duration_hours,
-        skills_in_module: Array.isArray(module.skills_in_module) ? module.skills_in_module : [],
-        steps: Array.isArray(module.steps) ? module.steps.map(step => {
-          // Return ONLY the 5 fields from Prompt 3 step structure
-          return {
-            step: step.step,
-            title: step.title,
-            description: step.description,
-            estimatedTime: step.estimatedTime,
-            skills_covered: Array.isArray(step.skills_covered) ? step.skills_covered : []
-          };
-        }) : []
-      };
+      // Build module in EXACT order from Prompt 3 specification
+      const cleanModule = {};
       
-      // Remove empty arrays (but keep them if they have content)
-      if (cleanModule.skills_in_module.length === 0) {
-        delete cleanModule.skills_in_module;
+      // Field 1: module_order (MUST be first)
+      cleanModule.module_order = module.module_order;
+      
+      // Field 2: module_title (MUST be second)
+      cleanModule.module_title = module.module_title;
+      
+      // Field 3: estimated_duration_hours (MUST be third)
+      cleanModule.estimated_duration_hours = module.estimated_duration_hours;
+      
+      // Field 4: skills_in_module (MUST be fourth) - only add if not empty
+      const skillsInModule = Array.isArray(module.skills_in_module) ? module.skills_in_module : [];
+      if (skillsInModule.length > 0) {
+        cleanModule.skills_in_module = skillsInModule;
       }
-      if (cleanModule.steps.length === 0) {
-        delete cleanModule.steps;
+      
+      // Field 5: steps (MUST be last) - only add if present
+      if (Array.isArray(module.steps) && module.steps.length > 0) {
+        cleanModule.steps = module.steps.map(step => {
+          // Build step in EXACT order: step → title → description → estimatedTime → skills_covered
+          const cleanStep = {};
+          cleanStep.step = step.step;
+          cleanStep.title = step.title;
+          cleanStep.description = step.description;
+          cleanStep.estimatedTime = step.estimatedTime;
+          cleanStep.skills_covered = Array.isArray(step.skills_covered) ? step.skills_covered : [];
+          return cleanStep;
+        });
       }
       
       return cleanModule;
     });
     
-    // Build pathData with EXACT Prompt 3 structure - ONLY these 4 fields!
-    const pathData = {
-      path_title: pathMetadata.path_title || learningPath.pathTitle || pathMetadata.pathTitle || 'Learning Path',
-      learner_id: pathMetadata.learner_id || learningPath.userId,
-      total_estimated_duration_hours: pathMetadata.total_estimated_duration_hours || learningPath.totalDurationHours || pathMetadata.totalDurationHours || 0,
-      learning_modules: learningModules
-    };
+    // Build pathData with EXACT Prompt 3 structure - enforce field order!
+    // Prompt 3 specifies: path_title → learner_id → total_estimated_duration_hours → learning_modules
+    const pathData = {};
+    
+    // Field 1: path_title (MUST be first)
+    pathData.path_title = pathMetadata.path_title || learningPath.pathTitle || pathMetadata.pathTitle || 'Learning Path';
+    
+    // Field 2: learner_id (MUST be second)
+    pathData.learner_id = pathMetadata.learner_id || learningPath.userId;
+    
+    // Field 3: total_estimated_duration_hours (MUST be third)
+    pathData.total_estimated_duration_hours = pathMetadata.total_estimated_duration_hours || learningPath.totalDurationHours || pathMetadata.totalDurationHours || 0;
+    
+    // Field 4: learning_modules (MUST be last)
+    pathData.learning_modules = learningModules;
     
     // NO OTHER FIELDS! Remove any undefined/null values just to be safe
     Object.keys(pathData).forEach(key => {
@@ -182,12 +197,77 @@ export class SupabaseRepository {
   }
 
   /**
+   * Reorder learning_path JSON to match Prompt 3 field order
+   * Ensures consistent field order when reading from database
+   * @private
+   */
+  _reorderLearningPath(pathData) {
+    if (!pathData || typeof pathData !== 'object') {
+      return pathData;
+    }
+
+    // Reorder root level: path_title → learner_id → total_estimated_duration_hours → learning_modules
+    const reordered = {};
+    
+    if (pathData.path_title !== undefined) {
+      reordered.path_title = pathData.path_title;
+    }
+    if (pathData.learner_id !== undefined) {
+      reordered.learner_id = pathData.learner_id;
+    }
+    if (pathData.total_estimated_duration_hours !== undefined) {
+      reordered.total_estimated_duration_hours = pathData.total_estimated_duration_hours;
+    }
+    
+    // Reorder learning_modules
+    if (pathData.learning_modules && Array.isArray(pathData.learning_modules)) {
+      reordered.learning_modules = pathData.learning_modules.map(module => {
+        // Reorder module: module_order → module_title → estimated_duration_hours → skills_in_module → steps
+        const reorderedModule = {};
+        
+        if (module.module_order !== undefined) {
+          reorderedModule.module_order = module.module_order;
+        }
+        if (module.module_title !== undefined) {
+          reorderedModule.module_title = module.module_title;
+        }
+        if (module.estimated_duration_hours !== undefined) {
+          reorderedModule.estimated_duration_hours = module.estimated_duration_hours;
+        }
+        if (module.skills_in_module !== undefined && Array.isArray(module.skills_in_module)) {
+          reorderedModule.skills_in_module = module.skills_in_module;
+        }
+        if (module.steps !== undefined && Array.isArray(module.steps)) {
+          reorderedModule.steps = module.steps.map(step => {
+            // Reorder step: step → title → description → estimatedTime → skills_covered
+            const reorderedStep = {};
+            if (step.step !== undefined) reorderedStep.step = step.step;
+            if (step.title !== undefined) reorderedStep.title = step.title;
+            if (step.description !== undefined) reorderedStep.description = step.description;
+            if (step.estimatedTime !== undefined) reorderedStep.estimatedTime = step.estimatedTime;
+            if (step.skills_covered !== undefined) reorderedStep.skills_covered = step.skills_covered;
+            return reorderedStep;
+          });
+        }
+        
+        return reorderedModule;
+      });
+    }
+    
+    return reordered;
+  }
+
+  /**
    * Map database record to LearningPath entity
    * Maps from courses table structure to LearningPath entity
    * Reads from Prompt 3 structure (snake_case) in learning_path JSONB
+   * Reorders fields to match Prompt 3 specification
    */
   _mapToLearningPath(record) {
-    const pathData = record.learning_path || {};
+    let pathData = record.learning_path || {};
+    
+    // Reorder learning_path to match Prompt 3 field order
+    pathData = this._reorderLearningPath(pathData);
     
     // Read from Prompt 3 structure (snake_case) - primary format
     const pathTitle = pathData.path_title || pathData.pathTitle || null;
@@ -203,8 +283,8 @@ export class SupabaseRepository {
       pathSteps: learningModules, // learning_modules array
       pathTitle: pathTitle,
       totalDurationHours: totalDurationHours,
-      pathMetadata: pathData, // Store the exact Prompt 3 structure
-      learning_path: record.learning_path, // Direct access to learning_path JSONB
+      pathMetadata: pathData, // Store the reordered Prompt 3 structure
+      learning_path: pathData, // Store reordered learning_path JSONB
       status: record.approved ? 'approved' : 'pending', // Status comes from courses.approved, not learning_path JSONB
       createdAt: record.created_at,
       updatedAt: record.last_modified_at || record.created_at

@@ -1,6 +1,7 @@
 import { Job } from '../../domain/entities/Job.js';
 import { LearningPath } from '../../domain/entities/LearningPath.js';
 import { v4 as uuidv4 } from 'uuid';
+import { calculateAverageDifficulty, validatePrerequisiteOrder, getDifficultyScoreWithFallback } from '../../infrastructure/knowledge/skillPrerequisites.js';
 
 /**
  * GenerateLearningPathUseCase
@@ -440,17 +441,69 @@ export class GenerateLearningPathUseCase {
           }
         : skillsGap.toJSON(); // Fallback if skillsRawData not available (backward compatibility)
       
-      const fullPrompt3 = prompt3
-        .replace('{initialGap}', JSON.stringify(initialGapForPrompt3, null, 2))
-        .replace('{expandedBreakdown}', JSON.stringify(expandedBreakdownForPrompt3, null, 2));
-      // Path creation needs more time - use 90 seconds timeout (default is 30s)
-      const prompt3Result = await this.geminiClient.executePrompt(fullPrompt3, '', {
-        timeout: 90000, // 90 seconds for complex path generation
-        maxRetries: 3
-      });
+      // Extract skills explicitly to make it clearer for the AI
+      const initialSkills = this._extractSkillsFromInitialGap(initialGapForPrompt3);
+      const expandedSkills = this._extractSkillsFromExpandedBreakdown(expandedBreakdownForPrompt3);
+      
+      // Add explicit skill lists to make it crystal clear for the AI
+      const initialGapWithSkills = {
+        ...initialGapForPrompt3,
+        EXTRACTED_SKILLS: initialSkills, // Explicit list of skills to use
+        INSTRUCTION: `You MUST use ONLY these ${initialSkills.length} skills from Initial Skills Gap: ${initialSkills.join(', ')}`
+      };
+      
+      const expandedBreakdownWithSkills = {
+        ...expandedBreakdownForPrompt3,
+        EXTRACTED_SKILLS: expandedSkills, // Explicit list of skills to use
+        INSTRUCTION: `You MUST use ONLY these ${expandedSkills.length} skills from Expanded Breakdown: ${expandedSkills.join(', ')}`
+      };
+      
+      let fullPrompt3 = prompt3
+        .replace('{initialGap}', JSON.stringify(initialGapWithSkills, null, 2))
+        .replace('{expandedBreakdown}', JSON.stringify(expandedBreakdownWithSkills, null, 2));
+      
+      // Path creation with validation retry logic
+      let prompt3Result;
+      let pathData;
+      let validationAttempts = 0;
+      const maxValidationAttempts = 3;
+      
+      do {
+        // Path creation needs more time - use 90 seconds timeout (default is 30s)
+        prompt3Result = await this.geminiClient.executePrompt(fullPrompt3, '', {
+          timeout: 90000, // 90 seconds for complex path generation
+          maxRetries: 3
+        });
 
-      // Extract learning path structure from Prompt 3 result
-      const pathData = this._extractPathData(prompt3Result, skillsGap.userId);
+        // Extract learning path structure from Prompt 3 result
+        pathData = this._extractPathData(prompt3Result, skillsGap.userId);
+        
+        // Validate learning path for pedagogical correctness
+        const validation = this._validateLearningPath(pathData);
+        
+        if (validation.valid) {
+          console.log('✅ Learning path validation passed');
+          break; // Valid path, continue
+        }
+        
+        validationAttempts++;
+        console.warn(`⚠️ Learning path validation failed (attempt ${validationAttempts}/${maxValidationAttempts}):`, validation.errors);
+        
+        if (validationAttempts >= maxValidationAttempts) {
+          // Log warning but continue - don't fail the entire job
+          console.error(`❌ Learning path validation failed after ${maxValidationAttempts} attempts. Continuing with generated path.`);
+          console.error('Validation errors:', validation.errors);
+          // Continue with the path even if validation failed (less strict approach)
+          // Alternatively, throw error to fail the job:
+          // throw new Error(`Learning path validation failed after ${maxValidationAttempts} attempts: ${validation.errors.join('; ')}`);
+          break;
+        }
+        
+        // Retry with updated prompt that includes validation feedback
+        fullPrompt3 = this._addValidationFeedbackToPrompt(fullPrompt3, validation.errors);
+        console.log(`🔄 Retrying path generation with validation feedback (attempt ${validationAttempts + 1})...`);
+        
+      } while (validationAttempts < maxValidationAttempts);
 
       // Create learning path entity
       const learningPath = new LearningPath({
@@ -739,6 +792,102 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
+   * Extract skills from initial gap structure
+   * @private
+   */
+  _extractSkillsFromInitialGap(initialGap) {
+    const skills = [];
+    
+    // Try to extract from skills_raw_data.gap.missing_skills_map
+    if (initialGap.skills_raw_data?.gap?.missing_skills_map) {
+      const missingSkillsMap = initialGap.skills_raw_data.gap.missing_skills_map;
+      
+      // Handle different structures
+      if (typeof missingSkillsMap === 'object') {
+        Object.values(missingSkillsMap).forEach(skillArray => {
+          if (Array.isArray(skillArray)) {
+            skills.push(...skillArray);
+          } else if (typeof skillArray === 'string') {
+            skills.push(skillArray);
+          }
+        });
+      }
+    }
+    
+    // Try to extract from direct structure
+    if (initialGap.gap?.missing_skills_map) {
+      const missingSkillsMap = initialGap.gap.missing_skills_map;
+      if (typeof missingSkillsMap === 'object') {
+        Object.values(missingSkillsMap).forEach(skillArray => {
+          if (Array.isArray(skillArray)) {
+            skills.push(...skillArray);
+          }
+        });
+      }
+    }
+    
+    // Try to extract from microSkills/nanoSkills
+    if (Array.isArray(initialGap.microSkills)) {
+      skills.push(...initialGap.microSkills);
+    }
+    if (Array.isArray(initialGap.nanoSkills)) {
+      skills.push(...initialGap.nanoSkills);
+    }
+    
+    // Remove duplicates and return
+    return [...new Set(skills)];
+  }
+
+  /**
+   * Extract skills from expanded breakdown structure
+   * @private
+   */
+  _extractSkillsFromExpandedBreakdown(expandedBreakdown) {
+    const skills = [];
+    
+    // Try to extract from skillBreakdown
+    if (expandedBreakdown.skillBreakdown && typeof expandedBreakdown.skillBreakdown === 'object') {
+      Object.values(expandedBreakdown.skillBreakdown).forEach(competencyData => {
+        if (competencyData && typeof competencyData === 'object') {
+          // Extract from microSkills
+          if (Array.isArray(competencyData.microSkills)) {
+            competencyData.microSkills.forEach(skill => {
+              if (typeof skill === 'string') {
+                skills.push(skill);
+              } else if (skill?.name) {
+                skills.push(skill.name);
+              }
+            });
+          }
+          // Extract from nanoSkills
+          if (Array.isArray(competencyData.nanoSkills)) {
+            competencyData.nanoSkills.forEach(skill => {
+              if (typeof skill === 'string') {
+                skills.push(skill);
+              } else if (skill?.name) {
+                skills.push(skill.name);
+              }
+            });
+          }
+          // Extract from skills array
+          if (Array.isArray(competencyData.skills)) {
+            competencyData.skills.forEach(skill => {
+              if (typeof skill === 'string') {
+                skills.push(skill);
+              } else if (skill?.name) {
+                skills.push(skill.name);
+              }
+            });
+          }
+        }
+      });
+    }
+    
+    // Remove duplicates and return
+    return [...new Set(skills)];
+  }
+
+  /**
    * Format input for Prompt 3 (Path Creation)
    */
   _formatPathCreationInput(skillsGap, skillBreakdown) {
@@ -798,15 +947,30 @@ export class GenerateLearningPathUseCase {
         const hasSteps = module.steps && Array.isArray(module.steps) && module.steps.length > 0;
         const hasSuggestedSequence = module.suggested_content_sequence && Array.isArray(module.suggested_content_sequence);
         
-        // Build module structure matching Prompt 3 EXACTLY - no extra fields!
-        const moduleData = {
-          // Core fields from Prompt 3 (required)
-          module_order: module.module_order,
-          module_title: module.module_title,
-          estimated_duration_hours: module.estimated_duration_hours,
-          skills_in_module: skillsInModule,
-          steps: hasSteps ? module.steps.map(step => {
+        // Build module structure matching Prompt 3 EXACTLY - enforce field order from prompt!
+        // Prompt 3 specifies: module_order → module_title → estimated_duration_hours → skills_in_module → steps
+        // We MUST create the object in this exact order to match the prompt specification
+        const moduleData = {};
+        
+        // Field 1: module_order (MUST be first)
+        moduleData.module_order = module.module_order;
+        
+        // Field 2: module_title (MUST be second)
+        moduleData.module_title = module.module_title;
+        
+        // Field 3: estimated_duration_hours (MUST be third)
+        moduleData.estimated_duration_hours = module.estimated_duration_hours;
+        
+        // Field 4: skills_in_module (MUST be fourth) - only add if not empty
+        if (skillsInModule.length > 0) {
+          moduleData.skills_in_module = skillsInModule;
+        }
+        
+        // Field 5: steps (MUST be last) - only add if present
+        if (hasSteps) {
+          moduleData.steps = module.steps.map(step => {
             // Clean step to match Prompt 3 structure exactly
+            // Step field order: step → title → description → estimatedTime → skills_covered
             return {
               step: step.step,
               title: step.title,
@@ -814,28 +978,29 @@ export class GenerateLearningPathUseCase {
               estimatedTime: step.estimatedTime,
               skills_covered: step.skills_covered || []
             };
-          }) : []
-        };
-        
-        // Remove empty arrays
-        if (moduleData.skills_in_module.length === 0) {
-          delete moduleData.skills_in_module;
-        }
-        if (moduleData.steps.length === 0) {
-          delete moduleData.steps;
+          });
         }
         
         return moduleData;
       });
       
-      // Return structure matching Prompt 3 EXACTLY - only the 4 required fields!
-      return {
-        // Core fields from Prompt 3 (required - snake_case) - NO OTHER FIELDS!
-        path_title: pathTitle,
-        learner_id: parsed.learner_id || userId,
-        total_estimated_duration_hours: totalDuration,
-        learning_modules: processedModules
-      };
+      // Return structure matching Prompt 3 EXACTLY - enforce field order from prompt!
+      // Prompt 3 specifies: path_title → learner_id → total_estimated_duration_hours → learning_modules
+      const pathData = {};
+      
+      // Field 1: path_title (MUST be first)
+      pathData.path_title = pathTitle;
+      
+      // Field 2: learner_id (MUST be second)
+      pathData.learner_id = parsed.learner_id || userId;
+      
+      // Field 3: total_estimated_duration_hours (MUST be third)
+      pathData.total_estimated_duration_hours = totalDuration;
+      
+      // Field 4: learning_modules (MUST be last)
+      pathData.learning_modules = processedModules;
+      
+      return pathData;
     }
 
     // Fallback to old format with pathSteps
@@ -844,6 +1009,286 @@ export class GenerateLearningPathUseCase {
       path_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
       total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null
     };
+  }
+
+  /**
+   * Validate learning path for pedagogical correctness
+   * @param {Object} pathData - Extracted path data from Prompt 3
+   * @returns {Object} - { valid: boolean, errors: string[] }
+   */
+  _validateLearningPath(pathData) {
+    const errors = [];
+    
+    if (!pathData.learning_modules || !Array.isArray(pathData.learning_modules)) {
+      return { valid: false, errors: ['Missing or invalid learning_modules'] };
+    }
+    
+    const modules = pathData.learning_modules;
+    
+    // Check 1: Module order is sequential
+    for (let i = 0; i < modules.length; i++) {
+      if (modules[i].module_order !== i + 1) {
+        errors.push(`Module ${i + 1} has incorrect module_order: ${modules[i].module_order}`);
+      }
+    }
+    
+    // Check 2: Module difficulty progression
+    // Use knowledge base with fallback to pattern matching
+    try {
+      for (let i = 1; i < modules.length; i++) {
+        const prevModule = modules[i - 1];
+        const currModule = modules[i];
+        
+        const prevSkills = this._extractAllSkillsFromModule(prevModule);
+        const currSkills = this._extractAllSkillsFromModule(currModule);
+        
+        // Calculate difficulty using knowledge base + pattern matching fallback
+        const prevDifficulty = prevSkills.length > 0 
+          ? prevSkills.reduce((sum, skill) => sum + getDifficultyScoreWithFallback(skill), 0) / prevSkills.length
+          : 0;
+        const currDifficulty = currSkills.length > 0
+          ? currSkills.reduce((sum, skill) => sum + getDifficultyScoreWithFallback(skill), 0) / currSkills.length
+          : 0;
+        
+        if (currDifficulty > 0 && prevDifficulty > 0 && currDifficulty < prevDifficulty) {
+          errors.push(`Module ${currModule.module_order} has lower average difficulty (${currDifficulty.toFixed(2)}) than Module ${prevModule.module_order} (${prevDifficulty.toFixed(2)})`);
+        }
+      }
+    } catch (e) {
+      // Fallback to heuristic if knowledge base not available
+      console.warn('⚠️ Difficulty calculation failed, using heuristic fallback:', e.message);
+      for (let i = 1; i < modules.length; i++) {
+        const prevModule = modules[i - 1];
+        const currModule = modules[i];
+        
+        const prevSkills = this._extractAllSkillsFromModule(prevModule);
+        const currSkills = this._extractAllSkillsFromModule(currModule);
+        
+        // Basic heuristic: if current module has foundational skills and previous has advanced, that's wrong
+        if (this._hasFoundationalSkillsAfterAdvanced(currSkills, prevSkills)) {
+          errors.push(`Module ${currModule.module_order} may have foundational skills that belong in earlier modules`);
+        }
+      }
+    }
+    
+    // Check 2.5: Prerequisite validation across entire path
+    // NOTE: This only validates skills that exist in knowledge base (exact match)
+    // Unknown skills are skipped (no error)
+    try {
+      const skillOrder = this._extractSkillOrderFromPath(pathData);
+      const prerequisiteErrors = validatePrerequisiteOrder(skillOrder);
+      if (prerequisiteErrors.length > 0) {
+        errors.push(...prerequisiteErrors);
+        console.warn(`⚠️ Found ${prerequisiteErrors.length} prerequisite violations (only for skills in knowledge base)`);
+      }
+    } catch (e) {
+      // Knowledge base not available, skip prerequisite validation
+      console.warn('⚠️ Prerequisite validation failed:', e.message);
+    }
+    
+    // Check 3: Step order within modules
+    modules.forEach(module => {
+      if (!module.steps || !Array.isArray(module.steps)) return;
+      
+      // Check step numbering is sequential
+      for (let i = 0; i < module.steps.length; i++) {
+        if (module.steps[i].step !== i + 1) {
+          errors.push(`Module ${module.module_order}, Step ${i + 1} has incorrect step number: ${module.steps[i].step}`);
+        }
+      }
+      
+      // Check skills_in_module order matches step order
+      if (module.skills_in_module && module.steps.length > 0) {
+        const stepSkillOrder = this._extractSkillOrderFromSteps(module.steps);
+        if (!this._arraysMatchOrder(module.skills_in_module, stepSkillOrder)) {
+          errors.push(`Module ${module.module_order}: skills_in_module order does not match step introduction order`);
+        }
+        
+        // Check that all skills in skills_in_module appear in steps
+        const skillsInSteps = new Set();
+        module.steps.forEach(step => {
+          if (step.skills_covered) {
+            step.skills_covered.forEach(skill => skillsInSteps.add(skill));
+          }
+        });
+        
+        module.skills_in_module.forEach(skill => {
+          if (!skillsInSteps.has(skill)) {
+            errors.push(`Module ${module.module_order}: Skill "${skill}" is in skills_in_module but not covered in any step`);
+          }
+        });
+        
+        // Check that all skills in steps appear in skills_in_module
+        skillsInSteps.forEach(skill => {
+          if (!module.skills_in_module.includes(skill)) {
+            errors.push(`Module ${module.module_order}: Skill "${skill}" is covered in steps but not listed in skills_in_module`);
+          }
+        });
+      }
+    });
+    
+    // Check 4: All skills appear exactly once
+    const allSkills = this._extractAllSkillsFromPath(pathData);
+    const skillCounts = {};
+    allSkills.forEach(skill => {
+      skillCounts[skill] = (skillCounts[skill] || 0) + 1;
+    });
+    
+    Object.entries(skillCounts).forEach(([skill, count]) => {
+      if (count > 1) {
+        errors.push(`Skill "${skill}" appears ${count} times (should appear exactly once)`);
+      }
+    });
+    
+    return {
+      valid: errors.length === 0,
+      errors
+    };
+  }
+
+  /**
+   * Extract all skills from a module (from steps and skills_in_module)
+   * @private
+   */
+  _extractAllSkillsFromModule(module) {
+    const skills = new Set();
+    
+    if (module.skills_in_module) {
+      module.skills_in_module.forEach(skill => skills.add(skill));
+    }
+    
+    if (module.steps) {
+      module.steps.forEach(step => {
+        if (step.skills_covered) {
+          step.skills_covered.forEach(skill => skills.add(skill));
+        }
+      });
+    }
+    
+    return Array.from(skills);
+  }
+
+  /**
+   * Extract skill order from steps (order of first appearance)
+   * @private
+   */
+  _extractSkillOrderFromSteps(steps) {
+    const order = [];
+    const seen = new Set();
+    
+    steps.forEach(step => {
+      if (step.skills_covered) {
+        step.skills_covered.forEach(skill => {
+          if (!seen.has(skill)) {
+            order.push(skill);
+            seen.add(skill);
+          }
+        });
+      }
+    });
+    
+    return order;
+  }
+
+  /**
+   * Check if arrays match order (allowing for subset)
+   * @private
+   */
+  _arraysMatchOrder(arr1, arr2) {
+    // Check if arr1 is a subsequence of arr2 or vice versa
+    let i = 0, j = 0;
+    while (i < arr1.length && j < arr2.length) {
+      if (arr1[i] === arr2[j]) {
+        i++;
+      }
+      j++;
+    }
+    return i === arr1.length;
+  }
+
+  /**
+   * Extract all skills from entire path
+   * @private
+   */
+  _extractAllSkillsFromPath(pathData) {
+    const skills = [];
+    if (pathData.learning_modules) {
+      pathData.learning_modules.forEach(module => {
+        skills.push(...this._extractAllSkillsFromModule(module));
+      });
+    }
+    return skills;
+  }
+
+  /**
+   * Extract skill order from entire path (order of first appearance)
+   * @private
+   */
+  _extractSkillOrderFromPath(pathData) {
+    const order = [];
+    const seen = new Set();
+    
+    if (pathData.learning_modules) {
+      pathData.learning_modules.forEach(module => {
+        if (module.steps) {
+          module.steps.forEach(step => {
+            if (step.skills_covered) {
+              step.skills_covered.forEach(skill => {
+                if (!seen.has(skill)) {
+                  order.push(skill);
+                  seen.add(skill);
+                }
+              });
+            }
+          });
+        }
+      });
+    }
+    
+    return order;
+  }
+
+  /**
+   * Heuristic: Check if foundational skills appear after advanced skills
+   * Uses pattern-based difficulty inference (works for any domain)
+   * @private
+   */
+  _hasFoundationalSkillsAfterAdvanced(laterSkills, earlierSkills) {
+      // Use pattern-based difficulty inference from knowledge base
+    try {
+      // Calculate average difficulty for each set
+      const laterAvgDifficulty = laterSkills.length > 0
+        ? laterSkills.reduce((sum, skill) => sum + getDifficultyScoreWithFallback(skill), 0) / laterSkills.length
+        : 0;
+      const earlierAvgDifficulty = earlierSkills.length > 0
+        ? earlierSkills.reduce((sum, skill) => sum + getDifficultyScoreWithFallback(skill), 0) / earlierSkills.length
+        : 0;
+      
+      // If later module has lower difficulty than earlier, that's wrong
+      return laterAvgDifficulty > 0 && earlierAvgDifficulty > 0 && laterAvgDifficulty < earlierAvgDifficulty;
+    } catch (e) {
+      // Fallback to basic keyword matching if knowledge base not available
+      const foundationalKeywords = ['basic', 'introduction', 'intro', 'fundamentals', 'getting started', 'first steps', 'syntax', 'variables', 'data types'];
+      const advancedKeywords = ['advanced', 'expert', 'master', 'optimization', 'performance', 'memory management', 'concurrency', 'design patterns', 'architecture', 'enterprise', 'scalability'];
+      
+      const laterHasFoundational = laterSkills.some(skill => 
+        foundationalKeywords.some(keyword => skill.toLowerCase().includes(keyword))
+      );
+      const earlierHasAdvanced = earlierSkills.some(skill =>
+        advancedKeywords.some(keyword => skill.toLowerCase().includes(keyword))
+      );
+      
+      return laterHasFoundational && earlierHasAdvanced;
+    }
+  }
+
+  /**
+   * Add validation feedback to prompt for retry
+   * @private
+   */
+  _addValidationFeedbackToPrompt(originalPrompt, validationErrors) {
+    const feedback = `\n\n⚠️ VALIDATION FAILED - Previous attempt had these errors:\n${validationErrors.map(e => `- ${e}`).join('\n')}\n\nPlease regenerate the learning path ensuring these issues are fixed.`;
+    return originalPrompt + feedback;
   }
 
   /**
