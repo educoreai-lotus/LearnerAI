@@ -61,7 +61,15 @@ export function createSkillsGapsRouter(dependencies) {
       if (gap && processGapUpdateUseCase) {
         // Use the new flow: Process Skills Engine gap update
         console.log('✅ Using ProcessSkillsGapUpdateUseCase for normalization');
-        console.log('   Gap format:', typeof gap, Array.isArray(gap) ? 'array' : 'object', Object.keys(gap || {}));
+        console.log('   Gap format:', typeof gap, Array.isArray(gap) ? 'array' : 'object');
+        console.log('   Gap keys:', Object.keys(gap || {}));
+        console.log('   Gap is already a map (normalized format):', 
+          !gap.missing_skills_map && 
+          !gap.identifiedGaps && 
+          !Array.isArray(gap) &&
+          !gap.skills &&
+          Object.values(gap).every(value => Array.isArray(value) || typeof value === 'string')
+        );
         try {
           const skillsGap = await processGapUpdateUseCase.execute({
             user_id,
