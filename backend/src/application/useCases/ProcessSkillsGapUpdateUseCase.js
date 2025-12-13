@@ -116,7 +116,14 @@ export class ProcessSkillsGapUpdateUseCase {
     const existingGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competencyTargetName);
 
     // Normalize gap format to ensure consistency (always use direct competency map format)
+    console.log('🔄 Normalizing gap format...');
+    console.log('   Input gap type:', typeof gap, Array.isArray(gap) ? 'array' : 'object');
+    console.log('   Input gap keys:', Object.keys(gap || {}));
     const normalizedGap = this._normalizeGapFormat(gap);
+    console.log('✅ Gap normalized');
+    console.log('   Normalized gap type:', typeof normalizedGap, Array.isArray(normalizedGap) ? 'array' : 'object');
+    console.log('   Normalized gap keys:', Object.keys(normalizedGap || {}));
+    console.log('   Normalized gap sample:', JSON.stringify(normalizedGap).substring(0, 200));
 
     let skillsGap;
 
@@ -219,8 +226,17 @@ export class ProcessSkillsGapUpdateUseCase {
                                   Object.values(gap).every(value => Array.isArray(value) || typeof value === 'string');
     
     if (isDirectCompetencyMap) {
+      console.log('✅ Gap is already in normalized format (direct competency map)');
       return gap;
     }
+    
+    console.log('🔄 Gap needs normalization. Format check:', {
+      hasMissingSkillsMap: !!gap.missing_skills_map,
+      hasIdentifiedGaps: !!gap.identifiedGaps,
+      isArray: Array.isArray(gap),
+      hasSkills: !!gap.skills,
+      allValuesAreArraysOrStrings: Object.values(gap).every(value => Array.isArray(value) || typeof value === 'string')
+    });
 
     // Extract from missing_skills_map format
     if (gap.missing_skills_map && typeof gap.missing_skills_map === 'object') {

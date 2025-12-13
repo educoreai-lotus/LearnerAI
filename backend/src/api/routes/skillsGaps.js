@@ -60,6 +60,8 @@ export function createSkillsGapsRouter(dependencies) {
       // Check if this is a Skills Engine update (has 'gap' field)
       if (gap && processGapUpdateUseCase) {
         // Use the new flow: Process Skills Engine gap update
+        console.log('✅ Using ProcessSkillsGapUpdateUseCase for normalization');
+        console.log('   Gap format:', typeof gap, Array.isArray(gap) ? 'array' : 'object', Object.keys(gap || {}));
         try {
           const skillsGap = await processGapUpdateUseCase.execute({
             user_id,
@@ -72,13 +74,27 @@ export function createSkillsGapsRouter(dependencies) {
             gap
           });
 
+          console.log('✅ Skills gap processed successfully with normalization');
+          console.log('   Normalized skills_raw_data format:', typeof skillsGap.skills_raw_data, Object.keys(skillsGap.skills_raw_data || {}));
+
           return res.status(200).json({
             message: 'Skills gap processed successfully',
             skillsGap
           });
         } catch (useCaseError) {
+          // Log the full error for debugging
+          console.error('❌ ProcessSkillsGapUpdateUseCase failed:', useCaseError);
+          console.error('   Error stack:', useCaseError.stack);
           // Re-throw with more context
           throw new Error(`Failed to process skills gap: ${useCaseError.message}`);
+        }
+      } else {
+        // Log why we're not using the normalization flow
+        if (!gap) {
+          console.warn('⚠️  Gap field missing - cannot use normalization flow');
+        }
+        if (!processGapUpdateUseCase) {
+          console.warn('⚠️  ProcessSkillsGapUpdateUseCase not initialized - companyRepository may be missing');
         }
       }
       
