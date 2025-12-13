@@ -150,7 +150,7 @@ export class ProcessSkillsGapUpdateUseCase {
 
   /**
    * Filter skills_raw_data to keep only skills that are in the new gap
-   * Removes micro/nano skills that are NOT in the new gap
+   * Removes skills that are NOT in the new gap (handles both new and legacy formats)
    * @private
    */
   _filterSkillsByNewGap(existingSkillsRawData, newGap) {
@@ -172,24 +172,51 @@ export class ProcessSkillsGapUpdateUseCase {
     }
 
     // Filter each gap in existing identifiedGaps - keep only skills that ARE in new gap
+    // Note: This handles legacy format with skill arrays (deprecated)
     const filteredGaps = existingSkillsRawData.identifiedGaps.map(gap => {
-      const filteredMicro = gap.microSkills?.filter(skill => {
-        const skillId = skill.id || skill.skill_id;
+      // Handle legacy format with skill arrays (deprecated)
+      const legacySkillArrays = gap.microSkills || gap.nanoSkills || [];
+      const filteredLegacySkills = legacySkillArrays.filter(skill => {
+        const skillId = skill?.id || skill?.skill_id || skill;
         return skillId && newSkillIds.includes(skillId);
-      }) || [];
+      });
 
-      const filteredNano = gap.nanoSkills?.filter(skill => {
-        const skillId = skill.id || skill.skill_id;
-        return skillId && newSkillIds.includes(skillId);
-      }) || [];
+      // Handle new format with competency map
+      const competencyMap = gap.missing_skills_map || {};
+      const filteredCompetencyMap = {};
+      for (const [competencyName, skills] of Object.entries(competencyMap)) {
+        if (Array.isArray(skills)) {
+          const filtered = skills.filter(skill => {
+            const skillId = typeof skill === 'string' ? skill : (skill?.id || skill?.skill_id);
+            return skillId && newSkillIds.includes(skillId);
+          });
+          if (filtered.length > 0) {
+            filteredCompetencyMap[competencyName] = filtered;
+          }
+        }
+      }
 
       // Only keep gap if it has skills after filtering
-      if (filteredMicro.length > 0 || filteredNano.length > 0) {
-        return {
-          ...gap,
-          microSkills: filteredMicro,
-          nanoSkills: filteredNano
-        };
+      if (filteredLegacySkills.length > 0 || Object.keys(filteredCompetencyMap).length > 0) {
+        const filteredGap = { ...gap };
+        
+        // Update with filtered skills (remove legacy arrays if empty)
+        if (filteredLegacySkills.length > 0) {
+          // Keep legacy format for backward compatibility
+          if (gap.microSkills) filteredGap.microSkills = filteredLegacySkills;
+          if (gap.nanoSkills) filteredGap.nanoSkills = filteredLegacySkills;
+        } else {
+          // Remove empty legacy arrays
+          delete filteredGap.microSkills;
+          delete filteredGap.nanoSkills;
+        }
+        
+        // Update with new format
+        if (Object.keys(filteredCompetencyMap).length > 0) {
+          filteredGap.missing_skills_map = filteredCompetencyMap;
+        }
+        
+        return filteredGap;
       }
       return null;
     }).filter(gap => gap !== null); // Remove null gaps
@@ -207,28 +234,52 @@ export class ProcessSkillsGapUpdateUseCase {
 
   /**
    * Extract skill IDs from gap data structure
+   * Handles both new format (competency map) and legacy format (skill arrays)
    * @private
    */
   _extractSkillIds(gapData) {
     const skillIds = [];
     if (!gapData || typeof gapData !== 'object') return skillIds;
 
+    // NEW FORMAT: Extract from competency map (e.g., {"Competency_X": [skills]})
+    const isDirectCompetencyMap = !gapData.missing_skills_map && 
+                                  !gapData.identifiedGaps && 
+                                  !Array.isArray(gapData) &&
+                                  Object.values(gapData).every(value => Array.isArray(value) || typeof value === 'string');
+    
+    if (isDirectCompetencyMap) {
+      for (const [competencyName, skills] of Object.entries(gapData)) {
+        if (Array.isArray(skills)) {
+          skills.forEach(skill => {
+            const skillId = typeof skill === 'string' ? skill : (skill?.id || skill?.skill_id);
+            if (skillId) skillIds.push(skillId);
+          });
+        }
+      }
+    }
+
+    // NESTED FORMAT: Extract from missing_skills_map
+    if (gapData.missing_skills_map) {
+      for (const [competencyName, skills] of Object.entries(gapData.missing_skills_map)) {
+        if (Array.isArray(skills)) {
+          skills.forEach(skill => {
+            const skillId = typeof skill === 'string' ? skill : (skill?.id || skill?.skill_id);
+            if (skillId) skillIds.push(skillId);
+          });
+        }
+      }
+    }
+
+    // LEGACY FORMAT: Extract from identifiedGaps with skill arrays (deprecated)
     if (gapData.identifiedGaps && Array.isArray(gapData.identifiedGaps)) {
       gapData.identifiedGaps.forEach(gap => {
-        if (gap.microSkills && Array.isArray(gap.microSkills)) {
-          gap.microSkills.forEach(skill => {
-            if (skill && (skill.id || skill.skill_id)) {
-              skillIds.push(skill.id || skill.skill_id);
-            }
-          });
-        }
-        if (gap.nanoSkills && Array.isArray(gap.nanoSkills)) {
-          gap.nanoSkills.forEach(skill => {
-            if (skill && (skill.id || skill.skill_id)) {
-              skillIds.push(skill.id || skill.skill_id);
-            }
-          });
-        }
+        // Handle legacy skill arrays (deprecated)
+        const legacySkillArrays = gap.microSkills || gap.nanoSkills || [];
+        legacySkillArrays.forEach(skill => {
+          if (skill && (skill.id || skill.skill_id)) {
+            skillIds.push(skill.id || skill.skill_id);
+          }
+        });
       });
     }
 

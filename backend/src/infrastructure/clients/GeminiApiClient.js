@@ -56,6 +56,12 @@ export class GeminiApiClient {
       } catch (error) {
         lastError = error;
         
+        // Check if this is a 403 Forbidden error (leaked API key, invalid key, etc.)
+        const is403 = error.message?.includes('403') || 
+                     error.message?.includes('Forbidden') ||
+                     error.message?.includes('leaked') ||
+                     error.message?.includes('reported as leaked');
+        
         // Check if this is a 429 Quota Exceeded error
         const is429 = error.message?.includes('429') || 
                      error.message?.includes('Too Many Requests') ||
@@ -67,7 +73,28 @@ export class GeminiApiClient {
                      error.message?.includes('Service Unavailable') ||
                      error.message?.includes('overloaded');
         
-        if (is429) {
+        if (is403) {
+          // 403 errors are non-retryable (leaked API key, invalid key, etc.)
+          // Don't retry - fail immediately with clear error message
+          if (error.message?.includes('leaked') || error.message?.includes('reported as leaked')) {
+            console.error(`❌ Gemini API key is reported as leaked (403 Forbidden). This is a non-retryable error.`);
+            console.error(`   Action required:`);
+            console.error(`   1. Go to https://ai.google.dev/`);
+            console.error(`   2. Create a new API key in your Google Cloud project`);
+            console.error(`   3. Update GEMINI_API_KEY in your environment variables`);
+            console.error(`   4. Restart your application`);
+            throw new Error(`Gemini API key is reported as leaked (403 Forbidden). Please create a new API key and update GEMINI_API_KEY. See: https://ai.google.dev/ Original error: ${error.message || 'Unknown error'}`);
+          } else {
+            // Other 403 errors (invalid key, permission denied, etc.)
+            console.error(`❌ Gemini API key error (403 Forbidden):`, error.message);
+            console.error(`   Action required:`);
+            console.error(`   1. Verify your API key is correct`);
+            console.error(`   2. Check that your API key has the necessary permissions`);
+            console.error(`   3. Ensure your Google Cloud project has the Generative AI API enabled`);
+            console.error(`   4. Update GEMINI_API_KEY in your environment variables if needed`);
+            throw new Error(`Gemini API key error (403 Forbidden). Please verify your API key is valid and has proper permissions. Original error: ${error.message || 'Unknown error'}`);
+          }
+        } else if (is429) {
           // For 429 errors, extract retry delay from error message if available
           const retryDelayMatch = error.message?.match(/Please retry in ([\d.]+)s/i);
           let delay = 30000; // Default 30 seconds for quota errors
@@ -125,6 +152,14 @@ export class GeminiApiClient {
     }
 
     // Provide helpful error messages based on error type
+    if (lastError?.message?.includes('403') || lastError?.message?.includes('Forbidden')) {
+      if (lastError?.message?.includes('leaked') || lastError?.message?.includes('reported as leaked')) {
+        throw new Error(`Gemini API key is reported as leaked (403 Forbidden). Please create a new API key and update GEMINI_API_KEY. See: https://ai.google.dev/ Original error: ${lastError?.message || 'Unknown error'}`);
+      } else {
+        throw new Error(`Gemini API key error (403 Forbidden). Please verify your API key is valid and has proper permissions. Original error: ${lastError?.message || 'Unknown error'}`);
+      }
+    }
+    
     if (lastError?.message?.includes('429') || lastError?.message?.includes('quota')) {
       if (lastError?.message?.includes('free_tier')) {
         throw new Error(`Gemini API failed: Free tier quota exceeded. Your API key is on free tier. Please enable billing on your Google Cloud project and use a paid account API key. See: https://ai.google.dev/ Original error: ${lastError?.message || 'Unknown error'}`);

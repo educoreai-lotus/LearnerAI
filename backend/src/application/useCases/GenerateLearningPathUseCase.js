@@ -219,17 +219,33 @@ export class GenerateLearningPathUseCase {
         if (this.skillsExpansionRepository && expansionId) {
           try {
             // Parse prompt1Result if it's a string
-            const prompt1Output = typeof prompt1Result === 'string' 
-              ? JSON.parse(prompt1Result) 
-              : prompt1Result;
+            let prompt1Output;
+            if (typeof prompt1Result === 'string') {
+              try {
+                prompt1Output = JSON.parse(prompt1Result);
+              } catch (parseError) {
+                // If JSON parsing fails, save as string with metadata
+                console.warn(`⚠️ Prompt 1 result is not valid JSON, saving as string: ${parseError.message}`);
+                prompt1Output = {
+                  _raw_output: prompt1Result,
+                  _parse_error: parseError.message,
+                  _format: 'string'
+                };
+              }
+            } else {
+              prompt1Output = prompt1Result;
+            }
             
             await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
               prompt_1_output: prompt1Output
             });
             console.log(`✅ Saved Prompt 1 output to skills_expansions: ${expansionId}`);
+            console.log(`   Output type: ${typeof prompt1Output}, keys: ${prompt1Output && typeof prompt1Output === 'object' ? Object.keys(prompt1Output).join(', ') : 'N/A'}`);
           } catch (error) {
-            console.warn(`⚠️ Failed to save Prompt 1 output: ${error.message}`);
+            console.error(`❌ Failed to save Prompt 1 output: ${error.message}`);
             console.error(`   Error details:`, error);
+            console.error(`   Prompt 1 result type: ${typeof prompt1Result}, length: ${typeof prompt1Result === 'string' ? prompt1Result.length : 'N/A'}`);
+            // Don't throw - continue with the process even if save fails
           }
         } else {
           console.warn(`⚠️ Cannot save Prompt 1 output: skillsExpansionRepository=${!!this.skillsExpansionRepository}, expansionId=${expansionId}`);
@@ -270,26 +286,69 @@ export class GenerateLearningPathUseCase {
           })) }, null, 2)
         : this._formatPrompt1Result(prompt1Result);
       const fullPrompt2 = prompt2.replace('{input}', prompt2Input);
+      
+      // Execute Prompt 2 with error handling
+      try {
         prompt2Result = await this.geminiClient.executePrompt(fullPrompt2, '', {
-        timeout: 60000, // 60 seconds for competency identification
-        maxRetries: 3
-      });
+          timeout: 60000, // 60 seconds for competency identification
+          maxRetries: 3
+        });
+      } catch (prompt2Error) {
+        // Save error information to database before re-throwing
+        if (this.skillsExpansionRepository && expansionId) {
+          try {
+            await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
+              prompt_2_output: {
+                _error: true,
+                _error_message: prompt2Error.message,
+                _error_type: 'execution_failed',
+                _failed_at: new Date().toISOString()
+              }
+            });
+            console.error(`❌ Saved Prompt 2 error to skills_expansions: ${expansionId}`);
+            console.error(`   Error: ${prompt2Error.message}`);
+          } catch (saveError) {
+            console.error(`❌ Failed to save Prompt 2 error: ${saveError.message}`);
+          }
+        }
+        // Re-throw to fail the job
+        throw prompt2Error;
+      }
 
         // Save Prompt 2 output to skills_expansions table
         if (this.skillsExpansionRepository && expansionId) {
           try {
             // Parse prompt2Result if it's a string
-            const prompt2Output = typeof prompt2Result === 'string' 
-              ? JSON.parse(prompt2Result) 
-              : prompt2Result;
+            let prompt2Output;
+            if (typeof prompt2Result === 'string') {
+              try {
+                prompt2Output = JSON.parse(prompt2Result);
+              } catch (parseError) {
+                // If JSON parsing fails, save as string with metadata
+                console.warn(`⚠️ Prompt 2 result is not valid JSON, saving as string: ${parseError.message}`);
+                prompt2Output = {
+                  _raw_output: prompt2Result,
+                  _parse_error: parseError.message,
+                  _format: 'string'
+                };
+              }
+            } else {
+              prompt2Output = prompt2Result;
+            }
             
             await this.skillsExpansionRepository.updateSkillsExpansion(expansionId, {
               prompt_2_output: prompt2Output
             });
             console.log(`✅ Saved Prompt 2 output to skills_expansions: ${expansionId}`);
+            console.log(`   Output type: ${typeof prompt2Output}, keys: ${prompt2Output && typeof prompt2Output === 'object' ? Object.keys(prompt2Output).join(', ') : 'N/A'}`);
           } catch (error) {
-            console.warn(`⚠️ Failed to save Prompt 2 output: ${error.message}`);
+            console.error(`❌ Failed to save Prompt 2 output: ${error.message}`);
+            console.error(`   Error details:`, error);
+            console.error(`   Prompt 2 result type: ${typeof prompt2Result}, length: ${typeof prompt2Result === 'string' ? prompt2Result.length : 'N/A'}`);
+            // Don't throw - continue with the process even if save fails
           }
+        } else {
+          console.warn(`⚠️ Cannot save Prompt 2 output: skillsExpansionRepository=${!!this.skillsExpansionRepository}, expansionId=${expansionId}`);
         }
 
       // Extract competencies prepared for Skills Engine
@@ -506,16 +565,17 @@ export class GenerateLearningPathUseCase {
       } while (validationAttempts < maxValidationAttempts);
 
       // Create learning path entity
+      // pathData should always have learning_modules now (converted from old format if needed)
       const learningPath = new LearningPath({
         id: uuidv4(),
         userId: skillsGap.userId,
         companyId: skillsGap.companyId,
         competencyTargetName: competencyTargetName,
         gapId: gapId || null, // Link to original skills gap
-        pathSteps: pathData.learning_modules || pathData.pathSteps || [],
+        pathSteps: pathData.learning_modules || [], // Always use learning_modules (converted from old format if needed)
         pathTitle: pathData.path_title,
         totalDurationHours: pathData.total_estimated_duration_hours,
-        pathMetadata: pathData,
+        pathMetadata: pathData, // Contains full new structure with learning_modules
         status: 'completed'
       });
 
@@ -664,10 +724,10 @@ export class GenerateLearningPathUseCase {
       }, null, 2);
     }
     
-    // Fallback to request data (for backward compatibility)
+    // Fallback to request data (should not happen if skillsRawData is properly set)
+    // If skillsRawData is missing, return empty structure
     return JSON.stringify({
-      microSkills: skillsGap.microSkills || [],
-      nanoSkills: skillsGap.nanoSkills || [],
+      skills_raw_data: {},
       context: {
         userId: skillsGap.userId,
         competencyTargetName: competencyTargetName
@@ -798,13 +858,17 @@ export class GenerateLearningPathUseCase {
   _extractSkillsFromInitialGap(initialGap) {
     const skills = [];
     
-    // Try to extract from skills_raw_data.gap.missing_skills_map
-    if (initialGap.skills_raw_data?.gap?.missing_skills_map) {
-      const missingSkillsMap = initialGap.skills_raw_data.gap.missing_skills_map;
+    // Helper function to extract skills from a competency map structure
+    const extractFromCompetencyMap = (competencyMap) => {
+      if (!competencyMap || typeof competencyMap !== 'object') return;
       
-      // Handle different structures
-      if (typeof missingSkillsMap === 'object') {
-        Object.values(missingSkillsMap).forEach(skillArray => {
+      // Check if it's a competency map (object with competency names as keys, arrays as values)
+      const isCompetencyMap = Object.values(competencyMap).every(value => 
+        Array.isArray(value) || typeof value === 'string'
+      );
+      
+      if (isCompetencyMap) {
+        Object.values(competencyMap).forEach(skillArray => {
           if (Array.isArray(skillArray)) {
             skills.push(...skillArray);
           } else if (typeof skillArray === 'string') {
@@ -812,25 +876,43 @@ export class GenerateLearningPathUseCase {
           }
         });
       }
+    };
+    
+    // Try to extract from skills_raw_data directly (if it's a competency map)
+    if (initialGap.skills_raw_data) {
+      extractFromCompetencyMap(initialGap.skills_raw_data);
     }
     
-    // Try to extract from direct structure
+    // Try to extract from skills_raw_data.gap (if gap is a competency map)
+    if (initialGap.skills_raw_data?.gap) {
+      extractFromCompetencyMap(initialGap.skills_raw_data.gap);
+    }
+    
+    // Try to extract from skills_raw_data.gap.missing_skills_map
+    if (initialGap.skills_raw_data?.gap?.missing_skills_map) {
+      const missingSkillsMap = initialGap.skills_raw_data.gap.missing_skills_map;
+      extractFromCompetencyMap(missingSkillsMap);
+    }
+    
+    // Try to extract from gap directly (if gap is a competency map)
+    if (initialGap.gap) {
+      extractFromCompetencyMap(initialGap.gap);
+    }
+    
+    // Try to extract from gap.missing_skills_map
     if (initialGap.gap?.missing_skills_map) {
       const missingSkillsMap = initialGap.gap.missing_skills_map;
-      if (typeof missingSkillsMap === 'object') {
-        Object.values(missingSkillsMap).forEach(skillArray => {
-          if (Array.isArray(skillArray)) {
-            skills.push(...skillArray);
-          }
-        });
-      }
+      extractFromCompetencyMap(missingSkillsMap);
     }
     
-    // Try to extract from microSkills/nanoSkills
+    // Legacy fallback: Try to extract from old skill array formats (deprecated - should not be used)
+    // This is kept only for backward compatibility with very old data structures
     if (Array.isArray(initialGap.microSkills)) {
+      console.warn('⚠️ Using legacy skill array format - consider updating to competency map format');
       skills.push(...initialGap.microSkills);
     }
     if (Array.isArray(initialGap.nanoSkills)) {
+      console.warn('⚠️ Using legacy skill array format - consider updating to competency map format');
       skills.push(...initialGap.nanoSkills);
     }
     
@@ -889,12 +971,17 @@ export class GenerateLearningPathUseCase {
 
   /**
    * Format input for Prompt 3 (Path Creation)
+   * NOTE: This method is deprecated and not used anymore.
+   * The new format uses initialGapForPrompt3 and expandedBreakdownForPrompt3 directly.
+   * Kept for reference only.
    */
   _formatPathCreationInput(skillsGap, skillBreakdown) {
+    // This method is no longer used - the new format constructs the input directly
+    // in processJob() using initialGapForPrompt3 and expandedBreakdownForPrompt3
+    console.warn('⚠️ _formatPathCreationInput is deprecated and should not be called');
     return JSON.stringify({
       initialGap: {
-        microSkills: skillsGap.microSkills,
-        nanoSkills: skillsGap.nanoSkills
+        skills_raw_data: skillsGap.skills_raw_data || {}
       },
       expandedBreakdown: skillBreakdown
     }, null, 2);
@@ -920,11 +1007,38 @@ export class GenerateLearningPathUseCase {
       try {
         parsed = JSON.parse(prompt3Result);
       } catch {
-        // Fallback to old format extraction
+        // Fallback: If JSON parsing fails, try to extract and convert to new format
+        console.warn('⚠️ Failed to parse Prompt 3 result as JSON, attempting text extraction');
+        const extractedSteps = this._extractPathSteps(prompt3Result);
+        
+        // Convert old format to new learning_modules structure
+        if (extractedSteps && extractedSteps.length > 0) {
+          return {
+            path_title: 'Learning Path',
+            learner_id: userId,
+            total_estimated_duration_hours: null,
+            learning_modules: [{
+              module_order: 1,
+              module_title: 'Learning Path',
+              estimated_duration_hours: null,
+              skills_in_module: [],
+              steps: extractedSteps.map((step, index) => ({
+                step: step.step || step.order || index + 1,
+                title: step.title || step.name || `Step ${index + 1}`,
+                description: step.description || '',
+                estimatedTime: step.estimatedTime || step.duration || null,
+                skills_covered: step.skills_covered || step.skills || []
+              }))
+            }]
+          };
+        }
+        
+        // If extraction also fails, return minimal structure
         return {
-          pathSteps: this._extractPathSteps(prompt3Result),
           path_title: 'Learning Path',
-          total_estimated_duration_hours: null
+          learner_id: userId,
+          total_estimated_duration_hours: null,
+          learning_modules: []
         };
       }
     } else {
@@ -938,14 +1052,57 @@ export class GenerateLearningPathUseCase {
       const pathTitle = parsed.path_title || parsed.pathTitle || 'Personalized Learning Path';
       const totalDuration = parsed.total_estimated_duration_hours || parsed.totalDurationHours || null;
       
-      // Process modules: handle both new format (with steps) and old format (with suggested_content_sequence)
+      // Process modules: convert old format to new format if needed
       const processedModules = parsed.learning_modules.map(module => {
-        // Support both new format (skills_in_module) and old format (focus_micro_skills)
+        // Convert old format (focus_micro_skills) to new format (skills_in_module)
         const skillsInModule = module.skills_in_module || module.focus_micro_skills || [];
+        if (module.focus_micro_skills && !module.skills_in_module) {
+          console.warn('⚠️ Converting legacy focus_micro_skills to skills_in_module format');
+        }
         
-        // Support both new format (steps array) and old format (suggested_content_sequence)
+        // Convert old format (suggested_content_sequence) to new format (steps array)
         const hasSteps = module.steps && Array.isArray(module.steps) && module.steps.length > 0;
         const hasSuggestedSequence = module.suggested_content_sequence && Array.isArray(module.suggested_content_sequence);
+        
+        // If we have old format (suggested_content_sequence) but no steps, convert it
+        if (hasSuggestedSequence && !hasSteps) {
+          console.warn('⚠️ Converting legacy suggested_content_sequence to steps format');
+          // Convert string sequence to structured steps
+          const convertedSteps = module.suggested_content_sequence.map((content, index) => {
+            // Parse string format like "Lesson: Title (Skill: Name)" or just "Title"
+            // Legacy format may have "(Nano: Skill)" or "(Micro: Skill)" patterns
+            let title = content;
+            let skills = [];
+            
+            if (typeof content === 'string') {
+              // Try to extract title and skills from string format
+              const titleMatch = content.match(/^(?:Lesson:\s*)?([^(]+)/);
+              if (titleMatch) {
+                title = titleMatch[1].trim();
+              }
+              
+              // Extract skills from patterns like "(Skill: Name)" or legacy "(Nano: Skill)" / "(Micro: Skill)"
+              // Match any pattern in parentheses that looks like a skill reference
+              const skillMatches = content.matchAll(/\([^:]+:\s*([^)]+)\)/g);
+              for (const match of skillMatches) {
+                skills.push(match[1].trim());
+              }
+            }
+            
+            return {
+              step: index + 1,
+              title: title,
+              description: '',
+              estimatedTime: null,
+              skills_covered: skills.length > 0 ? skills : []
+            };
+          });
+          
+          // Use converted steps
+          module.steps = convertedSteps;
+          // Update hasSteps flag so converted steps are included
+          hasSteps = true;
+        }
         
         // Build module structure matching Prompt 3 EXACTLY - enforce field order from prompt!
         // Prompt 3 specifies: module_order → module_title → estimated_duration_hours → skills_in_module → steps
@@ -966,8 +1123,9 @@ export class GenerateLearningPathUseCase {
           moduleData.skills_in_module = skillsInModule;
         }
         
-        // Field 5: steps (MUST be last) - only add if present
-        if (hasSteps) {
+        // Field 5: steps (MUST be last) - only add if present (includes converted steps)
+        const finalHasSteps = hasSteps || (module.steps && Array.isArray(module.steps) && module.steps.length > 0);
+        if (finalHasSteps) {
           moduleData.steps = module.steps.map(step => {
             // Clean step to match Prompt 3 structure exactly
             // Step field order: step → title → description → estimatedTime → skills_covered
@@ -1003,12 +1161,56 @@ export class GenerateLearningPathUseCase {
       return pathData;
     }
 
-    // Fallback to old format with pathSteps
+    // Fallback: Convert old format (pathSteps or steps) to new format (learning_modules)
+    console.warn('⚠️ No learning_modules found, converting old format to new structure');
+    const oldSteps = this._extractPathSteps(parsed);
+    
+    // Convert old steps format to new learning_modules structure
+    if (oldSteps && oldSteps.length > 0) {
+      return {
+        path_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
+        learner_id: parsed.learner_id || userId,
+        total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null,
+        learning_modules: [{
+          module_order: 1,
+          module_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
+          estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null,
+          skills_in_module: this._extractAllSkillsFromOldSteps(oldSteps),
+          steps: oldSteps.map((step, index) => ({
+            step: step.step || step.order || index + 1,
+            title: step.title || step.name || `Step ${index + 1}`,
+            description: step.description || '',
+            estimatedTime: step.estimatedTime || step.duration || null,
+            skills_covered: step.skills_covered || step.skills || []
+          }))
+        }]
+      };
+    }
+    
+    // If no steps found, return minimal structure
     return {
-      pathSteps: this._extractPathSteps(parsed),
       path_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
-      total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null
+      learner_id: parsed.learner_id || userId,
+      total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null,
+      learning_modules: []
     };
+  }
+  
+  /**
+   * Extract all skills from old steps format (helper for conversion)
+   * @private
+   */
+  _extractAllSkillsFromOldSteps(steps) {
+    const skills = new Set();
+    steps.forEach(step => {
+      if (step.skills_covered && Array.isArray(step.skills_covered)) {
+        step.skills_covered.forEach(skill => skills.add(skill));
+      }
+      if (step.skills && Array.isArray(step.skills)) {
+        step.skills.forEach(skill => skills.add(skill));
+      }
+    });
+    return Array.from(skills);
   }
 
   /**
@@ -1293,6 +1495,8 @@ export class GenerateLearningPathUseCase {
 
   /**
    * Extract path steps from Prompt 3 result (old format fallback)
+   * Used only for converting old format to new format
+   * @private
    */
   _extractPathSteps(prompt3Result) {
     // Handle different response formats
@@ -1321,28 +1525,52 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
-   * Parse steps from text (fallback)
+   * Parse steps from text (fallback for very old format)
+   * Converts text lines to step objects compatible with new format
+   * @private
    */
   _parseStepsFromText(text) {
     const lines = text.split('\n').filter(line => line.trim());
     return lines.map((line, index) => ({
-      id: `step-${index + 1}`,
+      step: index + 1,
       title: line.trim(),
-      order: index + 1,
-      description: ''
+      description: '',
+      estimatedTime: null,
+      skills_covered: []
     }));
   }
 
   /**
    * Extract skill names from gap data structure
-   * Handles different gap formats: missing_skills_map, identifiedGaps, etc.
+   * Handles different gap formats: direct competency map, missing_skills_map, identifiedGaps (legacy), etc.
    * @private
    */
   _extractSkillNamesFromGap(gapData) {
     const skillNames = [];
     if (!gapData || typeof gapData !== 'object') return skillNames;
 
-    // Handle missing_skills_map format (from Skills Engine)
+    // NEW FORMAT: Handle direct competency map (e.g., {"Competency_X": [skills]})
+    // Check if gapData is directly a competency map (object with competency names as keys, arrays as values)
+    const isDirectCompetencyMap = !gapData.missing_skills_map && 
+                                  !gapData.identifiedGaps && 
+                                  !Array.isArray(gapData) &&
+                                  Object.values(gapData).every(value => Array.isArray(value) || typeof value === 'string');
+    
+    if (isDirectCompetencyMap) {
+      for (const [competencyName, skills] of Object.entries(gapData)) {
+        if (Array.isArray(skills)) {
+          skills.forEach(skill => {
+            if (typeof skill === 'string') {
+              skillNames.push(skill);
+            } else if (skill && (skill.name || skill.id)) {
+              skillNames.push(skill.name || skill.id);
+            }
+          });
+        }
+      }
+    }
+
+    // Handle missing_skills_map format (nested format from Skills Engine)
     if (gapData.missing_skills_map) {
       for (const [competencyName, skills] of Object.entries(gapData.missing_skills_map)) {
         if (Array.isArray(skills)) {
@@ -1357,27 +1585,19 @@ export class GenerateLearningPathUseCase {
       }
     }
 
-    // Handle identifiedGaps format (structured format)
+    // LEGACY FORMAT: Handle identifiedGaps format (old structured format - deprecated)
     if (gapData.identifiedGaps && Array.isArray(gapData.identifiedGaps)) {
+      console.warn('⚠️ Using legacy identifiedGaps format with skill arrays - consider updating to competency map format');
       gapData.identifiedGaps.forEach(gap => {
-        if (gap.microSkills && Array.isArray(gap.microSkills)) {
-          gap.microSkills.forEach(skill => {
-            if (typeof skill === 'string') {
-              skillNames.push(skill);
-            } else if (skill && (skill.name || skill.id || skill.skill_id)) {
-              skillNames.push(skill.name || skill.id || skill.skill_id);
-            }
-          });
-        }
-        if (gap.nanoSkills && Array.isArray(gap.nanoSkills)) {
-          gap.nanoSkills.forEach(skill => {
-            if (typeof skill === 'string') {
-              skillNames.push(skill);
-            } else if (skill && (skill.name || skill.id || skill.skill_id)) {
-              skillNames.push(skill.name || skill.id || skill.skill_id);
-            }
-          });
-        }
+        // Handle legacy skill arrays (deprecated - kept for backward compatibility)
+        const legacySkillArrays = gap.microSkills || gap.nanoSkills || [];
+        legacySkillArrays.forEach(skill => {
+          if (typeof skill === 'string') {
+            skillNames.push(skill);
+          } else if (skill && (skill.name || skill.id || skill.skill_id)) {
+            skillNames.push(skill.name || skill.id || skill.skill_id);
+          }
+        });
       });
     }
 
