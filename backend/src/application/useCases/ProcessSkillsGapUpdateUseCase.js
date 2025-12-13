@@ -115,12 +115,16 @@ export class ProcessSkillsGapUpdateUseCase {
     // Now that learner exists, we can safely create/update skills gap
     const existingGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competencyTargetName);
 
+    // Normalize gap format to ensure consistency (always use direct competency map format)
+    const normalizedGap = this._normalizeGapFormat(gap);
+
     let skillsGap;
 
     if (existingGap) {
       // Step 6: Update existing skills_gap
-      // Filter skills_raw_data: keep only skills that are in the new gap
-      const filteredSkills = this._filterSkillsByNewGap(existingGap.skills_raw_data, gap);
+      // Normalize existing gap format first, then filter to keep only skills that are in the new gap
+      const normalizedExistingGap = this._normalizeGapFormat(existingGap.skills_raw_data);
+      const filteredSkills = this._filterSkillsByNewGap(normalizedExistingGap, normalizedGap);
 
       skillsGap = await this.skillsGapRepository.updateSkillsGap(existingGap.gap_id, {
         skills_raw_data: filteredSkills,
@@ -138,7 +142,7 @@ export class ProcessSkillsGapUpdateUseCase {
         company_name,
         user_name,
         competency_target_name: competencyTargetName,
-        skills_raw_data: gap,
+        skills_raw_data: normalizedGap, // Use normalized format
         exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null
       });
 
@@ -150,7 +154,7 @@ export class ProcessSkillsGapUpdateUseCase {
 
   /**
    * Filter skills_raw_data to keep only skills that are in the new gap
-   * Removes skills that are NOT in the new gap (handles both new and legacy formats)
+   * Both existingSkillsRawData and newGap should be in normalized format (direct competency map)
    * @private
    */
   _filterSkillsByNewGap(existingSkillsRawData, newGap) {
@@ -158,78 +162,110 @@ export class ProcessSkillsGapUpdateUseCase {
       return newGap; // If no existing data, use new gap as-is
     }
 
-    // Extract skill IDs from new gap
-    const newSkillIds = this._extractSkillIds(newGap);
+    // Both should be normalized (direct competency map format)
+    // Extract all skill names from new gap (for comparison)
+    const newSkillNames = new Set();
+    for (const [competencyName, skills] of Object.entries(newGap)) {
+      if (Array.isArray(skills)) {
+        skills.forEach(skill => {
+          const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
+          if (skillName) newSkillNames.add(skillName);
+        });
+      }
+    }
 
-    // If no skill IDs in new gap, return new gap as-is (replace everything)
-    if (newSkillIds.length === 0) {
+    // If no skills in new gap, return new gap as-is (replace everything)
+    if (newSkillNames.size === 0) {
       return newGap;
     }
 
-    // Filter existing skills_raw_data structure
-    if (!existingSkillsRawData.identifiedGaps) {
-      return newGap; // If existing data has no identifiedGaps, use new gap
+    // Filter existing skills to only keep those in new gap
+    const filteredGap = {};
+    for (const [competencyName, skills] of Object.entries(existingSkillsRawData)) {
+      if (Array.isArray(skills)) {
+        const filtered = skills.filter(skill => {
+          const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
+          return skillName && newSkillNames.has(skillName);
+        });
+        if (filtered.length > 0) {
+          filteredGap[competencyName] = filtered;
+        }
+      }
     }
 
-    // Filter each gap in existing identifiedGaps - keep only skills that ARE in new gap
-    // Note: This handles legacy format with skill arrays (deprecated)
-    const filteredGaps = existingSkillsRawData.identifiedGaps.map(gap => {
-      // Handle legacy format with skill arrays (deprecated)
-      const legacySkillArrays = gap.microSkills || gap.nanoSkills || [];
-      const filteredLegacySkills = legacySkillArrays.filter(skill => {
-        const skillId = skill?.id || skill?.skill_id || skill;
-        return skillId && newSkillIds.includes(skillId);
-      });
+    // Merge with new gap (new gap takes precedence, but keep existing competencies that have matching skills)
+    const mergedGap = { ...filteredGap, ...newGap };
+    
+    return mergedGap;
+  }
 
-      // Handle new format with competency map
-      const competencyMap = gap.missing_skills_map || {};
-      const filteredCompetencyMap = {};
-      for (const [competencyName, skills] of Object.entries(competencyMap)) {
-        if (Array.isArray(skills)) {
-          const filtered = skills.filter(skill => {
-            const skillId = typeof skill === 'string' ? skill : (skill?.id || skill?.skill_id);
-            return skillId && newSkillIds.includes(skillId);
+  /**
+   * Normalize gap format to ensure consistency
+   * Converts all formats to the new direct competency map format
+   * @param {Object} gap - Gap data in any format
+   * @returns {Object} - Normalized gap in direct competency map format
+   * @private
+   */
+  _normalizeGapFormat(gap) {
+    if (!gap || typeof gap !== 'object') {
+      return {};
+    }
+
+    // If already in new format (direct competency map), return as-is
+    const isDirectCompetencyMap = !gap.missing_skills_map && 
+                                  !gap.identifiedGaps && 
+                                  !Array.isArray(gap) &&
+                                  !gap.skills &&
+                                  Object.values(gap).every(value => Array.isArray(value) || typeof value === 'string');
+    
+    if (isDirectCompetencyMap) {
+      return gap;
+    }
+
+    // Extract from missing_skills_map format
+    if (gap.missing_skills_map && typeof gap.missing_skills_map === 'object') {
+      return gap.missing_skills_map;
+    }
+
+    // Extract from identifiedGaps format (legacy)
+    if (gap.identifiedGaps && Array.isArray(gap.identifiedGaps)) {
+      const normalized = {};
+      gap.identifiedGaps.forEach(gapItem => {
+        // Try to extract competency name from gap item
+        const competencyName = gapItem.competency_name || gapItem.name || 'Unknown_Competency';
+        const skills = [];
+        
+        // Collect skills from legacy arrays
+        if (gapItem.microSkills && Array.isArray(gapItem.microSkills)) {
+          gapItem.microSkills.forEach(skill => {
+            const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
+            if (skillName) skills.push(skillName);
           });
-          if (filtered.length > 0) {
-            filteredCompetencyMap[competencyName] = filtered;
-          }
         }
-      }
+        if (gapItem.nanoSkills && Array.isArray(gapItem.nanoSkills)) {
+          gapItem.nanoSkills.forEach(skill => {
+            const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
+            if (skillName) skills.push(skillName);
+          });
+        }
+        
+        if (skills.length > 0) {
+          normalized[competencyName] = skills;
+        }
+      });
+      return normalized;
+    }
 
-      // Only keep gap if it has skills after filtering
-      if (filteredLegacySkills.length > 0 || Object.keys(filteredCompetencyMap).length > 0) {
-        const filteredGap = { ...gap };
-        
-        // Update with filtered skills (remove legacy arrays if empty)
-        if (filteredLegacySkills.length > 0) {
-          // Keep legacy format for backward compatibility
-          if (gap.microSkills) filteredGap.microSkills = filteredLegacySkills;
-          if (gap.nanoSkills) filteredGap.nanoSkills = filteredLegacySkills;
-        } else {
-          // Remove empty legacy arrays
-          delete filteredGap.microSkills;
-          delete filteredGap.nanoSkills;
-        }
-        
-        // Update with new format
-        if (Object.keys(filteredCompetencyMap).length > 0) {
-          filteredGap.missing_skills_map = filteredCompetencyMap;
-        }
-        
-        return filteredGap;
-      }
-      return null;
-    }).filter(gap => gap !== null); // Remove null gaps
+    // Handle flat skills array (very old format)
+    if (Array.isArray(gap.skills)) {
+      return {
+        'Default_Competency': gap.skills
+      };
+    }
 
-    // Return filtered existing gaps + new gap data
-    // The new gap will have the latest structure, filtered existing keeps only matching skills
-    return {
-      ...newGap,
-      identifiedGaps: [
-        ...filteredGaps, // Existing gaps with only skills that match new gap
-        ...(newGap.identifiedGaps || []) // New gap data
-      ]
-    };
+    // If we can't normalize, return empty object
+    console.warn('⚠️ Could not normalize gap format, returning empty object');
+    return {};
   }
 
   /**
