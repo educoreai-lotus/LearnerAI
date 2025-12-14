@@ -1,106 +1,117 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef } from 'react';
 
 /**
- * useChatbot Hook
- * Initializes the EDUCORE chatbot widget
+ * Hook for initializing the Educore Chatbot widget
  * 
- * @param {Object} config - Configuration object
- * @param {string} config.userId - User ID (required)
- * @param {string} config.token - Authentication token (optional, defaults to userId if not provided)
+ * @param {Object} config - Chatbot configuration
+ * @param {string} config.userId - User ID (required when user is authenticated)
+ * @param {string} config.token - Authentication token (required when user is authenticated)
  * @param {string} config.tenantId - Tenant ID (optional, defaults to "default")
- * @param {string} config.microservice - Microservice name (defaults to "LEARNERAI")
- * @param {string} config.container - Container selector (defaults to "#edu-bot-container")
- * @param {string} config.ragBackendUrl - RAG backend URL (defaults to Railway production)
+ * @param {string} config.container - Container selector (optional, defaults to "#edu-bot-container")
+ * @param {boolean} config.enabled - Whether to initialize the chatbot (optional, defaults to true)
+ * 
+ * @example
+ * const { user, token } = useAuth();
+ * useChatbot({
+ *   userId: user?.id,
+ *   token: token,
+ *   tenantId: user?.tenantId,
+ *   enabled: !!user && !!token
+ * });
  */
-export function useChatbot({
-  userId,
-  token = null,
-  tenantId = 'default',
-  microservice = 'LEARNERAI',
-  container = '#edu-bot-container',
-  ragBackendUrl = 'https://rag-production-3a4c.up.railway.app'
-} = {}) {
-  const [botInitialized, setBotInitialized] = useState(false);
-  const [scriptLoaded, setScriptLoaded] = useState(false);
+export function useChatbot({ 
+  userId, 
+  token, 
+  tenantId = "default", 
+  container = "#edu-bot-container",
+  enabled = true 
+}) {
+  const initializedRef = useRef(false);
+  const scriptLoadedRef = useRef(false);
 
   useEffect(() => {
-    // Don't initialize if no userId
-    if (!userId) {
-      console.log('useChatbot: No userId provided, skipping initialization');
+    // Don't initialize if disabled or missing required params
+    if (!enabled || !userId || !token) {
       return;
     }
 
-    // Use userId as token if token not provided (temporary solution until auth is implemented)
-    const authToken = token || userId;
+    // Don't initialize twice
+    if (initializedRef.current) {
+      return;
+    }
 
-    // Check if script is already loaded globally
-    if (window.EDUCORE_BOT_LOADED) {
-      setScriptLoaded(true);
-      // Script already loaded, just initialize
-      if (window.initializeEducoreBot && !botInitialized) {
+    const initChatbot = () => {
+      // Check if container exists
+      const containerElement = document.querySelector(container);
+      if (!containerElement) {
+        console.warn(`Chatbot container not found: ${container}`);
+        return;
+      }
+
+      // Check if script is loaded
+      if (window.initializeEducoreBot) {
         try {
           window.initializeEducoreBot({
-            microservice: microservice.toUpperCase(),
+            microservice: "LEARNER_AI", // LearnerAI microservice name
             userId: userId,
-            token: authToken,
+            token: token,
             tenantId: tenantId,
             container: container
           });
-          setBotInitialized(true);
-          console.log('✅ EDUCORE Bot initialized');
+          initializedRef.current = true;
+          console.log('✅ Chatbot initialized successfully');
         } catch (error) {
-          console.error('❌ Failed to initialize EDUCORE Bot:', error);
+          console.error('❌ Failed to initialize chatbot:', error);
+        }
+      } else {
+        // Script not loaded yet, try again
+        if (!scriptLoadedRef.current) {
+          loadScript();
+        } else {
+          // Script loaded but function not available, retry after delay
+          setTimeout(initChatbot, 100);
         }
       }
-    } else {
-      // Load script first
+    };
+
+    const loadScript = () => {
+      // Check if script already exists
+      if (document.querySelector('script[src*="bot.js"]')) {
+        scriptLoadedRef.current = true;
+        // Script exists, wait for it to load
+        setTimeout(initChatbot, 100);
+        return;
+      }
+
+      // Load the script
       const script = document.createElement('script');
-      script.src = `${ragBackendUrl}/embed/bot.js`;
+      script.src = 'https://rag-production-3a4c.up.railway.app/embed/bot.js';
       script.async = true;
       script.onload = () => {
-        setScriptLoaded(true);
-        // Wait a bit for the script to set up window.initializeEducoreBot
-        setTimeout(() => {
-          if (window.initializeEducoreBot && !botInitialized) {
-            try {
-              window.initializeEducoreBot({
-                microservice: microservice.toUpperCase(),
-                userId: userId,
-                token: authToken,
-                tenantId: tenantId,
-                container: container
-              });
-              setBotInitialized(true);
-              console.log('✅ EDUCORE Bot initialized');
-            } catch (error) {
-              console.error('❌ Failed to initialize EDUCORE Bot:', error);
-            }
-          }
-        }, 100);
+        scriptLoadedRef.current = true;
+        console.log('✅ Chatbot script loaded');
+        initChatbot();
       };
       script.onerror = () => {
-        console.error('❌ Failed to load chatbot script from:', script.src);
+        console.error('❌ Failed to load chatbot script');
       };
       document.head.appendChild(script);
+    };
 
-      // Cleanup function
-      return () => {
-        // Remove script if component unmounts (optional)
-        // Note: We don't remove it if it's already loaded globally
-        if (!window.EDUCORE_BOT_LOADED && script.parentNode) {
-          script.parentNode.removeChild(script);
-        }
-        // Destroy bot if function exists
-        if (window.destroyEducoreBot) {
-          window.destroyEducoreBot();
-        }
-      };
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadScript);
+    } else {
+      loadScript();
     }
-  }, [userId, token, tenantId, microservice, container, ragBackendUrl, botInitialized, scriptLoaded]);
 
-  return {
-    botInitialized,
-    scriptLoaded
-  };
+    // Cleanup function
+    return () => {
+      // Note: We don't remove the script or widget on cleanup
+      // as it might be used by other components
+    };
+  }, [userId, token, tenantId, container, enabled]);
 }
+
+export default useChatbot;
 
