@@ -772,6 +772,18 @@ async function skillsEngineHandler(payload, dependencies) {
     // This ensures all fields are available, with mapped versions overriding originals
     const normalizedPayload = { ...payload, ...mappedPayload };
     
+    // Debug: Log the normalized payload to verify mapping worked
+    console.log('📋 Normalized payload after mapping:', {
+      user_id: normalizedPayload.user_id || normalizedPayload.trainer_id || 'MISSING',
+      user_name: normalizedPayload.user_name || 'MISSING',
+      company_id: normalizedPayload.company_id || 'MISSING',
+      company_name: normalizedPayload.company_name || 'MISSING',
+      competency_target_name: normalizedPayload.competency_target_name || normalizedPayload.competency_name || 'MISSING',
+      gap: normalizedPayload.gap ? 'PRESENT' : 'MISSING',
+      gap_keys: normalizedPayload.gap ? Object.keys(normalizedPayload.gap) : [],
+      original_fields: Object.keys(payload)
+    });
+    
     // Extract skills gap data from normalized payload
     const {
       user_id,

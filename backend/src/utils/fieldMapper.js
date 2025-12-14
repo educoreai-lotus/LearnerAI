@@ -38,7 +38,10 @@ const FIELD_MAPPINGS = {
     'skills_gap': 'gap',
     'missing_skills': 'gap',
     'identified_gaps': 'gap',
-    'skills_raw_data': 'gap'
+    'skills_raw_data': 'gap',
+    'the_gap': 'gap', // Common variation: "the_gap" → "gap"
+    'gap_data': 'gap',
+    'skills_data': 'gap'
   },
   
   // Directory mappings
@@ -226,52 +229,39 @@ export async function mapFieldsWithAI(sourceData, geminiClient, serviceName = nu
     };
   }
 
-  // Step 1: Apply predefined mappings first (fast path)
+  // Step 1: Detect service (for context)
   const detectedServices = serviceName ? [serviceName] : detectService(sourceData);
   const detectedService = detectedServices[0] || 'common';
-  const predefinedMapped = mapFields(sourceData, detectedService, customMappings);
   
-  // Step 2: Identify unmapped fields (fields that weren't changed by mapping)
-  const unmappedFields = [];
-  const sourceFields = Object.keys(sourceData);
-  const predefinedMappedFields = Object.keys(predefinedMapped);
-  
-  for (const field of sourceFields) {
-    // If field exists in source but not in mapped (or value changed), it was mapped
-    // If field exists in both with same value and no mapping rule, it's unmapped
-    const hasMapping = FIELD_MAPPINGS[detectedService]?.[field] || customMappings[field];
-    if (!hasMapping && sourceData[field] === predefinedMapped[field]) {
-      unmappedFields.push(field);
-    }
-  }
-
-  // Step 3: If no unmapped fields or no AI client, return predefined mappings
-  if (unmappedFields.length === 0 || !geminiClient) {
+  // Step 2: If AI is available, use AI for ALL fields (primary method)
+  // Predefined mappings are only used as fallback if AI fails
+  if (!geminiClient) {
+    // No AI available - use predefined mappings as fallback
+    const predefinedMapped = mapFields(sourceData, detectedService, customMappings);
     return {
       mapped_data: predefinedMapped,
       ai_mappings: {},
-      predefined_mappings: {},
+      predefined_mappings: detectedService !== 'common' ? FIELD_MAPPINGS[detectedService] || {} : {},
       detected_service: detectedService,
-      unmapped_fields: []
+      unmapped_fields: [],
+      mapping_method: 'predefined_fallback'
     };
   }
 
-  // Step 4: Use AI to map unmapped fields
+  // Step 3: Use AI to map ALL fields intelligently (not just unmapped ones)
   const targetFields = targetSchema ? Object.keys(targetSchema) : [
     'user_id', 'user_name', 'company_id', 'company_name', 
     'competency_target_name', 'status', 'gap', 'gap_id',
     'skills_raw_data', 'exam_status', 'competency_name'
   ];
 
-  const unmappedData = {};
-  for (const field of unmappedFields) {
-    unmappedData[field] = sourceData[field];
-  }
+  // Use ALL source fields for AI mapping (AI will intelligently map everything)
+  const allSourceFields = Object.keys(sourceData);
 
   const aiPrompt = `You are an intelligent field mapping assistant. Your task is to map source field names to target field names based on semantic meaning, context, and data patterns.
 
-SOURCE FIELDS TO MAP: ${JSON.stringify(unmappedFields, null, 2)}
-SOURCE DATA SAMPLE: ${JSON.stringify(unmappedData, null, 2).substring(0, 1500)}
+SOURCE FIELDS TO MAP: ${JSON.stringify(allSourceFields, null, 2)}
+SOURCE DATA SAMPLE: ${JSON.stringify(sourceData, null, 2).substring(0, 1500)}
 TARGET FIELDS: ${JSON.stringify(targetFields, null, 2)}
 ${targetSchema ? `TARGET SCHEMA: ${JSON.stringify(targetSchema, null, 2)}` : ''}
 SERVICE CONTEXT: ${detectedService}
@@ -284,7 +274,7 @@ MAPPING RULES (apply ALL of these):
    - "organization_name", "org_name", "company_display_name" → "company_name"
    - "course_id", "path_id", "program_id" → "competency_target_name"
    - "exam_result", "test_status", "assessment_outcome" → "status"
-   - "skills_map", "missing_skills", "identified_gaps" → "gap"
+   - "skills_map", "missing_skills", "identified_gaps", "the_gap", "gap_data" → "gap"
 
 2. SYNONYM RECOGNITION: Recognize synonyms and related terms
    - User/learner/trainer/student/participant → user
@@ -319,6 +309,7 @@ EXAMPLES OF GOOD MAPPINGS:
 - "org_display_name": "TechCorp Inc." → "company_name" (confidence: 0.9) - org synonym + name pattern
 - "course_identifier": "Node.js Backend" → "competency_target_name" (confidence: 0.85) - course synonym
 - "exam_result_status": "fail" → "status" (confidence: 0.8) - status synonym + value pattern
+- "the_gap": {"Competency_X": [...]} → "gap" (confidence: 0.95) - "the_" prefix + gap synonym + object with competency keys
 
 Return ONLY valid JSON in this exact format (no markdown, no code blocks):
 {
@@ -370,18 +361,16 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
       reasoning = aiResponse.reasoning || '';
     }
 
-    // Step 5: Apply AI mappings (only high-confidence ones)
-    const finalMapped = { ...predefinedMapped };
+    // Step 4: Apply AI mappings (only high-confidence ones)
+    // Start with empty object - AI maps everything intelligently
+    const finalMapped = {};
     const appliedAiMappings = {};
 
+    // First, apply all AI mappings
     for (const [sourceField, targetField] of Object.entries(aiMappings)) {
       const confidence = aiConfidence[sourceField] || 0;
       if (confidence > 0.6 && sourceData[sourceField] !== undefined) {
         finalMapped[targetField] = sourceData[sourceField];
-        // Remove source field if it's different from target
-        if (sourceField !== targetField && finalMapped[sourceField] === sourceData[sourceField]) {
-          delete finalMapped[sourceField];
-        }
         appliedAiMappings[sourceField] = {
           target: targetField,
           confidence: confidence
@@ -389,25 +378,36 @@ Return ONLY valid JSON in this exact format (no markdown, no code blocks):
       }
     }
 
+    // Then, add fields that weren't mapped by AI (keep original names)
+    for (const [sourceField, sourceValue] of Object.entries(sourceData)) {
+      // If this field wasn't mapped by AI, keep it with original name
+      if (!appliedAiMappings[sourceField] && !finalMapped[sourceField]) {
+        finalMapped[sourceField] = sourceValue;
+      }
+    }
+
     return {
       mapped_data: finalMapped,
       ai_mappings: appliedAiMappings,
-      predefined_mappings: detectedService !== 'common' ? FIELD_MAPPINGS[detectedService] || {} : {},
+      predefined_mappings: {}, // Not used when AI is primary
       detected_service: detectedService,
       unmapped_fields: aiUnmapped,
       ai_reasoning: reasoning,
-      ai_confidence_scores: aiConfidence
+      ai_confidence_scores: aiConfidence,
+      mapping_method: 'ai_powered'
     };
   } catch (error) {
-    console.warn('AI field mapping failed, using predefined mappings only:', error.message);
+    console.warn('AI field mapping failed, falling back to predefined mappings:', error.message);
     // Fallback to predefined mappings if AI fails
+    const predefinedMapped = mapFields(sourceData, detectedService, customMappings);
     return {
       mapped_data: predefinedMapped,
       ai_mappings: {},
       predefined_mappings: detectedService !== 'common' ? FIELD_MAPPINGS[detectedService] || {} : {},
       detected_service: detectedService,
-      unmapped_fields: unmappedFields,
-      ai_error: error.message
+      unmapped_fields: [],
+      ai_error: error.message,
+      mapping_method: 'predefined_fallback'
     };
   }
 }
