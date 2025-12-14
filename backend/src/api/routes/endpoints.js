@@ -141,16 +141,7 @@ export function createEndpointsRouter(dependencies) {
             break;
           case "directory":
           case "Directory":
-            // Directory requests company/learner data
-            const { action: _, ...dataWithoutAction } = requestBody.payload;
-            result = {
-              success: true,
-              action: requestBody.payload.action || 'fill_directory_data',
-              data: await fillDirectoryData(dataWithoutAction, { 
-                companyRepository, 
-                learnerRepository 
-              })
-            };
+            result = await directoryHandler(requestBody.payload, dependencies);
             break;
           case "rag":
           case "rag-microservice":
@@ -711,7 +702,11 @@ export async function fillManagementReportingData(data, { courseRepository, skil
  * Handles requests from the skills-engine service
  * Payload must contain an "action" field indicating the type of action
  * 
- * Action: "update_skills_gap" or "create_skills_gap"
+ * Actions: 
+ * - "update_skills_gap" or "update_skills_gap_to_update_the_learning_path": Update existing skills gap
+ * - "create_skills_gap": Create new skills gap
+ * 
+ * All actions:
  * - Requires: user_id, user_name, company_id, company_name, competency_target_name, status, gap
  * - Processes skills gap and stores in database
  * - Creates learner if doesn't exist
@@ -736,7 +731,11 @@ async function skillsEngineHandler(payload, dependencies) {
   const { action } = payload;
   
   // Handle skills gap updates from Skills Engine
-  if (action === 'update_skills_gap' || action === 'create_skills_gap') {
+  // Support both "update_skills_gap" and "update_skills_gap_to_update_the_learning_path"
+  // (both do the same thing - learning path generation is automatic)
+  if (action === 'update_skills_gap' || 
+      action === 'create_skills_gap' || 
+      action === 'update_skills_gap_to_update_the_learning_path') {
     const { ProcessSkillsGapUpdateUseCase } = await import('../../application/useCases/ProcessSkillsGapUpdateUseCase.js');
     const processGapUpdateUseCase = new ProcessSkillsGapUpdateUseCase({
       skillsGapRepository,
@@ -887,7 +886,126 @@ async function skillsEngineHandler(payload, dependencies) {
   }
   
   // Unknown action
-  throw new Error(`Unknown Skills Engine action: ${action}. Supported actions: update_skills_gap, create_skills_gap`);
+  throw new Error(`Unknown Skills Engine action: ${action}. Supported actions: update_skills_gap, create_skills_gap, update_skills_gap_to_update_the_learning_path`);
+}
+
+/**
+ * Directory Handler
+ * Handles requests from the directory service
+ * Payload must contain an "action" field indicating the type of action
+ * 
+ * Actions:
+ * - "sending_decision_maker_to_approve_learning_path": Update company with decision maker and approval policy
+ * - "update_company" or "register_company": Update/register company (same as above)
+ * - "fill_directory_data" or no action: Fill company/learner data (read-only)
+ */
+async function directoryHandler(payload, dependencies) {
+  const { 
+    companyRepository, 
+    learnerRepository,
+    geminiClient
+  } = dependencies;
+  const { action } = payload;
+  
+  // Handle company updates from Directory
+  if (action === 'sending_decision_maker_to_approve_learning_path' || 
+      action === 'update_company' || 
+      action === 'register_company') {
+    
+    const { ProcessCompanyUpdateUseCase } = await import('../../application/useCases/ProcessCompanyUpdateUseCase.js');
+    const processCompanyUpdateUseCase = new ProcessCompanyUpdateUseCase({
+      companyRepository,
+      learnerRepository
+    });
+    
+    // Map incoming fields to expected field names using AI (handles field name mismatches from Directory)
+    const { mapFieldsWithAI } = await import('../../utils/fieldMapper.js');
+    
+    // Target schema for Directory company update endpoint
+    const targetSchema = {
+      company_id: 'string (UUID)',
+      company_name: 'string',
+      approval_policy: 'string (auto|manual)',
+      decision_maker: 'object (JSONB)',
+      decision_maker_policy: 'string (auto|manual)'
+    };
+    
+    // Use AI-powered mapping to handle ANY field name mismatch (falls back to predefined if AI unavailable)
+    let mappingResult;
+    try {
+      mappingResult = geminiClient 
+        ? await mapFieldsWithAI(payload, geminiClient, 'directory', targetSchema)
+        : { mapped_data: payload }; // Fallback if no AI client
+    } catch (mappingError) {
+      console.warn('⚠️  Field mapping failed, using original payload:', mappingError.message);
+      mappingResult = { mapped_data: payload };
+    }
+    
+    const mappedPayload = mappingResult.mapped_data;
+    
+    // Log mapping results for debugging
+    if (mappingResult.ai_mappings && Object.keys(mappingResult.ai_mappings).length > 0) {
+      console.log('🤖 AI intelligently mapped incoming fields from Directory:');
+      Object.entries(mappingResult.ai_mappings).forEach(([source, mapping]) => {
+        console.log(`   "${source}" → "${mapping.target}" (confidence: ${mapping.confidence})`);
+      });
+    }
+    
+    // Merge mapped fields with original payload (mapped fields take precedence)
+    const normalizedPayload = { ...payload, ...mappedPayload };
+    
+    // Extract company data from normalized payload
+    const {
+      company_id,
+      company_name,
+      approval_policy,
+      decision_maker_policy,
+      decision_maker
+    } = normalizedPayload;
+    
+    // Use approval_policy or decision_maker_policy (both are valid)
+    const finalApprovalPolicy = approval_policy || decision_maker_policy;
+    
+    if (!company_id || !company_name || !finalApprovalPolicy) {
+      throw new Error('Missing required fields: company_id, company_name, approval_policy (or decision_maker_policy)');
+    }
+    
+    // Process the company update
+    const company = await processCompanyUpdateUseCase.execute({
+      company_id,
+      company_name,
+      approval_policy: finalApprovalPolicy,
+      decision_maker
+    });
+    
+    console.log(`✅ Company update processed: ${company_name} (${company_id}), policy: ${finalApprovalPolicy}, decision_maker: ${decision_maker ? 'configured' : 'not configured'}`);
+    
+    return {
+      success: true,
+      action: action,
+      data: {
+        message: 'Company updated successfully',
+        company: {
+          company_id: company.companyId,
+          company_name: company.companyName,
+          approval_policy: company.approvalPolicy,
+          decision_maker: company.decisionMaker
+        }
+      }
+    };
+  }
+  
+  // Handle read-only data requests (fill_directory_data or no action)
+  // This is for backward compatibility - Directory might request data without updating
+  const { action: _, ...dataWithoutAction } = payload;
+  return {
+    success: true,
+    action: action || 'fill_directory_data',
+    data: await fillDirectoryData(dataWithoutAction, { 
+      companyRepository, 
+      learnerRepository 
+    })
+  };
 }
 
 /**

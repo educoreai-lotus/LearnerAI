@@ -52,7 +52,9 @@ const FIELD_MAPPINGS = {
     'organization_id': 'company_id',
     'organization_name': 'company_name',
     'org_id': 'company_id',
-    'org_name': 'company_name'
+    'org_name': 'company_name',
+    'decision_maker_policy': 'approval_policy', // Directory might send decision_maker_policy instead of approval_policy
+    'approval_policy': 'approval_policy' // Keep original for clarity
   },
   
   // Course Builder mappings (incoming: Course Builder → LearnerAI)
