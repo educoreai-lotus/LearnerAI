@@ -14,6 +14,8 @@ const FIELD_MAPPINGS = {
     'learner_name': 'user_name',
     'learner_uuid': 'user_id',
     'user_uuid': 'user_id',
+    'trainer_id': 'user_id', // Skills Engine sometimes sends trainer_id instead of user_id
+    'trainer_name': 'user_name', // Skills Engine sometimes sends trainer_name instead of user_name
     
     // Company/organization fields
     'organization_id': 'company_id',
@@ -266,33 +268,70 @@ export async function mapFieldsWithAI(sourceData, geminiClient, serviceName = nu
     unmappedData[field] = sourceData[field];
   }
 
-  const aiPrompt = `You are a field mapping assistant. Map these source field names to the most appropriate target field names.
+  const aiPrompt = `You are an intelligent field mapping assistant. Your task is to map source field names to target field names based on semantic meaning, context, and data patterns.
 
-Source fields to map: ${JSON.stringify(unmappedFields, null, 2)}
-Source data sample: ${JSON.stringify(unmappedData, null, 2).substring(0, 1000)}
-Target fields: ${JSON.stringify(targetFields, null, 2)}
-${targetSchema ? `Target schema: ${JSON.stringify(targetSchema, null, 2)}` : ''}
-Service context: ${detectedService}
+SOURCE FIELDS TO MAP: ${JSON.stringify(unmappedFields, null, 2)}
+SOURCE DATA SAMPLE: ${JSON.stringify(unmappedData, null, 2).substring(0, 1500)}
+TARGET FIELDS: ${JSON.stringify(targetFields, null, 2)}
+${targetSchema ? `TARGET SCHEMA: ${JSON.stringify(targetSchema, null, 2)}` : ''}
+SERVICE CONTEXT: ${detectedService}
 
-Rules:
-1. Map based on semantic similarity (e.g., "learner_id" → "user_id", "org_name" → "company_name")
-2. Consider data type compatibility
-3. Use context clues from field values
-4. Only map if confidence > 0.6
-5. Return JSON with mappings and confidence scores
+MAPPING RULES (apply ALL of these):
+1. SEMANTIC SIMILARITY: Match fields by meaning, not just name
+   - "trainer_id", "learner_id", "student_id", "participant_id" → "user_id"
+   - "trainer_name", "learner_name", "student_name" → "user_name"
+   - "organization_id", "org_id", "company_uuid" → "company_id"
+   - "organization_name", "org_name", "company_display_name" → "company_name"
+   - "course_id", "path_id", "program_id" → "competency_target_name"
+   - "exam_result", "test_status", "assessment_outcome" → "status"
+   - "skills_map", "missing_skills", "identified_gaps" → "gap"
 
-Return ONLY valid JSON in this exact format:
+2. SYNONYM RECOGNITION: Recognize synonyms and related terms
+   - User/learner/trainer/student/participant → user
+   - Company/organization/org/employer → company
+   - Course/path/program/curriculum → competency_target_name
+   - Status/result/outcome/state → status
+   - Gap/skills/missing/identified → gap
+
+3. DATA TYPE ANALYSIS: Use field values to infer meaning
+   - UUIDs (36 chars with hyphens) → likely ID fields
+   - Strings with names → likely name fields
+   - Objects with competency keys → likely gap/skills data
+   - "pass"/"fail" values → likely status fields
+
+4. CONTEXT CLUES: Analyze surrounding fields for context
+   - If "trainer_id" appears with "user_name", map trainer_id → user_id
+   - If "org_name" appears with "company_id", map org_name → company_name
+   - If field contains "competency" or "course", likely maps to competency_target_name
+
+5. CONFIDENCE THRESHOLD: Only map if confidence > 0.6
+   - High confidence (0.8-1.0): Clear semantic match
+   - Medium confidence (0.6-0.8): Probable match with context
+   - Low confidence (<0.6): Don't map, leave unmapped
+
+6. HANDLE VARIATIONS: Consider common naming patterns
+   - snake_case, camelCase, kebab-case, PascalCase
+   - Singular vs plural (user vs users)
+   - Abbreviations (id vs identifier, uuid vs unique_id)
+
+EXAMPLES OF GOOD MAPPINGS:
+- "trainer_id": "b2c3d4e5-..." → "user_id" (confidence: 0.95) - UUID pattern + trainer synonym
+- "org_display_name": "TechCorp Inc." → "company_name" (confidence: 0.9) - org synonym + name pattern
+- "course_identifier": "Node.js Backend" → "competency_target_name" (confidence: 0.85) - course synonym
+- "exam_result_status": "fail" → "status" (confidence: 0.8) - status synonym + value pattern
+
+Return ONLY valid JSON in this exact format (no markdown, no code blocks):
 {
   "mappings": {
-    "source_field": "target_field",
+    "source_field_name": "target_field_name",
     ...
   },
   "confidence": {
-    "source_field": 0.0-1.0,
+    "source_field_name": 0.0-1.0,
     ...
   },
   "unmapped": ["field1", "field2"],
-  "reasoning": "Brief explanation"
+  "reasoning": "Brief explanation of key mappings and why they were chosen"
 }`;
 
   try {

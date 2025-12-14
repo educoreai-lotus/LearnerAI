@@ -722,7 +722,57 @@ async function skillsEngineHandler(payload, dependencies) {
       companyRepository
     });
     
-    // Extract skills gap data from payload
+    // Map incoming fields to expected field names using AI (handles field name mismatches from Skills Engine)
+    const { mapFieldsWithAI } = await import('../../utils/fieldMapper.js');
+    
+    // Target schema for Skills Engine skills gap endpoint
+    const targetSchema = {
+      user_id: 'string (UUID)',
+      user_name: 'string',
+      company_id: 'string (UUID)',
+      company_name: 'string',
+      competency_target_name: 'string',
+      competency_name: 'string',
+      status: 'string (pass|fail)',
+      gap: 'object (competency map)',
+      exam_status: 'string (pass|fail)'
+    };
+    
+    // Use AI-powered mapping to handle ANY field name mismatch (falls back to predefined if AI unavailable)
+    let mappingResult;
+    try {
+      mappingResult = geminiClient 
+        ? await mapFieldsWithAI(payload, geminiClient, 'skills-engine', targetSchema)
+        : { mapped_data: payload }; // Fallback if no AI client
+    } catch (mappingError) {
+      console.warn('⚠️  Field mapping failed, using original payload:', mappingError.message);
+      mappingResult = { mapped_data: payload };
+    }
+    
+    const mappedPayload = mappingResult.mapped_data;
+    
+    // Log mapping results for debugging
+    if (mappingResult.ai_mappings && Object.keys(mappingResult.ai_mappings).length > 0) {
+      console.log('🤖 AI intelligently mapped incoming fields from Skills Engine:');
+      Object.entries(mappingResult.ai_mappings).forEach(([source, mapping]) => {
+        console.log(`   "${source}" → "${mapping.target}" (confidence: ${mapping.confidence})`);
+      });
+    }
+    if (mappingResult.predefined_mappings && Object.keys(mappingResult.predefined_mappings).length > 0) {
+      console.log('📋 Applied predefined field mappings:', Object.keys(mappingResult.predefined_mappings).length, 'fields');
+    }
+    if (mappingResult.unmapped_fields && mappingResult.unmapped_fields.length > 0) {
+      console.log('⚠️  Fields that could not be mapped (will use original names):', mappingResult.unmapped_fields);
+    }
+    if (mappingResult.ai_reasoning) {
+      console.log('💡 AI reasoning:', mappingResult.ai_reasoning);
+    }
+    
+    // Merge mapped fields with original payload (mapped fields take precedence)
+    // This ensures all fields are available, with mapped versions overriding originals
+    const normalizedPayload = { ...payload, ...mappedPayload };
+    
+    // Extract skills gap data from normalized payload
     const {
       user_id,
       user_name,
@@ -733,7 +783,7 @@ async function skillsEngineHandler(payload, dependencies) {
       exam_status,
       status,
       gap
-    } = payload;
+    } = normalizedPayload;
     
     const finalStatus = status || (exam_status === 'PASS' ? 'pass' : exam_status === 'FAIL' ? 'fail' : null);
     const competencyTargetName = competency_target_name || competency_name;
