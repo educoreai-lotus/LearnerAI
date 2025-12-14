@@ -6,6 +6,7 @@ import CompanyDashboard from './pages/CompanyDashboard';
 import UserView from './pages/UserView';
 import ApprovalReview from './pages/ApprovalReview';
 import ApprovalsList from './pages/ApprovalsList';
+import { ChatbotContainer } from './components/ChatbotContainer';
 
 function App() {
   return (
@@ -20,6 +21,8 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
         <ViewSwitcher />
+        {/* Chatbot Container - Available on all pages */}
+        <ChatbotContainer />
       </div>
     </AppProvider>
   );

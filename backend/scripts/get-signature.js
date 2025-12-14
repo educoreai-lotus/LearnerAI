@@ -91,8 +91,9 @@ function main() {
     };
   }
   
-  // Get service name from requester_service
-  const serviceName = requestBody.requester_service || process.env.SERVICE_NAME || 'learnerAI-service';
+  // Get service name - prioritize SERVICE_NAME env var (matches coordinatorClient behavior)
+  // This ensures signature matches the X-Service-Name header value
+  const serviceName = process.env.SERVICE_NAME || requestBody.requester_service || 'learnerAI-service';
   
   // Get private key
   const privateKeyRaw = getPrivateKey();
