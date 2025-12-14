@@ -23,7 +23,141 @@ You can use either of these `requester_service` values for AI queries:
 
 ## Supported Actions
 
-### 1. Single Query (`query`)
+### 1. Field Mapping (`map_fields`)
+
+Automatically map field names from microservices to LearnerAI's expected format.
+
+**Request:**
+```json
+{
+  "requester_service": "ai",
+  "payload": {
+    "action": "map_fields",
+    "data": {
+      "learner_id": "123e4567-e89b-12d3-a456-426614174000",
+      "learner_name": "John Doe",
+      "organization_id": "550e8400-e29b-41d4-a716-446655440000",
+      "organization_name": "TechCorp Inc.",
+      "competency_name": "React Development",
+      "missing_skills_map": {
+        "Competency_React": ["MGS_React_Hooks", "MGS_React_State"]
+      }
+    },
+    "service_name": "skills-engine",
+    "custom_mappings": {
+      "custom_field": "target_field"
+    }
+  },
+  "response": {
+    "answer": ""
+  }
+}
+```
+
+**Parameters:**
+- `action` (required): Must be `"map_fields"`
+- `data` (required): Source data object with field names to map
+- `service_name` (optional): Name of the microservice (`"skills-engine"`, `"directory"`, `"course-builder"`, `"learning-analytics"`). If not provided, service will be auto-detected.
+- `custom_mappings` (optional): Custom field mappings to override defaults
+
+**Response:**
+```json
+{
+  "requester_service": "ai",
+  "payload": {
+    "action": "map_fields",
+    "original_data": { ... },
+    "mapped_data": {
+      "user_id": "123e4567-e89b-12d3-a456-426614174000",
+      "user_name": "John Doe",
+      "company_id": "550e8400-e29b-41d4-a716-446655440000",
+      "company_name": "TechCorp Inc.",
+      "competency_target_name": "React Development",
+      "gap": {
+        "Competency_React": ["MGS_React_Hooks", "MGS_React_State"]
+      }
+    },
+    "service_name": "skills-engine",
+    "detected_service": "skills-engine",
+    "confidence": true
+  },
+  "response": {
+    "answer": "..."
+  }
+}
+```
+
+### 2. AI-Powered Field Mapping (`map_fields_ai`)
+
+Use AI to intelligently map unknown field names based on semantic similarity and context.
+
+**Request:**
+```json
+{
+  "requester_service": "ai",
+  "payload": {
+    "action": "map_fields_ai",
+    "data": {
+      "employee_uuid": "123e4567-e89b-12d3-a456-426614174000",
+      "employee_full_name": "John Doe",
+      "org_uuid": "550e8400-e29b-41d4-a716-446655440000",
+      "org_display_name": "TechCorp Inc."
+    },
+    "target_schema": {
+      "user_id": "string",
+      "user_name": "string",
+      "company_id": "string",
+      "company_name": "string"
+    },
+    "service_name": "directory"
+  },
+  "response": {
+    "answer": ""
+  }
+}
+```
+
+**Parameters:**
+- `action` (required): Must be `"map_fields_ai"`
+- `data` (required): Source data object
+- `target_schema` (optional): Target schema object (helps AI understand expected fields)
+- `service_name` (optional): Name of the microservice
+- `custom_mappings` (optional): Custom field mappings
+
+**Response:**
+```json
+{
+  "requester_service": "ai",
+  "payload": {
+    "action": "map_fields_ai",
+    "original_data": { ... },
+    "mapped_data": {
+      "user_id": "123e4567-e89b-12d3-a456-426614174000",
+      "user_name": "John Doe",
+      "company_id": "550e8400-e29b-41d4-a716-446655440000",
+      "company_name": "TechCorp Inc."
+    },
+    "ai_mappings": {
+      "employee_uuid": "user_id",
+      "employee_full_name": "user_name",
+      "org_uuid": "company_id",
+      "org_display_name": "company_name"
+    },
+    "ai_confidence": {
+      "employee_uuid": 0.95,
+      "employee_full_name": 0.92,
+      "org_uuid": 0.90,
+      "org_display_name": 0.88
+    },
+    "ai_reasoning": "Mapped employee fields to user fields and organization fields to company fields based on semantic similarity."
+  },
+  "response": {
+    "answer": "..."
+  }
+}
+```
+
+### 3. Single Query (`query`)
 
 Execute a single AI prompt and get a response.
 
@@ -274,7 +408,23 @@ However, **Coordinator pattern is recommended** for microservice-to-microservice
 
 - **Handler:** `aiHandler()` in `backend/src/api/routes/endpoints.js`
 - **AI Client:** `GeminiApiClient` (requires `GEMINI_API_KEY`)
+- **Field Mapper:** `fieldMapper.js` utility for automatic field name mapping
 - **Dependencies:** `geminiClient` must be available in dependencies
+
+## Field Mapping
+
+The AI query endpoint now includes automatic field mapping capabilities to handle field name mismatches between microservices:
+
+### Supported Service Mappings
+
+- **skills-engine**: Maps `learner_id` → `user_id`, `organization_id` → `company_id`, `missing_skills_map` → `gap`, etc.
+- **directory**: Maps `employee_id` → `user_id`, `organization_name` → `company_name`, etc.
+- **course-builder**: Maps `course_id` → `competency_target_name`, `learner_name` → `user_name`, etc.
+- **learning-analytics**: Maps `learner_id` → `user_id`, `course_id` → `competency_target_name`, etc.
+
+### Automatic Field Mapping in Skills Gaps Endpoint
+
+The `/api/v1/skills-gaps` endpoint now automatically maps incoming fields before processing, so Skills Engine can send `learner_id` and it will be automatically mapped to `user_id`.
 
 ## Security
 

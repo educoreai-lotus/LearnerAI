@@ -11,7 +11,8 @@ export function createSkillsGapsRouter(dependencies) {
   const { 
     skillsGapRepository,
     learnerRepository,
-    companyRepository
+    companyRepository,
+    geminiClient // For AI-powered field mapping
   } = dependencies;
 
   // Initialize use case for Skills Engine gap updates
@@ -40,6 +41,43 @@ export function createSkillsGapsRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
+      // Map incoming fields to expected field names using AI (handles field name mismatches from microservices)
+      // Uses predefined mappings first, then AI for unknown fields
+      const { mapFieldsWithAI } = await import('../../utils/fieldMapper.js');
+      
+      // Target schema for LearnerAI skills gap endpoint
+      const targetSchema = {
+        user_id: 'string (UUID)',
+        user_name: 'string',
+        company_id: 'string (UUID)',
+        company_name: 'string',
+        competency_target_name: 'string',
+        competency_name: 'string',
+        status: 'string (pass|fail)',
+        gap: 'object (competency map)',
+        gap_id: 'string (UUID)',
+        skills_raw_data: 'object',
+        exam_status: 'string (pass|fail)'
+      };
+      
+      // Use AI-powered mapping (falls back to predefined if AI unavailable)
+      const mappingResult = geminiClient 
+        ? await mapFieldsWithAI(req.body, geminiClient, 'skills-engine', {}, targetSchema)
+        : { mapped_data: req.body }; // Fallback if no AI client
+      
+      const mappedBody = mappingResult.mapped_data;
+      
+      // Log mapping results for debugging
+      if (mappingResult.ai_mappings && Object.keys(mappingResult.ai_mappings).length > 0) {
+        console.log('🤖 AI mapped fields:', mappingResult.ai_mappings);
+      }
+      if (mappingResult.unmapped_fields && mappingResult.unmapped_fields.length > 0) {
+        console.log('⚠️  Unmapped fields (using original names):', mappingResult.unmapped_fields);
+      }
+      
+      // Merge mapped fields with original body (mapped fields take precedence)
+      const normalizedBody = { ...req.body, ...mappedBody };
+      
       const {
         user_id,
         user_name,
@@ -55,7 +93,7 @@ export function createSkillsGapsRouter(dependencies) {
         exam_status,
         decision_maker_id,
         decision_maker_policy
-      } = req.body;
+      } = normalizedBody;
 
       // Check if this is a Skills Engine update (has 'gap' field)
       if (gap && processGapUpdateUseCase) {

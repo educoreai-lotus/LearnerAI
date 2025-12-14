@@ -941,6 +941,8 @@ async function courseBuilderHandler(payload, dependencies) {
  * Actions:
  * - "query": Single AI prompt query
  * - "chat": Conversation with context
+ * - "map_fields": Map field names from microservices to LearnerAI format
+ * - "map_fields_ai": AI-powered intelligent field mapping
  */
 async function aiHandler(payload, dependencies) {
   const { geminiClient } = dependencies;
@@ -1060,6 +1062,194 @@ async function aiHandler(payload, dependencies) {
     };
   }
   
+  // Handle field mapping action (now uses AI by default if available)
+  if (action === 'map_fields') {
+    const { mapFields, mapFieldsAuto, mapFieldsWithAI, getFieldMappings } = await import('../../utils/fieldMapper.js');
+    const { data, service_name, custom_mappings, target_schema, use_ai = true } = payload;
+    
+    if (!data || typeof data !== 'object') {
+      throw new Error('data is required and must be an object');
+    }
+    
+    // Use AI-powered mapping by default if geminiClient is available and use_ai is true
+    if (use_ai && geminiClient) {
+      try {
+        const result = await mapFieldsWithAI(data, geminiClient, service_name || null, custom_mappings || {}, target_schema || null);
+        
+        return {
+          success: true,
+          action: action,
+          original_data: data,
+          mapped_data: result.mapped_data,
+          ai_mappings: result.ai_mappings,
+          predefined_mappings: result.predefined_mappings,
+          detected_service: result.detected_service,
+          unmapped_fields: result.unmapped_fields,
+          ai_reasoning: result.ai_reasoning,
+          ai_confidence_scores: result.ai_confidence_scores,
+          custom_mappings: custom_mappings || {},
+          mapping_method: 'ai_powered'
+        };
+      } catch (aiError) {
+        console.warn('AI mapping failed, falling back to predefined mappings:', aiError.message);
+        // Fall through to predefined mapping
+      }
+    }
+    
+    // Fallback to predefined mappings (fast path, no AI)
+    if (service_name) {
+      const mapped = mapFields(data, service_name, custom_mappings || {});
+      const mappings = getFieldMappings(service_name);
+      
+      return {
+        success: true,
+        action: action,
+        original_data: data,
+        mapped_data: mapped,
+        service_name: service_name,
+        mappings_used: mappings,
+        custom_mappings: custom_mappings || {},
+        mapping_method: 'predefined'
+      };
+    } else {
+      // Auto-detect service and map
+      const result = mapFieldsAuto(data, custom_mappings || {});
+      
+      return {
+        success: true,
+        action: action,
+        original_data: data,
+        ...result,
+        custom_mappings: custom_mappings || {},
+        mapping_method: 'predefined_auto'
+      };
+    }
+  }
+  
+  // Handle AI-powered intelligent field mapping
+  if (action === 'map_fields_ai') {
+    const { mapFieldsAuto, getFieldMappings } = await import('../../utils/fieldMapper.js');
+    const { data, target_schema, service_name, custom_mappings } = payload;
+    
+    if (!data || typeof data !== 'object') {
+      throw new Error('data is required and must be an object');
+    }
+    
+    if (!geminiClient) {
+      throw new Error('AI service (Gemini) is not available. Please configure GEMINI_API_KEY.');
+    }
+    
+    // First, try automatic mapping
+    const autoResult = mapFieldsAuto(data, custom_mappings || {});
+    
+    // Build AI prompt for intelligent mapping
+    const sourceFields = Object.keys(data);
+    const targetFields = target_schema ? Object.keys(target_schema) : 
+      ['user_id', 'user_name', 'company_id', 'company_name', 'competency_target_name', 'status', 'gap'];
+    
+    const mappingPrompt = `You are a field mapping assistant. Your task is to intelligently map field names from a source object to target field names.
+
+Source fields: ${JSON.stringify(sourceFields, null, 2)}
+Target fields: ${JSON.stringify(targetFields, null, 2)}
+Source data sample: ${JSON.stringify(data, null, 2).substring(0, 500)}
+
+${target_schema ? `Target schema: ${JSON.stringify(target_schema, null, 2)}` : ''}
+
+Analyze the source fields and map them to the most appropriate target fields based on:
+1. Semantic similarity (e.g., "learner_id" → "user_id", "organization_name" → "company_name")
+2. Common naming patterns
+3. Data type compatibility
+4. Context clues from the data values
+
+Return a JSON object with:
+{
+  "mappings": {
+    "source_field_name": "target_field_name",
+    ...
+  },
+  "confidence": {
+    "source_field_name": 0.0-1.0,
+    ...
+  },
+  "unmapped_fields": ["field1", "field2"],
+  "reasoning": "Brief explanation of key mappings"
+}
+
+Only include mappings you're confident about (confidence > 0.6).`;
+
+    try {
+      const options = {
+        maxRetries: 3,
+        retryDelay: 1000,
+        timeout: 30000
+      };
+      
+      const aiResponse = await geminiClient.executePrompt(mappingPrompt, '', options);
+      
+      // Parse AI response
+      let aiMappings = {};
+      let confidence = {};
+      let reasoning = '';
+      
+      if (typeof aiResponse === 'string') {
+        try {
+          const parsed = JSON.parse(aiResponse);
+          aiMappings = parsed.mappings || {};
+          confidence = parsed.confidence || {};
+          reasoning = parsed.reasoning || '';
+        } catch (e) {
+          // If parsing fails, try to extract JSON from text
+          const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+          if (jsonMatch) {
+            const parsed = JSON.parse(jsonMatch[0]);
+            aiMappings = parsed.mappings || {};
+            confidence = parsed.confidence || {};
+            reasoning = parsed.reasoning || '';
+          }
+        }
+      } else if (typeof aiResponse === 'object') {
+        aiMappings = aiResponse.mappings || {};
+        confidence = aiResponse.confidence || {};
+        reasoning = aiResponse.reasoning || '';
+      }
+      
+      // Apply AI mappings
+      const finalMappings = { ...autoResult.mapped_data };
+      for (const [sourceField, targetField] of Object.entries(aiMappings)) {
+        if (data[sourceField] !== undefined && confidence[sourceField] > 0.6) {
+          finalMappings[targetField] = data[sourceField];
+          if (sourceField !== targetField) {
+            delete finalMappings[sourceField];
+          }
+        }
+      }
+      
+      return {
+        success: true,
+        action: action,
+        original_data: data,
+        mapped_data: finalMappings,
+        auto_mapping: autoResult,
+        ai_mappings: aiMappings,
+        ai_confidence: confidence,
+        ai_reasoning: reasoning,
+        service_name: service_name || autoResult.detected_service,
+        custom_mappings: custom_mappings || {}
+      };
+    } catch (error) {
+      // Fallback to automatic mapping if AI fails
+      console.warn('AI field mapping failed, using automatic mapping:', error.message);
+      return {
+        success: true,
+        action: action,
+        original_data: data,
+        ...autoResult,
+        ai_error: error.message,
+        fallback: 'automatic_mapping'
+      };
+    }
+  }
+  
   // Unknown action
-  throw new Error(`Unknown AI action: ${action}. Supported actions: query, chat`);
+  throw new Error(`Unknown AI action: ${action}. Supported actions: query, chat, map_fields, map_fields_ai`);
 }
