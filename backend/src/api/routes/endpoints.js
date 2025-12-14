@@ -230,6 +230,28 @@ export function createEndpointsRouter(dependencies) {
 
       // Step 4: Store result in response.answer (as stringified JSON)
       requestBody.response.answer = typeof result === 'string' ? result : JSON.stringify(result);
+      
+      // Step 4.5: For Course Builder get_learning_path, also populate response.learning_path and response.skills directly
+      if (requestBody.requester_service === 'course-builder' && 
+          requestBody.payload?.action === 'get_learning_path' && 
+          result) {
+        // Extract learning_path and skills from result (can be in result.data or result directly)
+        const learningPathData = result.learning_path !== undefined ? result.learning_path : 
+                                 result.data?.learning_path !== undefined ? result.data.learning_path : null;
+        const skillsData = result.skills !== undefined ? result.skills : 
+                          result.data?.skills !== undefined ? result.data.skills : null;
+        
+        // Populate response directly (Course Builder expects these fields in response object)
+        if (learningPathData !== undefined && learningPathData !== null) {
+          requestBody.response.learning_path = learningPathData;
+        }
+        if (skillsData !== undefined && skillsData !== null) {
+          requestBody.response.skills = skillsData;
+        }
+        console.log(`✅ Populated response.learning_path and response.skills for Course Builder`);
+        console.log(`   learning_path type: ${Array.isArray(learningPathData) ? 'array' : typeof learningPathData}, length: ${Array.isArray(learningPathData) ? learningPathData.length : 'N/A'}`);
+        console.log(`   skills type: ${Array.isArray(skillsData) ? 'array' : typeof skillsData}, keys: ${typeof skillsData === 'object' && skillsData !== null ? Object.keys(skillsData).join(', ') : 'N/A'}`);
+      }
 
       // Step 5: Return the full object as stringified JSON (preserving requester_service, payload, and response)
       const totalTime = Date.now() - requestStartTime;
@@ -981,6 +1003,117 @@ async function courseBuilderHandler(payload, dependencies) {
       status: 'approved',
       message: result.message,
       data: result.data
+    };
+  }
+  
+  // Handle get learning path (get_learning_path - returns immediately, doesn't wait for approval)
+  if (action === 'get_learning_path') {
+    // Map incoming fields using AI (handles tag → competency_target_name, etc.)
+    const { mapFieldsWithAI } = await import('../../utils/fieldMapper.js');
+    const { geminiClient } = dependencies;
+    
+    // Target schema for Course Builder get_learning_path
+    const targetSchema = {
+      user_id: 'string (UUID)',
+      competency_target_name: 'string',
+      tag: 'string (maps to competency_target_name)'
+    };
+    
+    // Use AI-powered mapping to handle field name mismatches
+    let mappingResult;
+    try {
+      mappingResult = geminiClient 
+        ? await mapFieldsWithAI(payload, geminiClient, 'course-builder', targetSchema)
+        : { mapped_data: payload };
+    } catch (mappingError) {
+      console.warn('⚠️  Field mapping failed, using original payload:', mappingError.message);
+      mappingResult = { mapped_data: payload };
+    }
+    
+    const mappedPayload = mappingResult.mapped_data;
+    
+    // Extract fields (support both tag and competency_target_name)
+    const user_id = mappedPayload.user_id || payload.user_id;
+    const competency_target_name = mappedPayload.competency_target_name || mappedPayload.tag || payload.competency_target_name || payload.tag;
+    
+    if (!user_id || !competency_target_name) {
+      throw new Error('user_id and tag (or competency_target_name) are required for get_learning_path action');
+    }
+    
+    // Fetch learning path from database
+    let learningPath = null;
+    let skillsRawData = null;
+    
+    try {
+      // Get course/learning path (filter by both user_id and competency_target_name to ensure correct course)
+      if (courseRepository && typeof courseRepository.getCourseById === 'function') {
+        const course = await courseRepository.getCourseById(competency_target_name);
+        if (course) {
+          // Verify this course belongs to the requested user
+          if (course.user_id === user_id) {
+            // Parse learning_path if it's a string
+            learningPath = course.learning_path;
+            if (typeof learningPath === 'string') {
+              try {
+                learningPath = JSON.parse(learningPath);
+              } catch (e) {
+                console.warn('⚠️  Could not parse learning_path JSON:', e.message);
+                learningPath = null;
+              }
+            }
+            console.log(`✅ Found learning path for user ${user_id}, competency ${competency_target_name}`);
+          } else {
+            console.warn(`⚠️  Course found but user_id mismatch: expected ${user_id}, got ${course.user_id}`);
+          }
+        } else {
+          console.warn(`⚠️  No course found for competency: ${competency_target_name}`);
+        }
+      }
+      
+      // Get skills gap data (skills_raw_data)
+      if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
+        const skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competency_target_name);
+        if (skillsGap) {
+          skillsRawData = skillsGap.skills_raw_data;
+          console.log(`✅ Found skills gap data for user ${user_id}, competency ${competency_target_name}`);
+        } else {
+          console.warn(`⚠️  No skills gap found for user ${user_id}, competency ${competency_target_name}`);
+        }
+      }
+    } catch (error) {
+      console.error('❌ Error fetching learning path data:', error.message);
+      console.error('   Stack:', error.stack);
+      // Don't throw - return empty arrays instead
+    }
+    
+    // Return data in format expected by Course Builder
+    // Note: learning_path should be the full learning path object/array, not empty array if null
+    // skills should be the skills_raw_data object, not empty array if null
+    const learningPathValue = learningPath !== null && learningPath !== undefined ? learningPath : [];
+    const skillsValue = skillsRawData !== null && skillsRawData !== undefined ? skillsRawData : [];
+    
+    console.log(`📊 Returning data for Course Builder:`, {
+      user_id,
+      competency_target_name,
+      learning_path_type: Array.isArray(learningPathValue) ? 'array' : typeof learningPathValue,
+      learning_path_length: Array.isArray(learningPathValue) ? learningPathValue.length : 
+                           (typeof learningPathValue === 'object' && learningPathValue !== null ? Object.keys(learningPathValue).length : 0),
+      skills_type: Array.isArray(skillsValue) ? 'array' : typeof skillsValue,
+      skills_keys: typeof skillsValue === 'object' && skillsValue !== null ? Object.keys(skillsValue).join(', ') : 'N/A'
+    });
+    
+    return {
+      success: true,
+      action: action,
+      data: {
+        user_id: user_id,
+        competency_target_name: competency_target_name,
+        learning_path: learningPathValue,
+        skills: skillsValue
+      },
+      // Also include at root level for direct access in response population
+      learning_path: learningPathValue,
+      skills: skillsValue
     };
   }
   
