@@ -50,13 +50,22 @@ const FIELD_MAPPINGS = {
     'org_name': 'company_name'
   },
   
-  // Course Builder mappings
+  // Course Builder mappings (incoming: Course Builder → LearnerAI)
   'course-builder': {
     'course_id': 'competency_target_name',
     'course_name': 'competency_target_name',
     'path_id': 'competency_target_name',
     'learner_id': 'user_id',
     'learner_name': 'user_name'
+  },
+  
+  // Course Builder reverse mappings (outgoing: LearnerAI → Course Builder)
+  'course-builder-out': {
+    'user_id': 'learner_id', // LearnerAI sends user_id, Course Builder expects learner_id
+    'user_name': 'learner_name', // LearnerAI sends user_name, Course Builder expects learner_name
+    'competency_target_name': 'course_id', // LearnerAI sends competency_target_name, Course Builder expects course_id
+    'company_id': 'organization_id', // Optional: if Course Builder uses organization_id
+    'company_name': 'organization_name' // Optional: if Course Builder uses organization_name
   },
   
   // Learning Analytics mappings
@@ -360,6 +369,185 @@ Return ONLY valid JSON in this exact format:
       detected_service: detectedService,
       unmapped_fields: unmappedFields,
       ai_error: error.message
+    };
+  }
+}
+
+/**
+ * Reverse field mapping - maps LearnerAI fields to target microservice format
+ * @param {Object} sourceData - LearnerAI data object
+ * @param {string} targetService - Target microservice name (e.g., 'course-builder-out', 'learning-analytics-out')
+ * @param {Object} customMappings - Optional custom field mappings
+ * @returns {Object} Mapped data object in target service format
+ */
+export function mapFieldsOutgoing(sourceData, targetService, customMappings = {}) {
+  if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) {
+    return sourceData;
+  }
+
+  const mapped = {};
+  const serviceMappings = FIELD_MAPPINGS[targetService] || {};
+  const allMappings = { ...serviceMappings, ...customMappings };
+
+  // Create reverse lookup: target field -> source field
+  const reverseMappings = {};
+  for (const [sourceField, targetField] of Object.entries(allMappings)) {
+    reverseMappings[targetField] = sourceField;
+  }
+
+  // Map each field from LearnerAI format to target service format
+  for (const [sourceKey, sourceValue] of Object.entries(sourceData)) {
+    // Check if there's a reverse mapping for this field
+    const targetKey = reverseMappings[sourceKey] || sourceKey;
+    
+    // If value is an object, recursively map it
+    if (sourceValue && typeof sourceValue === 'object' && !Array.isArray(sourceValue)) {
+      mapped[targetKey] = mapFieldsOutgoing(sourceValue, targetService, customMappings);
+    } else if (Array.isArray(sourceValue)) {
+      // If value is an array, map each object in the array
+      mapped[targetKey] = sourceValue.map(item => 
+        typeof item === 'object' && item !== null && !Array.isArray(item)
+          ? mapFieldsOutgoing(item, targetService, customMappings)
+          : item
+      );
+    } else {
+      mapped[targetKey] = sourceValue;
+    }
+  }
+
+  return mapped;
+}
+
+/**
+ * AI-powered reverse field mapping - maps LearnerAI fields to target microservice format using AI
+ * @param {Object} sourceData - LearnerAI data object
+ * @param {Object} geminiClient - Gemini API client instance
+ * @param {string} targetService - Target microservice name
+ * @param {Object} targetSchema - Target service's expected schema
+ * @param {Object} customMappings - Optional custom field mappings
+ * @returns {Promise<Object>} Mapped data object with AI mapping info
+ */
+export async function mapFieldsOutgoingWithAI(sourceData, geminiClient, targetService, targetSchema = null, customMappings = {}) {
+  if (!sourceData || typeof sourceData !== 'object' || Array.isArray(sourceData)) {
+    return {
+      mapped_data: sourceData,
+      ai_mappings: {},
+      predefined_mappings: {}
+    };
+  }
+
+  // Step 1: Apply predefined reverse mappings first (fast path)
+  const predefinedMapped = mapFieldsOutgoing(sourceData, targetService, customMappings);
+  
+  // Step 2: If no AI client or no target schema, return predefined mappings
+  if (!geminiClient || !targetSchema) {
+    return {
+      mapped_data: predefinedMapped,
+      ai_mappings: {},
+      predefined_mappings: FIELD_MAPPINGS[targetService] || {},
+      mapping_method: 'predefined'
+    };
+  }
+
+  // Step 3: Use AI to map any remaining unmapped fields
+  const sourceFields = Object.keys(sourceData);
+  const targetFields = Object.keys(targetSchema);
+  
+  const aiPrompt = `You are a field mapping assistant. Map LearnerAI's field names to ${targetService}'s expected field names.
+
+LearnerAI source fields: ${JSON.stringify(sourceFields, null, 2)}
+LearnerAI data sample: ${JSON.stringify(sourceData, null, 2).substring(0, 1000)}
+${targetService} target fields: ${JSON.stringify(targetFields, null, 2)}
+${targetService} target schema: ${JSON.stringify(targetSchema, null, 2)}
+
+Rules:
+1. Map based on semantic similarity (e.g., "user_id" → "learner_id", "competency_target_name" → "course_id")
+2. Consider data type compatibility
+3. Use context clues from field values
+4. Only map if confidence > 0.6
+5. Return JSON with mappings and confidence scores
+
+Return ONLY valid JSON in this exact format:
+{
+  "mappings": {
+    "learnerai_field": "target_service_field",
+    ...
+  },
+  "confidence": {
+    "learnerai_field": 0.0-1.0,
+    ...
+  },
+  "unmapped": ["field1", "field2"],
+  "reasoning": "Brief explanation"
+}`;
+
+  try {
+    const options = {
+      maxRetries: 2,
+      retryDelay: 1000,
+      timeout: 20000
+    };
+
+    const aiResponse = await geminiClient.executePrompt(aiPrompt, '', options);
+    
+    // Parse AI response
+    let aiMappings = {};
+    let aiConfidence = {};
+    let reasoning = '';
+
+    if (typeof aiResponse === 'string') {
+      try {
+        const jsonMatch = aiResponse.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          aiMappings = parsed.mappings || {};
+          aiConfidence = parsed.confidence || {};
+          reasoning = parsed.reasoning || '';
+        }
+      } catch (e) {
+        console.warn('Failed to parse AI outgoing mapping response:', e.message);
+      }
+    } else if (typeof aiResponse === 'object') {
+      aiMappings = aiResponse.mappings || {};
+      aiConfidence = aiResponse.confidence || {};
+      reasoning = aiResponse.reasoning || '';
+    }
+
+    // Step 4: Apply AI mappings (only high-confidence ones)
+    const finalMapped = { ...predefinedMapped };
+    const appliedAiMappings = {};
+
+    for (const [learnerAIField, targetField] of Object.entries(aiMappings)) {
+      const confidence = aiConfidence[learnerAIField] || 0;
+      if (confidence > 0.6 && sourceData[learnerAIField] !== undefined) {
+        finalMapped[targetField] = sourceData[learnerAIField];
+        // Remove original field if it's different from target
+        if (learnerAIField !== targetField && finalMapped[learnerAIField] === sourceData[learnerAIField]) {
+          delete finalMapped[learnerAIField];
+        }
+        appliedAiMappings[learnerAIField] = {
+          target: targetField,
+          confidence: confidence
+        };
+      }
+    }
+
+    return {
+      mapped_data: finalMapped,
+      ai_mappings: appliedAiMappings,
+      predefined_mappings: FIELD_MAPPINGS[targetService] || {},
+      ai_reasoning: reasoning,
+      ai_confidence_scores: aiConfidence,
+      mapping_method: 'ai_powered'
+    };
+  } catch (error) {
+    console.warn('AI outgoing field mapping failed, using predefined mappings only:', error.message);
+    return {
+      mapped_data: predefinedMapped,
+      ai_mappings: {},
+      predefined_mappings: FIELD_MAPPINGS[targetService] || {},
+      ai_error: error.message,
+      mapping_method: 'predefined_fallback'
     };
   }
 }

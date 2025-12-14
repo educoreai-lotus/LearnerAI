@@ -131,7 +131,8 @@ try {
   const courseBuilderClient = new CourseBuilderClient({
     baseUrl: process.env.COURSE_BUILDER_URL,
     serviceToken: process.env.COURSE_BUILDER_TOKEN,
-    httpClient
+    httpClient,
+    geminiClient // For AI-powered field mapping
   });
   const analyticsClient = new AnalyticsClient({
     baseUrl: process.env.ANALYTICS_URL,
