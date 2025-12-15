@@ -55,12 +55,13 @@ export function createLearningPathsRouter(dependencies) {
       }
 
       // Create skills gap entity
+      // Note: Skills are typically stored in database as competency map, not passed here
+      // This entity is mainly used as a parameter object with identifiers
       const skillsGap = new SkillsGap({
         userId,
         companyId,
         competencyTargetName,
-        microSkills: microSkills || [],
-        nanoSkills: nanoSkills || []
+        skills: [] // Skills are fetched from database, not passed here
       });
 
       // Execute use case

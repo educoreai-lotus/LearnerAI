@@ -53,7 +53,7 @@ export class ProcessApprovalResponseUseCase {
     });
 
     // If approved, update the course's approved field
-    // NOTE: We do NOT automatically distribute to Course Builder anymore.
+    // NOTE: We do NOT automatically distribute to Course Builder.
     // Course Builder will request data when needed via the request endpoint.
     if (response === 'approved') {
       // Update the course's approved field to true
@@ -61,7 +61,7 @@ export class ProcessApprovalResponseUseCase {
         try {
           await this.courseRepository.updateCourse(approval.learningPathId, { approved: true });
           console.log(`✅ Course ${approval.learningPathId} marked as approved in courses table`);
-          console.log(`📋 Course Builder can now request this learning path data when needed`);
+          console.log(`📋 Course Builder can request this learning path data on-demand when needed`);
         } catch (error) {
           console.error(`⚠️  Failed to update course approved status: ${error.message}`);
           // Don't fail the approval process if course update fails

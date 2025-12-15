@@ -1,5 +1,5 @@
 Act as a Senior Adaptive Learning Architect. Analyze the provided list
-of Nano and Micro Skills representing a learner's current skill gaps.
+of skills (at the lowest layer) representing a learner's current skill gaps.
 
 Your goal is to generate an expanded list of high-level Competencies 
 required for the learner to achieve full mastery and professional readiness.

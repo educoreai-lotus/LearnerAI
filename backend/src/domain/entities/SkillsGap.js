@@ -1,21 +1,23 @@
 /**
  * SkillsGap Domain Entity
  * Represents a skills gap identified for a learner
+ * 
+ * Note: Skills are stored as an array of skill names (strings) at the lowest layer.
+ * The actual gap data structure in the database may be a competency map:
+ * { "Competency_Name": ["Skill Name 1", "Skill Name 2", ...] }
  */
 export class SkillsGap {
   constructor({
     userId,
     companyId,
     competencyTargetName,
-    microSkills = [],
-    nanoSkills = [],
+    skills = [], // Array of skill names (strings) at the lowest layer
     receivedAt
   }) {
     this.userId = userId;
     this.companyId = companyId;
     this.competencyTargetName = competencyTargetName;
-    this.microSkills = microSkills; // Array of micro skill objects
-    this.nanoSkills = nanoSkills; // Array of nano skill objects
+    this.skills = skills; // Array of skill names (strings) - no IDs, no micro/nano separation
     this.receivedAt = receivedAt || new Date().toISOString();
   }
 
@@ -23,16 +25,14 @@ export class SkillsGap {
    * Check if gap has any skills
    */
   hasSkills() {
-    return this.microSkills.length > 0 || this.nanoSkills.length > 0;
+    return Array.isArray(this.skills) && this.skills.length > 0;
   }
 
   /**
-   * Get all skill IDs
+   * Get all skill names
    */
-  getAllSkillIds() {
-    const microIds = this.microSkills.map(s => s.id).filter(Boolean);
-    const nanoIds = this.nanoSkills.map(s => s.id).filter(Boolean);
-    return [...microIds, ...nanoIds];
+  getAllSkillNames() {
+    return Array.isArray(this.skills) ? [...this.skills] : [];
   }
 
   /**
@@ -43,8 +43,7 @@ export class SkillsGap {
       userId: this.userId,
       companyId: this.companyId,
       competencyTargetName: this.competencyTargetName,
-      microSkills: this.microSkills,
-      nanoSkills: this.nanoSkills,
+      skills: this.skills,
       receivedAt: this.receivedAt
     };
   }

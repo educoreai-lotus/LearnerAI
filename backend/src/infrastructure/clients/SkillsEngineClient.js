@@ -11,20 +11,24 @@ export class SkillsEngineClient {
 
   /**
    * Request skill breakdown for competencies
-   * Explicitly requests the LOWEST LEVEL skills for the given competencies,
-   * including expansions competencies. This matches the level of the initial skills gap.
+   * Explicitly requests the LOWEST LEVEL skills for the given competencies.
+   * This matches the level of the initial skills gap.
    * 
    * @param {Array} competencies - Array of competency names (strings) or objects with 'name' property
    * @param {object} options - Request options (maxRetries, retryDelay, useMockData, includeExpansions)
    * @param {boolean} options.includeExpansions - Whether to include expansions competencies (default: true)
-   * @returns {Promise<object>} Skill breakdown with lowest level skills (list of skills at the lowest level in Skills Engine hierarchy)
+   * @returns {Promise<object>} Skill breakdown with lowest level skills (array of skill names per competency)
    * 
    * Response format:
    * {
-   *   "Competency_Name": {
-   *     "skills": [...]  // List of skills at the lowest level in Skills Engine hierarchy
-   *   }
+   *   "Competency_Name": [
+   *     "Skill Name 1",
+   *     "Skill Name 2",
+   *     "Skill Name 3"
+   *   ]
    * }
+   * 
+   * Note: Returns only skill names (strings) in the lowest layer - no IDs, no micro/nano separation
    */
   async requestSkillBreakdown(competencies, options = {}) {
     const {
@@ -93,7 +97,8 @@ export class SkillsEngineClient {
 
   /**
    * Get mock skill breakdown (fallback)
-   * Returns a list of skills at the lowest level for each competency
+   * Returns a list of skill names at the lowest level for each competency
+   * Format: { "Competency_Name": ["Skill Name 1", "Skill Name 2", ...] }
    */
   _getMockSkillBreakdown(competencies) {
     const breakdown = {};
@@ -103,14 +108,12 @@ export class SkillsEngineClient {
         ? comp 
         : (comp.name || comp.competency_name || `Competency ${index + 1}`);
       
-      // Return list of skills at the lowest level (not categorized as micro/nano)
-      breakdown[compName] = {
-        skills: [
-          { id: `skill-${index}-1`, name: `${compName} - Skill 1` },
-          { id: `skill-${index}-2`, name: `${compName} - Skill 2` },
-          { id: `skill-${index}-3`, name: `${compName} - Skill 3` }
-        ]
-      };
+      // Return array of skill names at the lowest level (no IDs, no micro/nano separation)
+      breakdown[compName] = [
+        `${compName} - Skill 1`,
+        `${compName} - Skill 2`,
+        `${compName} - Skill 3`
+      ];
     });
     return breakdown;
   }

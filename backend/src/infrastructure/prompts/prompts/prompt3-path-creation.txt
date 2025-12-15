@@ -11,6 +11,7 @@ Initial Skills Gap: {initialGap}
 - Extract skills from: skills_raw_data.gap.missing_skills_map (if present)
 - Or from the structure provided - look for arrays of skill names
 - These are the EXACT skills you must include in the learning path
+- IMPORTANT: The initialGap contains "competencyTargetName" - this is the target competency for the learning path
 
 Expanded Competency Breakdown: {expandedBreakdown}
 - This contains additional skills needed to reach the target competency
@@ -59,10 +60,12 @@ Output Requirements
 
 Return ONLY a JSON object with snake_case fields.
 
+CRITICAL: The path_title MUST be the competencyTargetName from the initialGap input. Use it exactly as provided (do not modify or paraphrase it).
+
 JSON structure:
 
 {
-  "path_title": "Personalized Learning Path for [Learner Role] – [Target Goal]",
+  "path_title": "[Use competencyTargetName from initialGap as the path title]",
   "learner_id": "[provided by system]",
   "total_estimated_duration_hours": 0,
   "learning_modules": [

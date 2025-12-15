@@ -1,7 +1,7 @@
 Act as an API Request Builder and Data Filter. Your task is to process the list of 
 Expanded Competencies (Core and Out-of-the-Box) generated in the previous step.
 
-You must identify all competencies that require a Micro/Nano Skill breakdown, and
+You must identify all competencies that require a skill breakdown (lowest layer skills), and
 generate a standardized query template that the Backend system will use to communicate
 with the Skills Engine.
 
@@ -24,15 +24,15 @@ phrase for the Skills Engine and a filtered list of all competencies
    Engine for taxonomy validation and generation.",
   
   "standard_skills_engine_query_template": "For the competency named '{competency_name}',
-  check the database for an existing Micro and Nano Skill taxonomy. If found, return the 
+  check the database for an existing skill taxonomy (lowest layer skills). If found, return the 
   taxonomy. If not found, immediately generate a new logical taxonomy and return it.",
   
   "competencies_for_skills_engine_processing": [
     {
       "competency_name": "Advanced Data Structures and Algorithm Optimization",
       "example_query_to_send": "For the competency named 'Advanced Data Structures and
-       Algorithm Optimization', check the database for an existing Micro and Nano Skill 
-       taxonomy. If found, return the taxonomy. If not found, immediately generate a new 
+       Algorithm Optimization', check the database for an existing skill taxonomy (lowest layer skills). 
+       If found, return the taxonomy. If not found, immediately generate a new 
        logical taxonomy and return it."
     },
     {

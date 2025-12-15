@@ -403,17 +403,29 @@ export class GenerateLearningPathUseCase {
           const breakdown = skillBreakdown[competencyName];
           
           if (breakdown) {
-            // Filter micro and nano skills to only include those in remaining gap
-            const filteredMicro = (breakdown.microSkills || []).filter(skill => {
-              const skillName = typeof skill === 'string' ? skill : (skill.name || skill.id || String(skill));
-              return remainingSkillNames.some(remaining => 
-                remaining.toLowerCase().includes(skillName.toLowerCase()) ||
-                skillName.toLowerCase().includes(remaining.toLowerCase())
-              );
-            });
+            // NEW FORMAT: breakdown is an array of skill names (strings)
+            // OLD FORMAT (backward compatibility): breakdown is an object with microSkills/nanoSkills
+            let skillsToFilter = [];
             
-            const filteredNano = (breakdown.nanoSkills || []).filter(skill => {
-              const skillName = typeof skill === 'string' ? skill : (skill.name || skill.id || String(skill));
+            if (Array.isArray(breakdown)) {
+              // New format: direct array of skill names
+              skillsToFilter = breakdown;
+            } else if (breakdown && typeof breakdown === 'object') {
+              // Old format: extract from microSkills/nanoSkills (backward compatibility)
+              const microSkills = breakdown.microSkills || [];
+              const nanoSkills = breakdown.nanoSkills || [];
+              const skillsArray = breakdown.skills || [];
+              
+              // Combine all skills from old format
+              skillsToFilter = [
+                ...microSkills,
+                ...nanoSkills,
+                ...skillsArray
+              ].map(skill => typeof skill === 'string' ? skill : (skill.name || skill.id || String(skill)));
+            }
+            
+            // Filter skills to only include those in remaining gap
+            const filteredSkills = skillsToFilter.filter(skillName => {
               return remainingSkillNames.some(remaining => 
                 remaining.toLowerCase().includes(skillName.toLowerCase()) ||
                 skillName.toLowerCase().includes(remaining.toLowerCase())
@@ -421,11 +433,9 @@ export class GenerateLearningPathUseCase {
             });
             
             // Only keep competency if it has skills after filtering
-            if (filteredMicro.length > 0 || filteredNano.length > 0) {
-              filteredSkillBreakdown[competencyName] = {
-                microSkills: filteredMicro,
-                nanoSkills: filteredNano
-              };
+            if (filteredSkills.length > 0) {
+              // Store in new format (array of skill names)
+              filteredSkillBreakdown[competencyName] = filteredSkills;
               filteredCompetencies.push(competency);
             } else {
               console.log(`   ⚠️  Removed competency "${competencyName}" - no remaining skills match`);
@@ -535,7 +545,7 @@ export class GenerateLearningPathUseCase {
         });
 
         // Extract learning path structure from Prompt 3 result
-        pathData = this._extractPathData(prompt3Result, skillsGap.userId);
+        pathData = this._extractPathData(prompt3Result, skillsGap.userId, competencyTargetName);
         
         // Validate learning path for pedagogical correctness
         const validation = this._validateLearningPath(pathData);
@@ -638,11 +648,11 @@ export class GenerateLearningPathUseCase {
    */
   async _handlePathDistribution(learningPath, skillsGap, isUpdateAfterFailure = false) {
     // Special case: Skip approval workflow for updates after exam failure
-    // NOTE: We do NOT automatically distribute to Course Builder anymore.
+    // NOTE: We do NOT automatically distribute to Course Builder.
     // Course Builder will request data when needed via the request endpoint.
     if (isUpdateAfterFailure) {
       console.log(`🔄 Learning path ${learningPath.id} is an update after exam failure - skipping approval workflow`);
-      console.log(`📋 Course Builder can now request this learning path data when needed`);
+      console.log(`📋 Course Builder can request this learning path data on-demand when needed`);
       return;
     }
 
@@ -694,10 +704,10 @@ export class GenerateLearningPathUseCase {
         }
       } else {
         // Auto approval - mark as approved but do NOT distribute
-        // NOTE: We do NOT automatically distribute to Course Builder anymore.
+        // NOTE: We do NOT automatically distribute to Course Builder.
         // Course Builder will request data when needed via the request endpoint.
         console.log(`✅ Auto approval for company ${skillsGap.companyId} - learning path marked as approved`);
-        console.log(`📋 Course Builder can now request this learning path data when needed`);
+        console.log(`📋 Course Builder can request this learning path data on-demand when needed`);
       }
     } catch (error) {
       console.error(`❌ Error handling path distribution: ${error.message}`);
@@ -922,6 +932,8 @@ export class GenerateLearningPathUseCase {
 
   /**
    * Extract skills from expanded breakdown structure
+   * Handles new format: { "Competency_Name": ["Skill Name 1", "Skill Name 2", ...] }
+   * Also supports old format for backward compatibility
    * @private
    */
   _extractSkillsFromExpandedBreakdown(expandedBreakdown) {
@@ -930,8 +942,16 @@ export class GenerateLearningPathUseCase {
     // Try to extract from skillBreakdown
     if (expandedBreakdown.skillBreakdown && typeof expandedBreakdown.skillBreakdown === 'object') {
       Object.values(expandedBreakdown.skillBreakdown).forEach(competencyData => {
-        if (competencyData && typeof competencyData === 'object') {
-          // Extract from microSkills
+        // NEW FORMAT: Check for array first (array of skill names)
+        if (Array.isArray(competencyData)) {
+          competencyData.forEach(skillName => {
+            if (typeof skillName === 'string') {
+              skills.push(skillName);
+            }
+          });
+        } else if (competencyData && typeof competencyData === 'object') {
+          // OLD FORMAT: Backward compatibility - extract from microSkills/nanoSkills
+          // Extract from microSkills (legacy)
           if (Array.isArray(competencyData.microSkills)) {
             competencyData.microSkills.forEach(skill => {
               if (typeof skill === 'string') {
@@ -941,7 +961,7 @@ export class GenerateLearningPathUseCase {
               }
             });
           }
-          // Extract from nanoSkills
+          // Extract from nanoSkills (legacy)
           if (Array.isArray(competencyData.nanoSkills)) {
             competencyData.nanoSkills.forEach(skill => {
               if (typeof skill === 'string') {
@@ -951,7 +971,7 @@ export class GenerateLearningPathUseCase {
               }
             });
           }
-          // Extract from skills array
+          // Extract from skills array (alternative legacy format)
           if (Array.isArray(competencyData.skills)) {
             competencyData.skills.forEach(skill => {
               if (typeof skill === 'string') {
@@ -999,8 +1019,12 @@ export class GenerateLearningPathUseCase {
    * 
    * Note: Steps use simplified format (no step_type, content_type, resources, objectives required)
    * but these fields may be present in older formats for backward compatibility.
+   * 
+   * @param {string|object} prompt3Result - The result from Prompt 3
+   * @param {string} userId - The user ID
+   * @param {string} competencyTargetName - The target competency name (used as fallback for path_title)
    */
-  _extractPathData(prompt3Result, userId) {
+  _extractPathData(prompt3Result, userId, competencyTargetName = null) {
     // Handle different response formats
     let parsed;
     if (typeof prompt3Result === 'string') {
@@ -1014,7 +1038,7 @@ export class GenerateLearningPathUseCase {
         // Convert old format to new learning_modules structure
         if (extractedSteps && extractedSteps.length > 0) {
           return {
-            path_title: 'Learning Path',
+            path_title: competencyTargetName || 'Learning Path',
             learner_id: userId,
             total_estimated_duration_hours: null,
             learning_modules: [{
@@ -1035,7 +1059,7 @@ export class GenerateLearningPathUseCase {
         
         // If extraction also fails, return minimal structure
         return {
-          path_title: 'Learning Path',
+          path_title: competencyTargetName || 'Learning Path',
           learner_id: userId,
           total_estimated_duration_hours: null,
           learning_modules: []
@@ -1049,7 +1073,12 @@ export class GenerateLearningPathUseCase {
     if (parsed.learning_modules && Array.isArray(parsed.learning_modules)) {
       // The prompt generates snake_case format (path_title, total_estimated_duration_hours)
       // We preserve both formats for compatibility and convert to camelCase for storage
-      const pathTitle = parsed.path_title || parsed.pathTitle || 'Personalized Learning Path';
+      // Use competencyTargetName as fallback if path_title is missing or is a generic default
+      const defaultTitles = ['Learning Path', 'Personalized Learning Path', 'Target Goal'];
+      const extractedPathTitle = parsed.path_title || parsed.pathTitle;
+      const pathTitle = (extractedPathTitle && !defaultTitles.includes(extractedPathTitle))
+        ? extractedPathTitle
+        : (competencyTargetName || 'Learning Path');
       const totalDuration = parsed.total_estimated_duration_hours || parsed.totalDurationHours || null;
       
       // Process modules: convert old format to new format if needed
@@ -1168,7 +1197,7 @@ export class GenerateLearningPathUseCase {
     // Convert old steps format to new learning_modules structure
     if (oldSteps && oldSteps.length > 0) {
       return {
-        path_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
+        path_title: parsed.pathTitle || parsed.path_title || competencyTargetName || 'Learning Path',
         learner_id: parsed.learner_id || userId,
         total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null,
         learning_modules: [{
@@ -1189,7 +1218,7 @@ export class GenerateLearningPathUseCase {
     
     // If no steps found, return minimal structure
     return {
-      path_title: parsed.pathTitle || parsed.path_title || 'Learning Path',
+      path_title: parsed.pathTitle || parsed.path_title || competencyTargetName || 'Learning Path',
       learner_id: parsed.learner_id || userId,
       total_estimated_duration_hours: parsed.totalDurationHours || parsed.total_estimated_duration_hours || null,
       learning_modules: []

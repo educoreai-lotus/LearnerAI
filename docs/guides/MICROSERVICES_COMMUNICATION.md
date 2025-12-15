@@ -248,33 +248,37 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
   - `"React Hooks"`
   - `"TypeScript Fundamentals"`
   - `"Node.js Backend Development"`
-- **Skills Engine returns the LOWEST LAYER** (nano/micro skills) by default, which matches the level of the initial skills gap.
+- **Skills Engine returns the LOWEST LAYER skills** as a simple array of skill names (strings) - no IDs, no micro/nano separation
 - This ensures consistency: both the initial gap and expanded breakdown are at the same granularity level (lowest layer).
 
 #### **Response (from Skills Engine)**
 ```json
 {
-  "Competency_Name_1": {
-    "microSkills": [
-      { "id": "MGS_Micro_1", "name": "Micro Skill Name 1" },
-      { "id": "MGS_Micro_2", "name": "Micro Skill Name 2" }
-    ],
-    "nanoSkills": [
-      { "id": "MGS_Nano_1", "name": "Nano Skill Name 1" },
-      { "id": "MGS_Nano_2", "name": "Nano Skill Name 2" }
-    ]
-  },
-  "Competency_Name_2": {
-    "microSkills": [...],
-    "nanoSkills": [...]
-  }
+  "React Hooks": [
+    "State Management",
+    "Side Effects",
+    "Custom Hooks",
+    "useState Hook",
+    "useEffect Hook"
+  ],
+  "TypeScript Fundamentals": [
+    "Type Annotations",
+    "Interfaces",
+    "Generics",
+    "Type Guards"
+  ]
 }
 ```
+
+**Note:** 
+- Response format is `{ "Competency_Name": ["Skill Name 1", "Skill Name 2", ...] }`
+- Only skill names (strings) in the lowest layer - no IDs, no micro/nano separation
+- This matches the level of the initial skills gap for consistency
 
 #### **When LearnerAI Calls This**
 - ✅ During learning path generation (after Prompt 2 - Competency Identification)
 - ✅ After AI expands competencies from the initial skills gap
-- ✅ Used to get detailed Micro/Nano skill breakdown for path creation
+- ✅ Used to get the lowest layer skills for each competency for path creation
 
 #### **Flow in Learning Path Generation**
 ```
@@ -282,7 +286,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 2. Prompt 1: Expand skills gap
 3. Prompt 2: Identify competencies from expanded skills
 4. LearnerAI → Skills Engine: Request breakdown for expanded competencies (Communication Type 2)
-5. Skills Engine → LearnerAI: Returns Micro/Nano skills
+5. Skills Engine → LearnerAI: Returns lowest layer skills (array of skill names)
 6. Prompt 3: Create learning path using gap + breakdown
 ```
 
