@@ -106,8 +106,12 @@ export function createEndpointsRouter(dependencies) {
           error: "Missing required field: payload"
         }));
       }
-      // Action field is optional - handlers are data-driven and process based on what data is present
-      // If action is provided, it's used for logging/response, but not required for processing
+      if (!requestBody.payload.action) {
+        return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
+          error: "Missing required field: payload.action",
+          message: "Every payload must contain an 'action' field indicating the type of action"
+        }));
+      }
       if (!requestBody.response) {
         requestBody.response = { answer: "" };
       }
@@ -117,8 +121,7 @@ export function createEndpointsRouter(dependencies) {
 
       // Step 3: Route based on requester_service
       console.log(`[Coordinator Request] ${requestId} - Routing to handler: ${requestBody.requester_service}`);
-      console.log(`[Coordinator Request] ${requestId} - Action: ${requestBody.payload?.action || 'data-driven (no action specified)'}`);
-      console.log(`[Coordinator Request] ${requestId} - Payload keys: ${requestBody.payload ? Object.keys(requestBody.payload).join(', ') : 'none'}`);
+      console.log(`[Coordinator Request] ${requestId} - Action: ${requestBody.payload?.action || 'none'}`);
       
       let result;
       try {
@@ -697,12 +700,16 @@ export async function fillManagementReportingData(data, { courseRepository, skil
 /**
  * Skills Engine Handler
  * Handles requests from the skills-engine service
- * Data-driven: Processes based on what data is present, not action names
+ * Payload must contain an "action" field indicating the type of action
  * 
- * Flow:
- * - If payload contains 'gap' field → Process skills gap (create or update based on what exists)
- * - ProcessSkillsGapUpdateUseCase handles create vs update logic automatically
- * - Creates company/learner if they don't exist
+ * Actions: 
+ * - "update_skills_gap" or "update_skills_gap_to_update_the_learning_path": Update existing skills gap
+ * - "create_skills_gap": Create new skills gap
+ * 
+ * All actions:
+ * - Requires: user_id, user_name, company_id, company_name, competency_target_name, status, gap
+ * - Processes skills gap and stores in database
+ * - Creates learner if doesn't exist
  * - Automatically triggers learning path generation after processing
  */
 async function skillsEngineHandler(payload, dependencies) {
@@ -721,10 +728,14 @@ async function skillsEngineHandler(payload, dependencies) {
     requestPathApprovalUseCase,
     distributePathUseCase
   } = dependencies;
+  const { action } = payload;
   
-  // Check if this is a skills gap update (has 'gap' field)
-  // ProcessSkillsGapUpdateUseCase will handle create vs update based on what exists in DB
-  if (payload.gap) {
+  // Handle skills gap updates from Skills Engine
+  // Support both "update_skills_gap" and "update_skills_gap_to_update_the_learning_path"
+  // (both do the same thing - learning path generation is automatic)
+  if (action === 'update_skills_gap' || 
+      action === 'create_skills_gap' || 
+      action === 'update_skills_gap_to_update_the_learning_path') {
     const { ProcessSkillsGapUpdateUseCase } = await import('../../application/useCases/ProcessSkillsGapUpdateUseCase.js');
     const processGapUpdateUseCase = new ProcessSkillsGapUpdateUseCase({
       skillsGapRepository,
@@ -865,7 +876,7 @@ async function skillsEngineHandler(payload, dependencies) {
     
     return {
       success: true,
-      action: payload.action || 'process_skills_gap',
+      action: action,
       data: {
         message: 'Skills gap processed successfully',
         skillsGap,
@@ -874,24 +885,19 @@ async function skillsEngineHandler(payload, dependencies) {
     };
   }
   
-  // If no 'gap' field, treat as data request (fill fields)
-  const { action: _, ...dataWithoutAction } = payload;
-  return {
-    success: true,
-    action: payload.action || 'fill_skills_engine_data',
-    data: await fillSkillsEngineData(dataWithoutAction, { skillsGapRepository, courseRepository })
-  };
+  // Unknown action
+  throw new Error(`Unknown Skills Engine action: ${action}. Supported actions: update_skills_gap, create_skills_gap, update_skills_gap_to_update_the_learning_path`);
 }
 
 /**
  * Directory Handler
  * Handles requests from the directory service
- * Data-driven: Processes based on what data is present, not action names
+ * Payload must contain an "action" field indicating the type of action
  * 
- * Flow:
- * - If payload contains company data (company_id, company_name, approval_policy) → Process company update
- * - ProcessCompanyUpdateUseCase uses upsertCompany which handles create vs update automatically
- * - If no company data → Fill company/learner data (read-only)
+ * Actions:
+ * - "sending_decision_maker_to_approve_learning_path": Update company with decision maker and approval policy
+ * - "update_company" or "register_company": Update/register company (same as above)
+ * - "fill_directory_data" or no action: Fill company/learner data (read-only)
  */
 async function directoryHandler(payload, dependencies) {
   const { 
@@ -899,10 +905,12 @@ async function directoryHandler(payload, dependencies) {
     learnerRepository,
     geminiClient
   } = dependencies;
+  const { action } = payload;
   
-  // Check if this is a company update (has company_id, company_name, and approval_policy/decision_maker_policy)
-  // ProcessCompanyUpdateUseCase uses upsertCompany which handles create vs update automatically
-  if (payload.company_id && payload.company_name && (payload.approval_policy || payload.decision_maker_policy)) {
+  // Handle company updates from Directory
+  if (action === 'sending_decision_maker_to_approve_learning_path' || 
+      action === 'update_company' || 
+      action === 'register_company') {
     
     const { ProcessCompanyUpdateUseCase } = await import('../../application/useCases/ProcessCompanyUpdateUseCase.js');
     const processCompanyUpdateUseCase = new ProcessCompanyUpdateUseCase({
@@ -974,7 +982,7 @@ async function directoryHandler(payload, dependencies) {
     
     return {
       success: true,
-      action: payload.action || 'process_company_update',
+      action: action,
       data: {
         message: 'Company updated successfully',
         company: {
@@ -987,11 +995,12 @@ async function directoryHandler(payload, dependencies) {
     };
   }
   
-  // If no company update data, treat as data request (fill fields)
+  // Handle read-only data requests (fill_directory_data or no action)
+  // This is for backward compatibility - Directory might request data without updating
   const { action: _, ...dataWithoutAction } = payload;
   return {
     success: true,
-    action: payload.action || 'fill_directory_data',
+    action: action || 'fill_directory_data',
     data: await fillDirectoryData(dataWithoutAction, { 
       companyRepository, 
       learnerRepository 
