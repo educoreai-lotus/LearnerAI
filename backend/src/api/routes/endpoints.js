@@ -701,16 +701,12 @@ export async function fillManagementReportingData(data, { courseRepository, skil
 /**
  * Skills Engine Handler
  * Handles requests from the skills-engine service
- * Payload must contain an "action" field indicating the type of action
+ * Data-driven: Processes based on what data is present, not action names
  * 
- * Actions: 
- * - "update_skills_gap" or "update_skills_gap_to_update_the_learning_path": Update existing skills gap
- * - "create_skills_gap": Create new skills gap
- * 
- * All actions:
- * - Requires: user_id, user_name, company_id, company_name, competency_target_name, status, gap
- * - Processes skills gap and stores in database
- * - Creates learner if doesn't exist
+ * Flow:
+ * - If payload contains 'gap' field → Process skills gap (create or update based on what exists)
+ * - ProcessSkillsGapUpdateUseCase handles create vs update logic automatically
+ * - Creates company/learner if they don't exist
  * - Automatically triggers learning path generation after processing
  */
 async function skillsEngineHandler(payload, dependencies) {
@@ -729,14 +725,10 @@ async function skillsEngineHandler(payload, dependencies) {
     requestPathApprovalUseCase,
     distributePathUseCase
   } = dependencies;
-  const { action } = payload;
   
-  // Handle skills gap updates from Skills Engine
-  // Support both "update_skills_gap" and "update_skills_gap_to_update_the_learning_path"
-  // (both do the same thing - learning path generation is automatic)
-  if (action === 'update_skills_gap' || 
-      action === 'create_skills_gap' || 
-      action === 'update_skills_gap_to_update_the_learning_path') {
+  // Check if this is a skills gap update (has 'gap' field)
+  // ProcessSkillsGapUpdateUseCase will handle create vs update based on what exists in DB
+  if (payload.gap) {
     const { ProcessSkillsGapUpdateUseCase } = await import('../../application/useCases/ProcessSkillsGapUpdateUseCase.js');
     const processGapUpdateUseCase = new ProcessSkillsGapUpdateUseCase({
       skillsGapRepository,
@@ -761,10 +753,11 @@ async function skillsEngineHandler(payload, dependencies) {
     };
     
     // Use AI-powered mapping to handle ANY field name mismatch (falls back to predefined if AI unavailable)
+    // AI will intelligently map ANY field names from Skills Engine to expected format
     let mappingResult;
     try {
       mappingResult = geminiClient 
-        ? await mapFieldsWithAI(payload, geminiClient, 'skills-engine', targetSchema)
+        ? await mapFieldsWithAI(payload, geminiClient, 'skills-engine', {}, targetSchema)
         : { mapped_data: payload }; // Fallback if no AI client
     } catch (mappingError) {
       console.warn('⚠️  Field mapping failed, using original payload:', mappingError.message);
@@ -877,7 +870,7 @@ async function skillsEngineHandler(payload, dependencies) {
     
     return {
       success: true,
-      action: action,
+      action: payload.action || 'process_skills_gap',
       data: {
         message: 'Skills gap processed successfully',
         skillsGap,
@@ -886,8 +879,14 @@ async function skillsEngineHandler(payload, dependencies) {
     };
   }
   
-  // Unknown action
-  throw new Error(`Unknown Skills Engine action: ${action}. Supported actions: update_skills_gap, create_skills_gap, update_skills_gap_to_update_the_learning_path`);
+  // If no 'gap' field, treat as data request (fill fields)
+  // Return the data as-is (Skills Engine can request any data it needs)
+  const { action: _, ...dataWithoutAction } = payload;
+  return {
+    success: true,
+    action: payload.action || 'fill_skills_engine_data',
+    data: dataWithoutAction
+  };
 }
 
 /**
