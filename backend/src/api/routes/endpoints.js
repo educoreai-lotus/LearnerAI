@@ -124,6 +124,7 @@ export function createEndpointsRouter(dependencies) {
       try {
         switch (requestBody.requester_service) {
           case "skills-engine":
+          case "skills-engine-service":
             result = await skillsEngineHandler(requestBody.payload, dependencies);
             break;
           case "LearningAnalytics":
@@ -182,7 +183,7 @@ export function createEndpointsRouter(dependencies) {
             console.warn(`[Coordinator Request] ${requestId} - Unknown service: ${requestBody.requester_service}`);
             return res.status(400).setHeader('Content-Type', 'application/json').send(JSON.stringify({
               error: "Unknown requester_service",
-              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, analytics, LearningAnalytics, course-builder, ai, directory, Directory, rag, rag-microservice, rag-service`
+              message: `Unknown service: ${requestBody.requester_service}. Supported services: skills-engine, skills-engine-service, analytics, LearningAnalytics, course-builder, ai, directory, Directory, rag, rag-microservice, rag-service`
             }));
         }
         
