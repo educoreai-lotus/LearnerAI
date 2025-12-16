@@ -433,48 +433,9 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           }
         }
         
-        // Map learning path structure (steps-based format)
-        let learningPathSteps = [];
-        if (course.learning_path) {
-          if (course.learning_path.steps && Array.isArray(course.learning_path.steps)) {
-            learningPathSteps = course.learning_path.steps;
-          } else if (course.learning_path.modules && Array.isArray(course.learning_path.modules)) {
-            // Convert modules format to steps format
-            let stepIndex = 0;
-            course.learning_path.modules.forEach(module => {
-              if (module.lessons && Array.isArray(module.lessons)) {
-                module.lessons.forEach(lesson => {
-                  learningPathSteps.push({
-                    step: stepIndex++,
-                    title: lesson.lesson_name || '',
-                    duration: lesson.duration_minutes ? `${lesson.duration_minutes} minutes` : '',
-                    resources: [],
-                    objectives: module.objectives || [],
-                    estimatedTime: lesson.duration_minutes ? `${lesson.duration_minutes} minutes` : ''
-                  });
-                });
-              }
-            });
-          }
-        }
-        
-        // Calculate estimated completion from learning path
-        let estimatedCompletion = '';
-        if (course.learning_path?.estimated_duration_hours) {
-          estimatedCompletion = `${course.learning_path.estimated_duration_hours} hours`;
-        } else if (course.learning_path?.estimatedCompletion) {
-          estimatedCompletion = course.learning_path.estimatedCompletion;
-        } else if (learningPathSteps.length > 0) {
-          // Calculate from steps if available
-          const totalMinutes = learningPathSteps.reduce((sum, step) => {
-            const duration = step.duration || step.estimatedTime || '';
-            const minutes = parseInt(duration) || 0;
-            return sum + minutes;
-          }, 0);
-          if (totalMinutes > 0) {
-            estimatedCompletion = `${Math.round(totalMinutes / 60 * 10) / 10} hours`;
-          }
-        }
+        // Return learning_path in Prompt 3 format exactly as stored
+        // No conversion needed - return Prompt 3 structure directly
+        const learning_path = course.learning_path || null;
         
         // Collect data with fallback priority: skillsGap > learner > empty
         const user_name = skillsGap?.user_name || learner?.user_name || '';
@@ -485,21 +446,9 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         const exam_status = skillsGap?.exam_status || '';
         
         learningPaths.push({
-          user_id: course.user_id || '',
-          user_name: user_name,
-          company_id: company_id,
-          company_name: company_name,
           competency_target_name: course.competency_target_name || '',
-          gap_id: gap_id,
           skills_raw_data: skills_raw_data,
-          exam_status: exam_status,
-          learning_path: {
-            steps: learningPathSteps,
-            estimatedCompletion: estimatedCompletion,
-            totalSteps: learningPathSteps.length,
-            createdAt: course.created_at || '',
-            updatedAt: course.last_modified_at || ''
-          }
+          learning_path: learning_path
         });
       }
       
@@ -511,7 +460,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
     }
   }
   
-  // If only user_id is provided, return all courses for that user (without learning_path)
+  // If only user_id is provided, return all courses for that user (WITH learning_path)
   if (data.user_id && !data.competency_target_name) {
     try {
       if (courseRepository && typeof courseRepository.getCoursesByUser === 'function') {
@@ -527,7 +476,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           }
         }
         
-        // Build response array with all courses for this user (without learning_path)
+        // Build response array with all courses for this user (WITH learning_path)
         const userData = [];
         for (const course of courses || []) {
           // Get skills gap for each course
@@ -543,21 +492,20 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
             }
           }
           
-          // Use fallback: skillsGap > learner > empty
+          // Return learning_path in Prompt 3 format exactly as stored
+          // No conversion needed - return Prompt 3 structure directly
+          const learning_path = course.learning_path || null;
+          const skills_raw_data = skillsGap?.skills_raw_data || null;
+          
+          // Return simplified format: only competency_target_name, skills_raw_data, learning_path
           userData.push({
-            user_id: course.user_id,
-            user_name: skillsGap?.user_name || learner?.user_name || '',
-            company_id: skillsGap?.company_id || learner?.company_id || '',
-            company_name: skillsGap?.company_name || learner?.company_name || '',
             competency_target_name: course.competency_target_name,
-            gap_id: skillsGap?.gap_id || null,
-            skills_raw_data: skillsGap?.skills_raw_data || null,
-            exam_status: skillsGap?.exam_status || null
-            // Note: learning_path is NOT included in on-demand mode
+            skills_raw_data: skills_raw_data,
+            learning_path: learning_path
           });
         }
         
-        return userData; // Return array of user data
+        return userData; // Return array of user data with learning_path
       }
     } catch (error) {
       console.warn(`[Endpoints] Could not fetch courses for user ${data.user_id}:`, error.message);
@@ -566,9 +514,8 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
   }
 
   // If user_id + competency_target_name is provided, return specific course data
+  // Return as array with simplified format for Learning Analytics
   if (data.user_id && data.competency_target_name) {
-    const filled = { ...data };
-
     try {
       // Get skills gap for analytics
       let skillsGap = null;
@@ -577,46 +524,24 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           data.user_id,
           data.competency_target_name
         );
-        if (skillsGap) {
-          filled.gap_id = skillsGap.gap_id || filled.gap_id || null;
-          filled.skills_raw_data = skillsGap.skills_raw_data || filled.skills_raw_data || null;
-          filled.exam_status = skillsGap.exam_status || filled.exam_status || null;
-          filled.user_name = skillsGap.user_name || filled.user_name || '';
-          filled.company_id = skillsGap.company_id || filled.company_id || '';
-          filled.company_name = skillsGap.company_name || filled.company_name || '';
-        }
       }
       
-      // Fallback: Get learner data if skills gap doesn't have user/company info
-      if ((!skillsGap || !skillsGap.user_name || !skillsGap.company_name) && learnerRepository && typeof learnerRepository.getLearnerById === 'function') {
-        try {
-          const learner = await learnerRepository.getLearnerById(data.user_id);
-          if (learner) {
-            filled.user_name = filled.user_name || learner.user_name || '';
-            filled.company_id = filled.company_id || learner.company_id || '';
-            filled.company_name = filled.company_name || learner.company_name || '';
-          }
-        } catch (error) {
-          console.warn(`[Endpoints] Could not fetch learner for ${data.user_id}:`, error.message);
-        }
+      // Get course with learning_path
+      let course = null;
+      if (courseRepository && typeof courseRepository.getCourseById === 'function') {
+        course = await courseRepository.getCourseById(data.competency_target_name);
       }
-
-      // Only include learning_path if explicitly requested (competency_target_name provided)
-      // Note: In on-demand mode, we typically don't send learning_path unless specifically requested
-      if (data.include_learning_path !== false) {
-        if (courseRepository && typeof courseRepository.getCourseById === 'function') {
-          const course = await courseRepository.getCourseById(data.competency_target_name);
-          if (course) {
-            filled.learning_path = course.learning_path || filled.learning_path || null;
-            filled.approved = course.approved !== undefined ? course.approved : filled.approved || false;
-          }
-        }
-      }
+      
+      // Return simplified format: only competency_target_name, skills_raw_data, learning_path
+      return [{
+        competency_target_name: data.competency_target_name,
+        skills_raw_data: skillsGap?.skills_raw_data || null,
+        learning_path: course?.learning_path || null
+      }];
     } catch (error) {
       console.warn(`[Endpoints] Could not fetch analytics data:`, error.message);
+      return [];
     }
-
-    return filled;
   }
 
   // If neither user_id nor competency_target_name provided, return empty
@@ -1023,36 +948,132 @@ async function analyticsHandler(payload, dependencies) {
   const { action: _, ...dataWithoutAction } = payload;
   const result = await fillLearningAnalyticsData(dataWithoutAction, { courseRepository, skillsGapRepository, learnerRepository });
   
-  // For batch requests, format response according to LearningAnalytics expectations
-  if (payload.type === 'batch' || payload.date_range) {
-    const formattedResult = {
-      version: "1.0.0",
-      fetched_at: new Date().toISOString(),
-      pagination: {
-        total_learning_paths: Array.isArray(result) ? result.length : 0,
-        returned_learning_paths: Array.isArray(result) ? result.length : 0,
-        next_cursor: "",
-        has_more: false
-      },
-      learning_paths: Array.isArray(result) ? result : []
-    };
-    
-    console.log('[AnalyticsHandler] Batch response formatted:', {
-      total_learning_paths: formattedResult.pagination.total_learning_paths,
-      learning_paths_count: formattedResult.learning_paths.length
-    });
-    
-    return {
-      success: true,
-      action: action,
-      data: formattedResult
-    };
-  }
+  // Simplified response: Return simple array with competency_target_name, skills_raw_data, learning_path
+  // No wrapper structure, no pagination - just the data array
+  const coursesArray = Array.isArray(result) ? result : [];
+  
+  // Transform to simplified format: only competency_target_name, skills_raw_data, learning_path
+  const simplifiedCourses = coursesArray.map(course => ({
+    competency_target_name: course.competency_target_name || '',
+    skills_raw_data: course.skills_raw_data || {},
+    learning_path: course.learning_path || null
+  }));
+  
+  console.log(`[AnalyticsHandler] ${payload.type || 'on-demand'} response:`, {
+    type: payload.type || 'on-demand',
+    courses_count: simplifiedCourses.length
+  });
   
   return {
     success: true,
     action: action,
-    data: result
+    data: simplifiedCourses
+  };
+}
+
+/**
+ * Helper function: Get career paths for a single user
+ * Reusable logic for fetching all courses and building career_learning_paths array
+ * Used by both single user (career_path_driven) and batch learners requests
+ */
+async function getCareerPathsForUser(user_id, company_id, { courseRepository, skillsGapRepository, learnerRepository }) {
+  if (!user_id) {
+    throw new Error('user_id is required');
+  }
+  
+  // Fetch all courses for this user
+  let allCourses = [];
+  let user_name = null;
+  let company_name = null;
+  
+  // Get all courses for user
+  if (courseRepository && typeof courseRepository.getCoursesByUser === 'function') {
+    allCourses = await courseRepository.getCoursesByUser(user_id);
+    console.log(`✅ Found ${allCourses.length} courses for user ${user_id}`);
+  }
+  
+  // Get user_name, company_id, and company_name from first skills gap or learner
+  if (skillsGapRepository && allCourses.length > 0) {
+    // Try to get from first skills gap (most reliable source)
+    const firstCompetency = allCourses[0].competencyTargetName || allCourses[0].competency_target_name;
+    if (firstCompetency) {
+      const firstSkillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, firstCompetency);
+      if (firstSkillsGap) {
+        user_name = firstSkillsGap.user_name;
+        // Use company_id from parameter if provided, otherwise from skills gap
+        company_id = company_id || firstSkillsGap.company_id;
+        company_name = firstSkillsGap.company_name;
+      }
+    }
+  }
+  
+  // Fallback: Get from learner repository if skills gap didn't have the info
+  if ((!user_name || !company_name || !company_id) && learnerRepository && typeof learnerRepository.getLearnerById === 'function') {
+    try {
+      const learner = await learnerRepository.getLearnerById(user_id);
+      if (learner) {
+        user_name = user_name || learner.user_name || learner.userName;
+        company_id = company_id || learner.company_id || learner.companyId;
+        company_name = company_name || learner.company_name || learner.companyName;
+      }
+    } catch (error) {
+      console.warn(`⚠️  Could not fetch learner for ${user_id}:`, error.message);
+    }
+  }
+  
+  // Build career_learning_paths array
+  const career_learning_paths = [];
+  
+  for (const course of allCourses) {
+    const competency_target_name = course.competencyTargetName || course.competency_target_name;
+    
+    if (!competency_target_name) {
+      console.warn(`⚠️  Course missing competency_target_name, skipping:`, course);
+      continue;
+    }
+    
+    // Get learning_path from course
+    let learning_path = course.learning_path || course.pathMetadata;
+    if (typeof learning_path === 'string') {
+      try {
+        learning_path = JSON.parse(learning_path);
+      } catch (e) {
+        console.warn(`⚠️  Could not parse learning_path JSON for ${competency_target_name}:`, e.message);
+        learning_path = null;
+      }
+    }
+    
+    // Get skills_raw_data from skills_gap table
+    let skills_raw_data = null;
+    if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
+      try {
+        const skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competency_target_name);
+        if (skillsGap) {
+          skills_raw_data = skillsGap.skills_raw_data;
+          // Also get user_name and company_name if not already set
+          if (!user_name && skillsGap.user_name) user_name = skillsGap.user_name;
+          if (!company_name && skillsGap.company_name) company_name = skillsGap.company_name;
+        }
+      } catch (error) {
+        console.warn(`⚠️  Could not fetch skills gap for ${competency_target_name}:`, error.message);
+      }
+    }
+    
+    // Add to career_learning_paths array
+    career_learning_paths.push({
+      competency_target_name: competency_target_name,
+      skills_raw_data: skills_raw_data,
+      learning_path: learning_path
+    });
+  }
+  
+  return {
+    user_id: user_id,
+    user_name: user_name,
+    company_id: company_id,
+    company_name: company_name,
+    learning_flow: 'career_path_driven',
+    career_learning_paths: career_learning_paths
   };
 }
 
@@ -1080,8 +1101,82 @@ async function courseBuilderHandler(payload, dependencies) {
     return await aiHandler(payload, dependencies);
   }
   
-  // Handle career path driven request (learning_flow === "career_path_driven")
-  // Check this FIRST before action checks - data-driven approach
+  // Handle batch learners request (data-driven: checks for learners array)
+  // Course Builder can send a list of learner_ids and get career paths for all of them
+  // May include learning_flow: "career_path_driven" in the payload
+  if (payload.learners && Array.isArray(payload.learners) && payload.learners.length > 0) {
+    const { company_id, company_name, learning_flow } = payload;
+    const learners = payload.learners;
+    
+    // Validate required fields - company_id is REQUIRED for batch requests
+    // since Course Builder sends all learners from a specific company
+    // company_name is optional (can be fetched from database if needed)
+    if (!company_id) {
+      throw new Error('company_id is required for batch learners request. Course Builder must provide company_id when sending learners from a company.');
+    }
+    
+    // Use learning_flow from payload if provided, otherwise default to 'career_path_driven'
+    const finalLearningFlow = learning_flow || 'career_path_driven';
+    
+    console.log(`📊 Processing batch learners request: ${learners.length} learners, company_id: ${company_id}${company_name ? `, company_name: ${company_name}` : ''}, learning_flow: ${finalLearningFlow}`);
+    
+    // Process each learner and collect results
+    const learnersData = [];
+    
+    for (const learnerItem of learners) {
+      const learner_id = learnerItem.learner_id || learnerItem.user_id || learnerItem;
+      
+      if (!learner_id) {
+        console.warn(`⚠️  Skipping learner item with no learner_id:`, learnerItem);
+        continue;
+      }
+      
+      try {
+        // Get career paths for this learner (reuse same logic as career_path_driven)
+        const learnerCareerPaths = await getCareerPathsForUser(
+          learner_id,
+          company_id,
+          { courseRepository, skillsGapRepository, learnerRepository }
+        );
+        
+        // Override learning_flow if provided in payload
+        if (finalLearningFlow) {
+          learnerCareerPaths.learning_flow = finalLearningFlow;
+        }
+        
+        learnersData.push(learnerCareerPaths);
+      } catch (error) {
+        console.error(`❌ Error processing learner ${learner_id}:`, error.message);
+        // Continue with other learners even if one fails
+        // Optionally add error entry to results
+        learnersData.push({
+          user_id: learner_id,
+          user_name: null,
+          company_id: company_id,  // Required - validated above
+          company_name: company_name || null,  // Optional - can be null if not provided
+          learning_flow: finalLearningFlow,
+          career_learning_paths: [],
+          error: error.message
+        });
+      }
+    }
+    
+    console.log(`✅ Batch learners request completed: ${learnersData.length} learners processed`);
+    
+    return {
+      success: true,
+      action: action || 'get_batch_career_paths',
+      data: {
+        company_id: company_id,  // Required - validated above
+        company_name: company_name || null,  // Optional - can be null if not provided
+        learning_flow: finalLearningFlow,
+        learners_data: learnersData
+      }
+    };
+  }
+  
+  // Handle single learner career path driven request (data-driven: checks for learning_flow)
+  // Check this BEFORE action checks - data-driven approach
   // Fetch ALL courses for user_id and return as career_learning_paths array
   if (payload.learning_flow === 'career_path_driven') {
     let { user_id, company_id } = payload;
@@ -1090,112 +1185,26 @@ async function courseBuilderHandler(payload, dependencies) {
       throw new Error('user_id is required for career_path_driven learning_flow');
     }
     
-    // Fetch all courses for this user
-    let allCourses = [];
-    let user_name = null;
-    let company_name = null;
-    
     try {
-      // Get all courses for user
-      if (courseRepository && typeof courseRepository.getCoursesByUser === 'function') {
-        allCourses = await courseRepository.getCoursesByUser(user_id);
-        console.log(`✅ Found ${allCourses.length} courses for user ${user_id}`);
-      }
-      
-      // Get user_name, company_id, and company_name from first skills gap or learner
-      if (skillsGapRepository && allCourses.length > 0) {
-        // Try to get from first skills gap (most reliable source)
-        const firstCompetency = allCourses[0].competencyTargetName || allCourses[0].competency_target_name;
-        if (firstCompetency) {
-          const firstSkillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, firstCompetency);
-          if (firstSkillsGap) {
-            user_name = firstSkillsGap.user_name;
-            // Use company_id from payload if provided, otherwise from skills gap
-            company_id = company_id || firstSkillsGap.company_id;
-            company_name = firstSkillsGap.company_name;
-          }
-        }
-      }
-      
-      // Fallback: Get from learner repository if skills gap didn't have the info
-      if ((!user_name || !company_name || !company_id) && learnerRepository && typeof learnerRepository.getLearnerById === 'function') {
-        try {
-          const learner = await learnerRepository.getLearnerById(user_id);
-          if (learner) {
-            user_name = user_name || learner.user_name || learner.userName;
-            company_id = company_id || learner.company_id || learner.companyId;
-            company_name = company_name || learner.company_name || learner.companyName;
-          }
-        } catch (error) {
-          console.warn(`⚠️  Could not fetch learner for ${user_id}:`, error.message);
-        }
-      }
-      
-      // Build career_learning_paths array
-      const career_learning_paths = [];
-      
-      for (const course of allCourses) {
-        const competency_target_name = course.competencyTargetName || course.competency_target_name;
-        
-        if (!competency_target_name) {
-          console.warn(`⚠️  Course missing competency_target_name, skipping:`, course);
-          continue;
-        }
-        
-        // Get learning_path from course
-        let learning_path = course.learning_path || course.pathMetadata;
-        if (typeof learning_path === 'string') {
-          try {
-            learning_path = JSON.parse(learning_path);
-          } catch (e) {
-            console.warn(`⚠️  Could not parse learning_path JSON for ${competency_target_name}:`, e.message);
-            learning_path = null;
-          }
-        }
-        
-        // Get skills_raw_data from skills_gap table
-        let skills_raw_data = null;
-        if (skillsGapRepository && typeof skillsGapRepository.getSkillsGapByUserAndCompetency === 'function') {
-          try {
-            const skillsGap = await skillsGapRepository.getSkillsGapByUserAndCompetency(user_id, competency_target_name);
-            if (skillsGap) {
-              skills_raw_data = skillsGap.skills_raw_data;
-              // Also get user_name and company_name if not already set
-              if (!user_name && skillsGap.user_name) user_name = skillsGap.user_name;
-              if (!company_name && skillsGap.company_name) company_name = skillsGap.company_name;
-            }
-          } catch (error) {
-            console.warn(`⚠️  Could not fetch skills gap for ${competency_target_name}:`, error.message);
-          }
-        }
-        
-        // Add to career_learning_paths array
-        career_learning_paths.push({
-          competency_target_name: competency_target_name,
-          skills_raw_data: skills_raw_data,
-          learning_path: learning_path
-        });
-      }
+      // Get career paths for this single user
+      const careerPathsData = await getCareerPathsForUser(
+        user_id,
+        company_id,
+        { courseRepository, skillsGapRepository, learnerRepository }
+      );
       
       console.log(`📊 Returning career path data for user ${user_id}:`, {
-        user_name,
-        company_name,
-        company_id: company_id || 'not provided',
+        user_name: careerPathsData.user_name,
+        company_name: careerPathsData.company_name,
+        company_id: careerPathsData.company_id || 'not provided',
         learning_flow: 'career_path_driven',
-        career_learning_paths_count: career_learning_paths.length
+        career_learning_paths_count: careerPathsData.career_learning_paths.length
       });
       
       return {
         success: true,
         action: action || 'get_career_paths',
-        data: {
-          user_id: user_id,
-          user_name: user_name,
-          company_id: company_id,
-          company_name: company_name,
-          learning_flow: 'career_path_driven',
-          career_learning_paths: career_learning_paths
-        }
+        data: careerPathsData
       };
     } catch (error) {
       console.error('❌ Error fetching career path data:', error.message);
