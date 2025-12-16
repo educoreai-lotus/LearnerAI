@@ -33,7 +33,7 @@
             "requester_service": {
               "type": "string",
               "required": true,
-              "description": "Name of the service making the request (e.g., 'course-builder', 'analytics', 'skills-engine', 'ai')"
+              "description": "Name of the service making the request (e.g., 'course-builder' or 'course-builder-service', 'analytics', 'skills-engine' or 'skills-engine-service', 'ai')"
             }
           }
         },
@@ -41,7 +41,8 @@
           "type": "object",
           "properties": {
             "data": {
-              "type": "object"
+              "type": ["object", "array"],
+              "description": "Response data - can be an object or array depending on the service and action"
             },
             "error": {
               "type": "string"
@@ -51,6 +52,10 @@
             },
             "success": {
               "type": "boolean"
+            },
+            "action": {
+              "type": "string",
+              "description": "Action that was performed"
             }
           }
         }

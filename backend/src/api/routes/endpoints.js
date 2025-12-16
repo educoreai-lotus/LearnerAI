@@ -134,6 +134,7 @@ export function createEndpointsRouter(dependencies) {
             result = await analyticsHandler(requestBody.payload, dependencies);
             break;
           case "course-builder":
+          case "course-builder-service":
             result = await courseBuilderHandler(requestBody.payload, dependencies);
             break;
           case "ai":
@@ -448,6 +449,7 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         learningPaths.push({
           competency_target_name: course.competency_target_name || '',
           skills_raw_data: skills_raw_data,
+          exam_status: exam_status || '',
           learning_path: learning_path
         });
       }
@@ -497,10 +499,14 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           const learning_path = course.learning_path || null;
           const skills_raw_data = skillsGap?.skills_raw_data || null;
           
-          // Return simplified format: only competency_target_name, skills_raw_data, learning_path
+          // Get exam_status from skills gap
+          const exam_status = skillsGap?.exam_status || '';
+          
+          // Return simplified format: competency_target_name, skills_raw_data, exam_status, learning_path
           userData.push({
             competency_target_name: course.competency_target_name,
             skills_raw_data: skills_raw_data,
+            exam_status: exam_status,
             learning_path: learning_path
           });
         }
@@ -532,10 +538,11 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         course = await courseRepository.getCourseById(data.competency_target_name);
       }
       
-      // Return simplified format: only competency_target_name, skills_raw_data, learning_path
+      // Return simplified format: competency_target_name, skills_raw_data, exam_status, learning_path
       return [{
         competency_target_name: data.competency_target_name,
         skills_raw_data: skillsGap?.skills_raw_data || null,
+        exam_status: skillsGap?.exam_status || '',
         learning_path: course?.learning_path || null
       }];
     } catch (error) {
@@ -948,14 +955,15 @@ async function analyticsHandler(payload, dependencies) {
   const { action: _, ...dataWithoutAction } = payload;
   const result = await fillLearningAnalyticsData(dataWithoutAction, { courseRepository, skillsGapRepository, learnerRepository });
   
-  // Simplified response: Return simple array with competency_target_name, skills_raw_data, learning_path
+  // Simplified response: Return simple array with competency_target_name, skills_raw_data, exam_status, learning_path
   // No wrapper structure, no pagination - just the data array
   const coursesArray = Array.isArray(result) ? result : [];
   
-  // Transform to simplified format: only competency_target_name, skills_raw_data, learning_path
+  // Transform to simplified format: competency_target_name, skills_raw_data, exam_status, learning_path
   const simplifiedCourses = coursesArray.map(course => ({
     competency_target_name: course.competency_target_name || '',
     skills_raw_data: course.skills_raw_data || {},
+    exam_status: course.exam_status || '',
     learning_path: course.learning_path || null
   }));
   

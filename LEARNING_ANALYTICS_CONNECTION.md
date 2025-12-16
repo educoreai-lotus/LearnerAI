@@ -35,11 +35,12 @@ This document describes the simplified connection between Learning Analytics and
 
 ### Response Structure
 
-LearnerAI returns an **array of courses**, where each course contains **exactly 3 fields in this order**:
+LearnerAI returns an **array of courses**, where each course contains **exactly 4 fields in this order**:
 
 1. `competency_target_name` - The competency/course name
 2. `skills_raw_data` - Skills gap data (object)
-3. `learning_path` - Learning path in Prompt 3 format (object)
+3. `exam_status` - Exam status: `"pass"` or `"fail"` (string)
+4. `learning_path` - Learning path in Prompt 3 format (object)
 
 ### Response Format
 
@@ -50,6 +51,7 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
     "skills_raw_data": {
       /* skills gap object */
     },
+    "exam_status": "pass" | "fail",
     "learning_path": {
       "path_title": "string",
       "learner_id": "uuid",
@@ -96,7 +98,7 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
 - Returns **ALL courses** in the database (all users, all competencies)
 
 **Response:**
-- Array of all courses with `competency_target_name`, `skills_raw_data`, `learning_path`
+- Array of all courses with `competency_target_name`, `skills_raw_data`, `exam_status`, `learning_path`
 
 **Example:**
 ```json
@@ -104,11 +106,13 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
   {
     "competency_target_name": "React Frontend Development",
     "skills_raw_data": { /* ... */ },
+    "exam_status": "fail",
     "learning_path": { /* Prompt 3 format */ }
   },
   {
     "competency_target_name": "Node.js Backend Development",
     "skills_raw_data": { /* ... */ },
+    "exam_status": "pass",
     "learning_path": { /* Prompt 3 format */ }
   }
   // ... all courses in database
@@ -123,7 +127,7 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
 - Returns **ALL courses** for the specified `user_id`
 
 **Response:**
-- Array of courses for that user with `competency_target_name`, `skills_raw_data`, `learning_path`
+- Array of courses for that user with `competency_target_name`, `skills_raw_data`, `exam_status`, `learning_path`
 
 **Example:**
 ```json
@@ -131,11 +135,13 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
   {
     "competency_target_name": "React Frontend Development",
     "skills_raw_data": { /* ... */ },
+    "exam_status": "fail",
     "learning_path": { /* Prompt 3 format */ }
   },
   {
     "competency_target_name": "Python Data Science",
     "skills_raw_data": { /* ... */ },
+    "exam_status": "pass",
     "learning_path": { /* Prompt 3 format */ }
   }
   // ... all courses for user_id
@@ -185,8 +191,8 @@ The `learning_path` field uses **exactly** the Prompt 3 format:
 
 | Request Type | Returns | Fields Order |
 |-------------|---------|--------------|
-| **Batch** | All courses in database | 1. `competency_target_name`<br>2. `skills_raw_data`<br>3. `learning_path` |
-| **On-Demand** | All courses for `user_id` | 1. `competency_target_name`<br>2. `skills_raw_data`<br>3. `learning_path` |
+| **Batch** | All courses in database | 1. `competency_target_name`<br>2. `skills_raw_data`<br>3. `exam_status`<br>4. `learning_path` |
+| **On-Demand** | All courses for `user_id` | 1. `competency_target_name`<br>2. `skills_raw_data`<br>3. `exam_status`<br>4. `learning_path` |
 
 **No wrapper structure, no pagination, no extra fields** - just a simple array of courses with the 3 fields in the specified order.
 

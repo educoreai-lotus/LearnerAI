@@ -40,20 +40,22 @@
 ### **Feature 2: Path Distribution & Approval Workflow**
 
 **User Story:**
-> "As a company, I want to control whether learning paths are sent automatically or require manager approval before being sent to Course Builder."
+> "As a company, I want to control whether learning paths are approved automatically or require manager approval before being available to Course Builder."
 
 **What Happens:**
 1. Directory sends company registration with approval policy (auto/manual)
 2. LearnerAI checks the policy
-3. If **auto** → sends directly to Course Builder
-4. If **manual** → sends for manager approval, then to Course Builder
-5. Also sends to Learning Analytics and Management Reports
+3. If **auto** → learning path is stored as `approved: true`
+4. If **manual** → learning path is stored as `approved: false`, sends for manager approval
+5. Course Builder requests learning paths on-demand when needed
+6. Learning Analytics requests data on-demand or in batch mode
 
 **Key Components:**
 - Company approval policies (auto/manual)
 - Decision maker notifications
 - Approval workflow management
-- Exception: Updates after exam failure skip approval
+- Course Builder pulls data on-demand (no automatic push)
+- Learning Analytics pulls data on-demand or batch
 
 ---
 
@@ -81,18 +83,23 @@
 
 #### 📥 **What LearnerAI Receives (Incoming):**
 
-**Endpoint:** `POST /api/v1/companies/register`
+**Endpoint:** `POST /api/fill-content-metrics`
 
 **Request Body:**
 ```json
 {
-  "company_id": "uuid",
-  "company_name": "TechCorp Inc.",
-  "approval_policy": "auto" | "manual",
-  "decision_maker": {
-    "employee_id": "uuid",
-    "employee_name": "John Manager",
-    "employee_email": "john@techcorp.com"
+  "requester_service": "directory" | "Directory",
+  "payload": {
+    "action": "sending_decision_maker_to_approve_learning_path" | "update_company" | "register_company",
+    "company_id": "uuid",
+    "company_name": "TechCorp Inc.",
+    "approval_policy": "auto" | "manual",
+    "decision_maker_policy": "auto" | "manual",
+    "decision_maker": {
+      "employee_id": "uuid",
+      "employee_name": "John Manager",
+      "employee_email": "john@techcorp.com"
+    }
   }
 }
 ```
@@ -100,8 +107,8 @@
 **Headers:**
 ```http
 Content-Type: application/json
-Authorization: Bearer {LEARNER_AI_SERVICE_TOKEN}
-X-Service-Token: {LEARNER_AI_SERVICE_TOKEN}
+X-Service-Name: directory-service
+X-Signature: <ECDSA signature>
 ```
 
 **When Directory Calls:**
@@ -135,23 +142,28 @@ X-Service-Token: {LEARNER_AI_SERVICE_TOKEN}
 
 #### 📥 **Type 1: Skills Gap (Incoming)**
 
-**Endpoint:** `POST /api/v1/skills-gaps`
+**Endpoint:** `POST /api/fill-content-metrics`
 
 **Request Body:**
 ```json
 {
-  "user_id": "uuid",
-  "user_name": "Alice Johnson",
-  "company_id": "uuid",
-  "company_name": "TechCorp Inc.",
-  "competency_target_name": "JavaScript Modern Development",
-  "exam_status": "PASS" | "FAIL",
-  "gap": {
-    "Competency_Front_End_Development": [
-      "MGS_React_Hooks_Advanced",
-      "MGS_Flexbox_Grid_System",
-      "MGS_Async_Await_Handling"
-    ]
+  "requester_service": "skills-engine" | "skills-engine-service",
+  "payload": {
+    "action": "update_skills_gap" | "create_skills_gap" | "update_skills_gap_to_update_the_learning_path",
+    "user_id": "uuid",
+    "user_name": "Alice Johnson",
+    "company_id": "uuid",
+    "company_name": "TechCorp Inc.",
+    "competency_target_name": "JavaScript Modern Development",
+    "status": "pass" | "fail",
+    "exam_status": "PASS" | "FAIL",
+    "gap": {
+      "Competency_Front_End_Development": [
+        "MGS_React_Hooks_Advanced",
+        "MGS_Flexbox_Grid_System",
+        "MGS_Async_Await_Handling"
+      ]
+    }
   }
 }
 ```
@@ -159,9 +171,11 @@ X-Service-Token: {LEARNER_AI_SERVICE_TOKEN}
 **Headers:**
 ```http
 Content-Type: application/json
-Authorization: Bearer {LEARNER_AI_SERVICE_TOKEN}
-X-Service-Token: {LEARNER_AI_SERVICE_TOKEN}
+X-Service-Name: skills-engine-service
+X-Signature: <ECDSA signature>
 ```
+
+**Note:** LearnerAI uses AI-powered field mapping to handle field name mismatches (e.g., `trainer_id` → `user_id`, `the_gap` → `gap`).
 
 **When Skills Engine Calls:**
 - ✅ After each exam completion
@@ -250,142 +264,289 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 
 ### 3️⃣ **Learning Analytics Microservice** (Bidirectional)
 
-#### 📥 **Type 1: On-Demand Requests (Incoming)**
+#### 📥 **Type 1: Batch Requests (Incoming)**
 
 **Endpoint:** `POST /api/fill-content-metrics`
 
 **Request Body:**
 ```json
 {
-  "serviceName": "LearningAnalytics",
-  "payload": "{\"user_id\":\"uuid\"}"
+  "requester_service": "LearningAnalytics",
+  "payload": {
+    "type": "batch",
+    "action": "batch:ROUTE_TO_LearnerAI: ..."
+  }
 }
 ```
 
 **Response from LearnerAI:**
 ```json
 {
-  "serviceName": "LearningAnalytics",
-  "payload": "[{\"user_id\":\"uuid\",\"user_name\":\"string\",\"company_id\":\"uuid\",\"company_name\":\"string\",\"competency_target_name\":\"string\",\"gap_id\":\"uuid\",\"skills_raw_data\":{...},\"exam_status\":\"PASS\"|\"FAIL\"},...]"
+  "success": true,
+  "action": "batch:...",
+  "data": [
+    {
+      "competency_target_name": "string",
+      "skills_raw_data": {
+        "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
+      },
+      "learning_path": {
+        "path_title": "string",
+        "learner_id": "uuid",
+        "total_estimated_duration_hours": number,
+        "learning_modules": [
+          {
+            "module_order": number,
+            "module_title": "string",
+            "estimated_duration_hours": number,
+            "skills_in_module": ["skill1", "skill2"],
+            "steps": [
+              {
+                "step": number,
+                "title": "string",
+                "description": "string",
+                "estimatedTime": number,
+                "skills_covered": ["skill1"]
+              }
+            ]
+          }
+        ]
+      }
+    }
+    // ... all courses in database
+  ]
 }
 ```
 
-**Note:** In on-demand mode, LearnerAI does **NOT** send `learning_path` unless Learning Analytics specifically requests it by including `competency_target_name` in the request.
-
 **When Learning Analytics Calls:**
-- ✅ When Learning Analytics needs data for a specific user
-- ✅ On-demand requests for user analytics
+- ✅ When Learning Analytics needs all learning paths (batch mode)
+- ✅ Returns **ALL courses** in the database (all users, all competencies)
 
-#### 📤 **Type 2: Batch Mode (Outgoing)**
+**Note:** Returns simple array with 3 fields per course: `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format)
 
-**Endpoint:** `POST {ANALYTICS_URL}/api/v1/paths/batch`
+#### 📥 **Type 2: On-Demand Requests (Incoming)**
+
+**Endpoint:** `POST /api/fill-content-metrics`
 
 **Request Body:**
 ```json
-[
-  {
+{
+  "requester_service": "LearningAnalytics",
+  "payload": {
+    "type": "on-demand",
+    "action": "on-demand:ROUTE_TO_LearnerAI: ...",
+    "user_id": "uuid"
+  }
+}
+```
+
+**Response from LearnerAI:**
+```json
+{
+  "success": true,
+  "action": "on-demand:...",
+  "data": [
+    {
+      "competency_target_name": "string",
+      "skills_raw_data": {
+        "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
+      },
+      "learning_path": {
+        "path_title": "string",
+        "learner_id": "uuid",
+        "total_estimated_duration_hours": number,
+        "learning_modules": [
+          {
+            "module_order": number,
+            "module_title": "string",
+            "estimated_duration_hours": number,
+            "skills_in_module": ["skill1", "skill2"],
+            "steps": [
+              {
+                "step": number,
+                "title": "string",
+                "description": "string",
+                "estimatedTime": number,
+                "skills_covered": ["skill1"]
+              }
+            ]
+          }
+        ]
+      }
+    }
+    // ... all courses for this user_id
+  ]
+}
+```
+
+**When Learning Analytics Calls:**
+- ✅ When Learning Analytics needs data for a specific user
+- ✅ Returns **ALL courses** for that `user_id`
+
+**Note:** Returns simple array with 3 fields per course: `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format). **Both batch and on-demand return the same structure** - just different scope (all courses vs. user-specific courses).
+
+---
+
+### 4️⃣ **Course Builder Microservice** (Bidirectional)
+
+#### 📥 **Type 1: Batch Learners Request (Incoming)**
+
+**Endpoint:** `POST /api/fill-content-metrics`
+
+**Request Body:**
+```json
+{
+  "requester_service": "course-builder",
+  "payload": {
+    "company_id": "uuid",
+    "company_name": "string",
+    "learning_flow": "career_path_driven",
+    "learners": [
+      { "learner_id": "uuid1" },
+      { "learner_id": "uuid2" }
+    ]
+  }
+}
+```
+
+**Response from LearnerAI:**
+```json
+{
+  "success": true,
+  "action": "get_batch_career_paths",
+  "data": {
+    "company_id": "uuid",
+    "company_name": "string",
+    "learning_flow": "career_path_driven",
+    "learners_data": [
+      {
+        "user_id": "uuid1",
+        "user_name": "string",
+        "company_id": "uuid",
+        "company_name": "string",
+        "learning_flow": "career_path_driven",
+        "career_learning_paths": [
+          {
+            "competency_target_name": "string",
+            "skills_raw_data": {},
+            "learning_path": {
+              "path_title": "string",
+              "learner_id": "uuid",
+              "total_estimated_duration_hours": number,
+              "learning_modules": [...]
+            }
+          }
+        ]
+      }
+      // ... one object per learner
+    ]
+  }
+}
+```
+
+**When Course Builder Calls:**
+- ✅ When Course Builder needs career paths for multiple learners from a company
+- ✅ Returns all courses for each learner in the `learners` array
+
+**Note:** `company_id` is **required**, `company_name` is optional. Returns Prompt 3 format learning paths.
+
+#### 📥 **Type 2: Single Learner Career Path Request (Incoming)**
+
+**Endpoint:** `POST /api/fill-content-metrics`
+
+**Request Body:**
+```json
+{
+  "requester_service": "course-builder",
+  "payload": {
+    "user_id": "uuid",
+    "company_id": "uuid",
+    "learning_flow": "career_path_driven"
+  }
+}
+```
+
+**Response from LearnerAI:**
+```json
+{
+  "success": true,
+  "action": "get_career_paths",
+  "data": {
     "user_id": "uuid",
     "user_name": "string",
     "company_id": "uuid",
     "company_name": "string",
-    "competency_target_name": "string",
-    "gap_id": "uuid",
-    "skills_raw_data": {
-      "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
-    },
-    "exam_status": "PASS" | "FAIL",
-    "learning_path": {
-      "steps": [...],
-      "estimatedCompletion": "string",
-      "totalSteps": 1,
-      "createdAt": "ISO DateTime",
-      "updatedAt": "ISO DateTime"
-    }
+    "learning_flow": "career_path_driven",
+    "career_learning_paths": [
+      {
+        "competency_target_name": "string",
+        "skills_raw_data": {},
+        "learning_path": {
+          "path_title": "string",
+          "learner_id": "uuid",
+          "total_estimated_duration_hours": number,
+          "learning_modules": [...]
+        }
+      }
+      // ... all courses for this user
+    ]
   }
-]
+}
 ```
 
-**Headers:**
-```http
-Content-Type: application/json
-Authorization: Bearer {ANALYTICS_TOKEN}
-X-Service-Token: {ANALYTICS_TOKEN}
-```
+**When Course Builder Calls:**
+- ✅ When Course Builder needs all career paths for a single learner
+- ✅ Returns all courses for that `user_id`
 
-**When LearnerAI Calls:**
-- ✅ **Scheduled daily batch** (e.g., every day at midnight)
-- ✅ Contains **all users** with their learning paths
-- ✅ Includes **complete data** with `learning_path` for each user
+**Note:** Returns Prompt 3 format learning paths.
 
----
+#### 📥 **Type 3: Get Learning Path Request (Incoming)**
 
-### 4️⃣ **Course Builder Microservice**
-
-#### 📤 **What LearnerAI Sends (Outgoing):**
-
-**Endpoint:** `POST {COURSE_BUILDER_URL}/api/v1/learning-paths`
+**Endpoint:** `POST /api/fill-content-metrics`
 
 **Request Body:**
 ```json
 {
-  "user_id": "uuid",
-  "user_name": "string",
-  "company_id": "uuid",
-  "company_name": "string",
-  "competency_target_name": "string",
-  "learning_path": {
-    "pathTitle": "Master GraphQL API Development",
-    "pathGoal": "Become a GraphQL expert",
-    "pathDescription": "...",
-    "steps": [
-      {
-        "step": 1,
-        "title": "Introduction to GraphQL",
-        "duration": "2 hours",
-        "resources": ["url1", "url2"],
-        "objectives": ["objective1", "objective2"],
-        "estimatedTime": "2 hours"
-      }
-    ],
-    "estimatedCompletion": "4 weeks",
-    "totalSteps": 10,
-    "createdAt": "ISO DateTime",
-    "updatedAt": "ISO DateTime"
+  "requester_service": "course-builder",
+  "payload": {
+    "action": "get_learning_path",
+    "user_id": "uuid",
+    "tag": "string"  // or "competency_target_name"
   }
 }
 ```
 
-**Headers:**
-```http
-Content-Type: application/json
-Authorization: Bearer {COURSE_BUILDER_TOKEN}
-X-Service-Token: {COURSE_BUILDER_TOKEN}
-```
-
-**⚠️ Important:** Course Builder does **NOT** receive:
-- ❌ `gap_id`
-- ❌ `skills_raw_data`
-- ❌ `exam_status`
-
-(These are only sent to Learning Analytics)
-
-**When LearnerAI Calls:**
-- ✅ After learning path is generated and approved (if manual approval)
-- ✅ Immediately after generation (if auto approval)
-- ✅ Only if company has `approval_policy: "auto"` OR after manual approval
-- ✅ **Exception:** Updates after exam failure skip approval and auto-distribute
-
-**Response:**
+**Response from LearnerAI:**
 ```json
 {
-  "message": "Learning path received successfully",
-  "course_id": "uuid",
-  "status": "created"
+  "success": true,
+  "action": "get_learning_path",
+  "data": {
+    "user_id": "uuid",
+    "competency_target_name": "string",
+    "learning_path": {
+      "path_title": "string",
+      "learner_id": "uuid",
+      "total_estimated_duration_hours": number,
+      "learning_modules": [...]
+    },
+    "skills": {}
+  },
+  "learning_path": {...},
+  "skills": {}
 }
 ```
 
-#### 📥 **What LearnerAI Receives:**
-- ❌ Nothing (Course Builder doesn't call LearnerAI)
+**When Course Builder Calls:**
+- ✅ When Course Builder needs a specific learning path for a competency
+- ✅ Returns learning path and skills_raw_data for that specific course
+
+**Note:** Supports both `tag` and `competency_target_name` fields (AI-powered field mapping). Returns Prompt 3 format learning paths.
+
+#### 📤 **What LearnerAI Sends (Outgoing):**
+- ❌ **No longer automatically sends** learning paths to Course Builder
+- ✅ Course Builder now **requests** data on-demand from LearnerAI
+- ✅ This allows Course Builder to pull data when needed, rather than LearnerAI pushing
 
 ---
 
@@ -527,13 +688,13 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 ### Scenario: New Company → New Learner → Skills Gap → Learning Path
 
 ```
-1. Directory → LearnerAI
-   POST /api/v1/companies/register
+1. Directory → LearnerAI (via Coordinator)
+   POST /api/fill-content-metrics
    └─> Store company in companies table
    └─> Save approval policy and decision maker
 
-2. Skills Engine → LearnerAI (Type 1)
-   POST /api/v1/skills-gaps
+2. Skills Engine → LearnerAI (Type 1, via Coordinator)
+   POST /api/fill-content-metrics
    └─> Store skills gap after exam
    └─> Create learner if doesn't exist
    └─> Start learning path generation
@@ -551,19 +712,28 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
    └─> Store learning path in courses table
 
 4. Check approval policy
-   ├─> If auto → Send directly to Course Builder
+   ├─> If auto → Learning path is ready (stored in database)
    └─> If manual → Create approval request
        └─> Send notification to decision maker
        └─> Wait for approval
-       └─> If approved → Send to Course Builder
+       └─> If approved → Learning path is ready (stored in database)
 
-5. LearnerAI → Course Builder
-   POST /api/v1/learning-paths
-   └─> Send learning path (NO gap data)
+5. Course Builder → LearnerAI (on-demand, via Coordinator)
+   POST /api/fill-content-metrics
+   └─> Course Builder requests learning path when needed
+   └─> Options:
+       - Batch learners: `learners` array + `company_id`
+       - Single learner: `learning_flow: "career_path_driven"` + `user_id`
+       - Get path: `action: "get_learning_path"` + `user_id` + `tag`
+   └─> LearnerAI returns learning path (Prompt 3 format) + skills_raw_data
 
-6. LearnerAI → Learning Analytics
-   POST /api/v1/paths/batch (or on-demand)
-   └─> Send learning path + gap data
+6. Learning Analytics → LearnerAI (on-demand or batch, via Coordinator)
+   POST /api/fill-content-metrics
+   └─> Learning Analytics requests data:
+       - Batch: `type: "batch"` → returns all courses
+       - On-demand: `type: "on-demand"` + `user_id` → returns user's courses
+   └─> LearnerAI returns simple array: `[{ competency_target_name, skills_raw_data, learning_path }, ...]`
+   └─> Learning path in Prompt 3 format exactly as stored
 
 7. LearnerAI → Management Reports
    POST /api/fill-reports-fields
@@ -597,12 +767,14 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 
 | Microservice | Direction | Endpoint | What LearnerAI Receives | What LearnerAI Sends |
 |--------------|-----------|----------|------------------------|---------------------|
-| **Directory** | 📥 Incoming | `POST /api/v1/companies/register` | Company registration data (company_id, name, approval_policy, decision_maker) | Response with company data |
-| **Skills Engine** | 📥 Incoming (Type 1) | `POST /api/v1/skills-gaps` | Skills gap data (user_id, competency, gap, exam_status) | Response with job_id |
+| **Directory** | 📥 Incoming | `POST /api/fill-content-metrics` | Company registration/update data (company_id, name, approval_policy, decision_maker) | Response with company data |
+| **Skills Engine** | 📥 Incoming (Type 1) | `POST /api/fill-content-metrics` | Skills gap data (user_id, competency, gap, exam_status) | Response with job_id |
 | **Skills Engine** | 📤 Outgoing (Type 2) | `POST /api/skills/breakdown` | Lowest layer skills (array of skill names per competency) | Array of competency names |
-| **Learning Analytics** | 📥 Incoming | `POST /api/fill-content-metrics` | On-demand request for user data | User data with gap (no learning_path unless requested) |
-| **Learning Analytics** | 📤 Outgoing | `POST /api/v1/paths/batch` | Confirmation | Batch data (all users with learning paths + gap data) |
-| **Course Builder** | 📤 Outgoing | `POST /api/v1/learning-paths` | Confirmation + course_id | Learning path structure (NO gap data) |
+| **Learning Analytics** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch request (`type: "batch"`) | Simple array: all courses with `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format) |
+| **Learning Analytics** | 📥 Incoming (On-demand) | `POST /api/fill-content-metrics` | On-demand request (`type: "on-demand"`, `user_id`) | Simple array: all courses for user with `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format) |
+| **Course Builder** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch learners request (`learners` array, `company_id`) | `learners_data` array with `career_learning_paths` (Prompt 3 format) |
+| **Course Builder** | 📥 Incoming (Single) | `POST /api/fill-content-metrics` | Career path request (`learning_flow: "career_path_driven"`, `user_id`) | `career_learning_paths` array (Prompt 3 format) |
+| **Course Builder** | 📥 Incoming (Get Path) | `POST /api/fill-content-metrics` | Get learning path (`action: "get_learning_path"`, `user_id`, `tag`) | Learning path + skills_raw_data (Prompt 3 format) |
 | **Management Reports** | 📤 Outgoing | `POST /api/fill-reports-fields` | Confirmation | Learning path data (fill-fields protocol) |
 | **RAG** | 📥 Incoming | `POST /api/fill-content-metrics` | Request for recommendations | Course recommendations |
 | **RAG** | 📤 Outgoing | `POST /api/v1/suggestions/process` | Enhanced suggestions | Course suggestions + completion data |
@@ -656,28 +828,35 @@ RAG_MICROSERVICE_TOKEN=your-rag-token
 
 ## 📝 Key Notes
 
-### Approval Workflow Exception
+### Approval Workflow
+
+**Learning Path Distribution:**
+- Learning paths are **stored in the database** after generation
+- **Course Builder requests** learning paths on-demand when needed (no automatic push)
+- Approval workflow determines if path is stored as `approved: true` or `approved: false`
+- Course Builder can request paths regardless of approval status
 
 **Updates After Exam Failure:**
 - If learning path is an **update** after exam failure (course already exists + `exam_status: 'fail'`):
-  - **Skip approval workflow entirely** (even for manual approval companies)
-  - **Automatically distribute** to Course Builder without decision maker approval
-  - **No notification** sent to decision maker
-  - This exception only applies to path updates, not new path creation
+  - Learning path is updated in database
+  - Course Builder can request the updated path on-demand
+  - No automatic distribution to Course Builder
 
 ### Data Differences
 
-**Course Builder receives:**
-- ✅ Learning path structure
+**Course Builder receives (when requesting from LearnerAI):**
+- ✅ Learning path structure (Prompt 3 format)
 - ✅ User and company info
-- ❌ NO gap data
-- ❌ NO exam status
+- ✅ Skills raw data (`skills_raw_data`) - included in career path requests
+- ✅ Learning path in Prompt 3 format: `{ path_title, learner_id, total_estimated_duration_hours, learning_modules: [...] }`
 
-**Learning Analytics receives:**
-- ✅ Learning path structure
-- ✅ Gap data (`gap_id`, `skills_raw_data`)
-- ✅ Exam status
-- ✅ User and company info
+**Learning Analytics receives (when requesting from LearnerAI):**
+- ✅ Learning path structure (Prompt 3 format)
+- ✅ Skills raw data (`skills_raw_data`)
+- ✅ Learning path in Prompt 3 format: `{ path_title, learner_id, total_estimated_duration_hours, learning_modules: [...] }`
+- ✅ Simple array format: `[{ competency_target_name, skills_raw_data, learning_path }, ...]`
+
+**Note:** Both Course Builder and Learning Analytics receive learning paths in **Prompt 3 format** exactly as stored in the database. No conversion or transformation is applied.
 
 ### Error Handling
 
@@ -694,6 +873,7 @@ RAG_MICROSERVICE_TOKEN=your-rag-token
 - **Requirements**: `docs/requirements.md`
 - **Microservices Communication Guide**: `docs/guides/MICROSERVICES_COMMUNICATION.md`
 - **API Endpoints**: `backend/API_ENDPOINTS.md`
+- **Learning Analytics Connection**: `LEARNING_ANALYTICS_CONNECTION.md`
 - **Learning Analytics JSON**: `docs/guides/LEARNING_ANALYTICS_JSON.md`
 - **Course Builder JSON**: `docs/guides/COURSE_BUILDER_JSON.md`
 
