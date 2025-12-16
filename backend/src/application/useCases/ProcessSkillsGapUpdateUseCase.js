@@ -171,11 +171,15 @@ export class ProcessSkillsGapUpdateUseCase {
 
     // Both should be normalized (direct competency map format)
     // Extract all skill names from new gap (for comparison)
+    // Note: Skills should already be normalized to strings, but handle objects just in case
     const newSkillNames = new Set();
     for (const [competencyName, skills] of Object.entries(newGap)) {
       if (Array.isArray(skills)) {
         skills.forEach(skill => {
-          const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
+          // Extract skill name (prioritize skill_name, then name, then id, then string conversion)
+          const skillName = typeof skill === 'string' 
+            ? skill 
+            : (skill?.skill_name || skill?.name || skill?.id || String(skill));
           if (skillName) newSkillNames.add(skillName);
         });
       }
@@ -191,7 +195,10 @@ export class ProcessSkillsGapUpdateUseCase {
     for (const [competencyName, skills] of Object.entries(existingSkillsRawData)) {
       if (Array.isArray(skills)) {
         const filtered = skills.filter(skill => {
-          const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
+          // Extract skill name (prioritize skill_name, then name, then id, then string conversion)
+          const skillName = typeof skill === 'string' 
+            ? skill 
+            : (skill?.skill_name || skill?.name || skill?.id || String(skill));
           return skillName && newSkillNames.has(skillName);
         });
         if (filtered.length > 0) {
@@ -209,8 +216,9 @@ export class ProcessSkillsGapUpdateUseCase {
   /**
    * Normalize gap format to ensure consistency
    * Converts all formats to the new direct competency map format
+   * Extracts only skill names (removes skill_id) from objects
    * @param {Object} gap - Gap data in any format
-   * @returns {Object} - Normalized gap in direct competency map format
+   * @returns {Object} - Normalized gap in direct competency map format (only skill names as strings)
    * @private
    */
   _normalizeGapFormat(gap) {
@@ -218,7 +226,26 @@ export class ProcessSkillsGapUpdateUseCase {
       return {};
     }
 
-    // If already in new format (direct competency map), return as-is
+    // Helper function to extract skill names from array (removes skill_id, keeps only skill_name)
+    const extractSkillNames = (skillsArray) => {
+      if (!Array.isArray(skillsArray)) {
+        return [];
+      }
+      return skillsArray.map(skill => {
+        // If it's already a string, return as-is
+        if (typeof skill === 'string') {
+          return skill;
+        }
+        // If it's an object, extract skill_name (ignore skill_id)
+        if (typeof skill === 'object' && skill !== null) {
+          return skill.skill_name || skill.name || skill.skillName || String(skill);
+        }
+        // Fallback
+        return String(skill);
+      }).filter(name => name && name.trim() !== ''); // Remove empty strings
+    };
+
+    // Check if gap is in direct competency map format (competency -> array of skills)
     const isDirectCompetencyMap = !gap.missing_skills_map && 
                                   !gap.identifiedGaps && 
                                   !Array.isArray(gap) &&
@@ -226,7 +253,28 @@ export class ProcessSkillsGapUpdateUseCase {
                                   Object.values(gap).every(value => Array.isArray(value) || typeof value === 'string');
     
     if (isDirectCompetencyMap) {
-      console.log('✅ Gap is already in normalized format (direct competency map)');
+      // Check if skills are objects with skill_id/skill_name, or already strings
+      const needsExtraction = Object.values(gap).some(skills => 
+        Array.isArray(skills) && skills.some(skill => 
+          typeof skill === 'object' && skill !== null && (skill.skill_id || skill.skill_name)
+        )
+      );
+      
+      if (needsExtraction) {
+        // Extract only skill names from objects
+        const normalized = {};
+        for (const [competencyName, skills] of Object.entries(gap)) {
+          if (Array.isArray(skills)) {
+            normalized[competencyName] = extractSkillNames(skills);
+          } else {
+            normalized[competencyName] = skills;
+          }
+        }
+        console.log('✅ Gap normalized: extracted skill names (removed skill_id)');
+        return normalized;
+      }
+      
+      console.log('✅ Gap is already in normalized format (direct competency map with skill names only)');
       return gap;
     }
     
@@ -240,7 +288,16 @@ export class ProcessSkillsGapUpdateUseCase {
 
     // Extract from missing_skills_map format
     if (gap.missing_skills_map && typeof gap.missing_skills_map === 'object') {
-      return gap.missing_skills_map;
+      // Extract skill names from objects (remove skill_id)
+      const normalized = {};
+      for (const [competencyName, skills] of Object.entries(gap.missing_skills_map)) {
+        if (Array.isArray(skills)) {
+          normalized[competencyName] = extractSkillNames(skills);
+        } else {
+          normalized[competencyName] = skills;
+        }
+      }
+      return normalized;
     }
 
     // Extract from identifiedGaps format (legacy)
@@ -251,18 +308,14 @@ export class ProcessSkillsGapUpdateUseCase {
         const competencyName = gapItem.competency_name || gapItem.name || 'Unknown_Competency';
         const skills = [];
         
-        // Collect skills from legacy arrays
+        // Collect skills from legacy arrays (extract only skill names, remove skill_id)
         if (gapItem.microSkills && Array.isArray(gapItem.microSkills)) {
-          gapItem.microSkills.forEach(skill => {
-            const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
-            if (skillName) skills.push(skillName);
-          });
+          const extractedNames = extractSkillNames(gapItem.microSkills);
+          skills.push(...extractedNames);
         }
         if (gapItem.nanoSkills && Array.isArray(gapItem.nanoSkills)) {
-          gapItem.nanoSkills.forEach(skill => {
-            const skillName = typeof skill === 'string' ? skill : (skill?.name || skill?.id || String(skill));
-            if (skillName) skills.push(skillName);
-          });
+          const extractedNames = extractSkillNames(gapItem.nanoSkills);
+          skills.push(...extractedNames);
         }
         
         if (skills.length > 0) {
@@ -275,7 +328,7 @@ export class ProcessSkillsGapUpdateUseCase {
     // Handle flat skills array (very old format)
     if (Array.isArray(gap.skills)) {
       return {
-        'Default_Competency': gap.skills
+        'Default_Competency': extractSkillNames(gap.skills)
       };
     }
 

@@ -143,6 +143,7 @@ export function createEndpointsRouter(dependencies) {
             break;
           case "directory":
           case "Directory":
+          case "directory-service":
             result = await directoryHandler(requestBody.payload, dependencies);
             break;
           case "rag":
@@ -744,7 +745,29 @@ async function skillsEngineHandler(payload, dependencies) {
       gap
     } = normalizedPayload;
     
-    const finalStatus = status || (exam_status === 'PASS' ? 'pass' : exam_status === 'FAIL' ? 'fail' : null);
+    // Handle both status and exam_status (exam_status may be mapped to status by field mapper)
+    // Check both normalizedPayload and original payload to ensure we catch exam_status
+    // Normalize to lowercase: 'pass' or 'fail'
+    let finalStatus = null;
+    
+    // First check status (which may be the mapped version of exam_status)
+    if (status) {
+      // status might be uppercase ('PASS', 'FAIL') or lowercase ('pass', 'fail')
+      const normalizedStatus = status.toString().toLowerCase();
+      finalStatus = (normalizedStatus === 'pass' || normalizedStatus === 'fail') ? normalizedStatus : null;
+    } 
+    // If status not found, check exam_status from normalized payload
+    else if (exam_status) {
+      // exam_status might be uppercase ('PASS', 'FAIL') or lowercase ('pass', 'fail')
+      const normalizedExamStatus = exam_status.toString().toLowerCase();
+      finalStatus = (normalizedExamStatus === 'pass' || normalizedExamStatus === 'fail') ? normalizedExamStatus : null;
+    }
+    // If still not found, check original payload (in case field mapper removed exam_status)
+    else if (payload.exam_status) {
+      // exam_status from original payload might be uppercase ('PASS', 'FAIL') or lowercase ('pass', 'fail')
+      const normalizedExamStatus = payload.exam_status.toString().toLowerCase();
+      finalStatus = (normalizedExamStatus === 'pass' || normalizedExamStatus === 'fail') ? normalizedExamStatus : null;
+    }
     const competencyTargetName = competency_target_name || competency_name;
     
     // Process the skills gap update

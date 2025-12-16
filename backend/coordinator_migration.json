@@ -33,7 +33,7 @@
             "requester_service": {
               "type": "string",
               "required": true,
-              "description": "Name of the service making the request (e.g., 'course-builder' or 'course-builder-service', 'analytics', 'skills-engine' or 'skills-engine-service', 'ai')"
+              "description": "Name of the service making the request (e.g., 'course-builder' or 'course-builder-service', 'analytics', 'skills-engine' or 'skills-engine-service', 'directory' or 'directory-service', 'ai')"
             }
           }
         },
