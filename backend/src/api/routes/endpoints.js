@@ -1084,7 +1084,7 @@ async function courseBuilderHandler(payload, dependencies) {
   // Check this FIRST before action checks - data-driven approach
   // Fetch ALL courses for user_id and return as career_learning_paths array
   if (payload.learning_flow === 'career_path_driven') {
-    const { user_id, company_id } = payload;
+    let { user_id, company_id } = payload;
     
     if (!user_id) {
       throw new Error('user_id is required for career_path_driven learning_flow');
