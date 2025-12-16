@@ -38,7 +38,7 @@ This document describes the simplified connection between Learning Analytics and
 LearnerAI returns an **array of courses**, where each course contains **exactly 4 fields in this order**:
 
 1. `competency_target_name` - The competency/course name
-2. `skills_raw_data` - Skills gap data (object)
+2. `skills_raw_data` - Skills gap data (array of skill names - competency structure removed)
 3. `exam_status` - Exam status: `"pass"` or `"fail"` (string)
 4. `learning_path` - Learning path in Prompt 3 format (object)
 
@@ -48,9 +48,11 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
 [
   {
     "competency_target_name": "string",
-    "skills_raw_data": {
-      /* skills gap object */
-    },
+    "skills_raw_data": [
+      "skill1",
+      "skill2",
+      "skill3"
+    ],
     "exam_status": "pass" | "fail",
     "learning_path": {
       "path_title": "string",
@@ -81,7 +83,8 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
   },
   {
     "competency_target_name": "string",
-    "skills_raw_data": {},
+    "skills_raw_data": [],
+    "exam_status": "pass" | "fail",
     "learning_path": {}
   }
   // ... more courses
@@ -105,13 +108,13 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
 [
   {
     "competency_target_name": "React Frontend Development",
-    "skills_raw_data": { /* ... */ },
+    "skills_raw_data": ["MGS_React_Hooks_Advanced", "MGS_Flexbox_Grid_System", "MGS_Async_Await_Handling"],
     "exam_status": "fail",
     "learning_path": { /* Prompt 3 format */ }
   },
   {
     "competency_target_name": "Node.js Backend Development",
-    "skills_raw_data": { /* ... */ },
+    "skills_raw_data": ["MGS_Node_JS_Async", "MGS_Database_Design"],
     "exam_status": "pass",
     "learning_path": { /* Prompt 3 format */ }
   }
@@ -134,13 +137,13 @@ LearnerAI returns an **array of courses**, where each course contains **exactly 
 [
   {
     "competency_target_name": "React Frontend Development",
-    "skills_raw_data": { /* ... */ },
+    "skills_raw_data": ["MGS_React_Hooks_Advanced", "MGS_Flexbox_Grid_System"],
     "exam_status": "fail",
     "learning_path": { /* Prompt 3 format */ }
   },
   {
     "competency_target_name": "Python Data Science",
-    "skills_raw_data": { /* ... */ },
+    "skills_raw_data": ["MGS_Pandas_Basics", "MGS_NumPy_Arrays"],
     "exam_status": "pass",
     "learning_path": { /* Prompt 3 format */ }
   }
@@ -191,8 +194,8 @@ The `learning_path` field uses **exactly** the Prompt 3 format:
 
 | Request Type | Returns | Fields Order |
 |-------------|---------|--------------|
-| **Batch** | All courses in database | 1. `competency_target_name`<br>2. `skills_raw_data`<br>3. `exam_status`<br>4. `learning_path` |
-| **On-Demand** | All courses for `user_id` | 1. `competency_target_name`<br>2. `skills_raw_data`<br>3. `exam_status`<br>4. `learning_path` |
+| **Batch** | All courses in database | 1. `competency_target_name`<br>2. `skills_raw_data` (array)<br>3. `exam_status`<br>4. `learning_path` |
+| **On-Demand** | All courses for `user_id` | 1. `competency_target_name`<br>2. `skills_raw_data` (array)<br>3. `exam_status`<br>4. `learning_path` |
 
 **No wrapper structure, no pagination, no extra fields** - just a simple array of courses with the 3 fields in the specified order.
 

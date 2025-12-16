@@ -164,6 +164,13 @@ X-Signature: <ECDSA signature>
         "MGS_Async_Await_Handling"
       ]
     }
+    // OR Skills Engine may send gap with skill_id and skill_name:
+    // "gap": {
+    //   "python basic": [
+    //     { "skill_id": "mgs-1", "skill_name": "lists" },
+    //     { "skill_id": "mgs-2", "skill_name": "dictionaries" }
+    //   ]
+    // }
   }
 }
 ```
@@ -175,7 +182,10 @@ X-Service-Name: skills-engine-service
 X-Signature: <ECDSA signature>
 ```
 
-**Note:** LearnerAI uses AI-powered field mapping to handle field name mismatches (e.g., `trainer_id` → `user_id`, `the_gap` → `gap`).
+**Note:** 
+- LearnerAI uses AI-powered field mapping to handle field name mismatches (e.g., `trainer_id` → `user_id`, `the_gap` → `gap`).
+- If Skills Engine sends gap data with objects containing `skill_id` and `skill_name` (e.g., `{"skill_id": "mgs-1", "skill_name": "lists"}`), LearnerAI extracts only the `skill_name` and removes `skill_id` before saving to database.
+- The database stores `skills_raw_data` in competency-based structure: `{"competency_name": ["skill1", "skill2"]}` (only skill names, no IDs).
 
 **When Skills Engine Calls:**
 - ✅ After each exam completion
@@ -184,12 +194,15 @@ X-Signature: <ECDSA signature>
 - ✅ When a learner passes an exam (exam_status: "PASS")
 
 **What LearnerAI Does:**
-1. Checks if skills gap exists (by `user_id` + `competency_target_name`)
-2. If exists: Updates `skills_raw_data` (filters to keep only skills in new gap)
-3. If not exists: Creates new `skills_gap` row
-4. Checks if learner exists (by `user_id`)
-5. If not exists: Creates learner (gets company details from `companies` table)
-6. Starts learning path generation process
+1. Normalizes gap format: Extracts only skill names from gap data (removes `skill_id` if present)
+   - If gap contains objects like `{"skill_id": "mgs-1", "skill_name": "lists"}`, extracts only `"lists"`
+   - Saves to database as: `{"competency_name": ["lists", "dictionaries"]}` (only skill names)
+2. Checks if skills gap exists (by `user_id` + `competency_target_name`)
+3. If exists: Updates `skills_raw_data` (filters to keep only skills in new gap)
+4. If not exists: Creates new `skills_gap` row
+5. Checks if learner exists (by `user_id`)
+6. If not exists: Creates learner (gets company details from `companies` table)
+7. Starts learning path generation process
 
 **Response:**
 ```json
@@ -287,9 +300,8 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
   "data": [
     {
       "competency_target_name": "string",
-      "skills_raw_data": {
-        "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
-      },
+      "skills_raw_data": ["MGS_Skill_ID_1", "MGS_Skill_ID_2", "MGS_Skill_ID_3"],
+      "exam_status": "pass" | "fail",
       "learning_path": {
         "path_title": "string",
         "learner_id": "uuid",
@@ -322,7 +334,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 - ✅ When Learning Analytics needs all learning paths (batch mode)
 - ✅ Returns **ALL courses** in the database (all users, all competencies)
 
-**Note:** Returns simple array with 3 fields per course: `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format)
+**Note:** Returns simple array with 4 fields per course: `competency_target_name`, `skills_raw_data` (array of skill names, competency structure removed), `exam_status`, `learning_path` (Prompt 3 format)
 
 #### 📥 **Type 2: On-Demand Requests (Incoming)**
 
@@ -348,9 +360,8 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
   "data": [
     {
       "competency_target_name": "string",
-      "skills_raw_data": {
-        "Competency_Name_1": ["MGS_Skill_ID_1", "MGS_Skill_ID_2"]
-      },
+      "skills_raw_data": ["MGS_Skill_ID_1", "MGS_Skill_ID_2", "MGS_Skill_ID_3"],
+      "exam_status": "pass" | "fail",
       "learning_path": {
         "path_title": "string",
         "learner_id": "uuid",
@@ -437,7 +448,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
         "career_learning_paths": [
           {
             "competency_target_name": "string",
-            "skills_raw_data": {},
+            "skills_raw_data": ["skill1", "skill2", "skill3"],
             "learning_path": {
               "path_title": "string",
               "learner_id": "uuid",
@@ -497,7 +508,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
     "career_learning_paths": [
       {
         "competency_target_name": "string",
-        "skills_raw_data": {},
+        "skills_raw_data": ["skill1", "skill2", "skill3"],
         "learning_path": {
           "path_title": "string",
           "learner_id": "uuid",
@@ -551,10 +562,10 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
       "total_estimated_duration_hours": number,
       "learning_modules": [...]
     },
-    "skills": {}
+    "skills_raw_data": ["skill1", "skill2", "skill3"]
   },
   "learning_path": {...},
-  "skills": {}
+  "skills_raw_data": ["skill1", "skill2", "skill3"]
 }
 ```
 
@@ -562,7 +573,10 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 - ✅ When Course Builder needs a specific learning path for a competency
 - ✅ Returns learning path and skills_raw_data for that specific course
 
-**Note:** Supports both `tag` and `competency_target_name` fields (AI-powered field mapping). Returns Prompt 3 format learning paths.
+**Note:** 
+- Supports both `tag` and `competency_target_name` fields (AI-powered field mapping)
+- Returns Prompt 3 format learning paths
+- `skills_raw_data` field is returned as an array of skill names (competency structure removed)
 
 #### 📤 **What LearnerAI Sends (Outgoing):**
 - ❌ **No longer automatically sends** learning paths to Course Builder
@@ -791,11 +805,11 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 | **Directory** | 📥 Incoming | `POST /api/fill-content-metrics` | Company registration/update data (company_id, name, approval_policy, decision_maker) | Response with company data |
 | **Skills Engine** | 📥 Incoming (Type 1) | `POST /api/fill-content-metrics` | Skills gap data (user_id, competency, gap, exam_status) | Response with job_id |
 | **Skills Engine** | 📤 Outgoing (Type 2) | `POST /api/skills/breakdown` | Lowest layer skills (array of skill names per competency) | Array of competency names |
-| **Learning Analytics** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch request (`type: "batch"`) | Simple array: all courses with `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format) |
-| **Learning Analytics** | 📥 Incoming (On-demand) | `POST /api/fill-content-metrics` | On-demand request (`type: "on-demand"`, `user_id`) | Simple array: all courses for user with `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format) |
-| **Course Builder** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch learners request (`learners` array with optional `learner_name`, `preferred_language`, `company_id`) | `learners_data` array with `career_learning_paths` + `preferred_language` (Prompt 3 format) |
-| **Course Builder** | 📥 Incoming (Single) | `POST /api/fill-content-metrics` | Career path request (`learning_flow: "career_path_driven"`, `user_id`, optional `learner_name`, `preferred_language`) | `career_learning_paths` array + `preferred_language` (Prompt 3 format) |
-| **Course Builder** | 📥 Incoming (Get Path) | `POST /api/fill-content-metrics` | Get learning path (`action: "get_learning_path"`, `user_id`, `tag`) | Learning path + skills_raw_data (Prompt 3 format) |
+| **Learning Analytics** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch request (`type: "batch"`) | Simple array: all courses with `competency_target_name`, `skills_raw_data` (array), `exam_status`, `learning_path` (Prompt 3 format) |
+| **Learning Analytics** | 📥 Incoming (On-demand) | `POST /api/fill-content-metrics` | On-demand request (`type: "on-demand"`, `user_id`) | Simple array: all courses for user with `competency_target_name`, `skills_raw_data` (array), `exam_status`, `learning_path` (Prompt 3 format) |
+| **Course Builder** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch learners request (`learners` array with optional `learner_name`, `preferred_language`, `company_id`) | `learners_data` array with `career_learning_paths` + `preferred_language` (Prompt 3 format, `skills_raw_data` as array) |
+| **Course Builder** | 📥 Incoming (Single) | `POST /api/fill-content-metrics` | Career path request (`learning_flow: "career_path_driven"`, `user_id`, optional `learner_name`, `preferred_language`) | `career_learning_paths` array + `preferred_language` (Prompt 3 format, `skills_raw_data` as array) |
+| **Course Builder** | 📥 Incoming (Get Path) | `POST /api/fill-content-metrics` | Get learning path (`action: "get_learning_path"`, `user_id`, `tag`) | Learning path + `skills_raw_data` (array) (Prompt 3 format) |
 | **Management Reports** | 📤 Outgoing | `POST /api/fill-reports-fields` | Confirmation | Learning path data (fill-fields protocol) |
 | **RAG** | 📥 Incoming | `POST /api/fill-content-metrics` | Request for recommendations | Course recommendations |
 | **RAG** | 📤 Outgoing | `POST /api/v1/suggestions/process` | Enhanced suggestions | Course suggestions + completion data |
@@ -868,17 +882,21 @@ RAG_MICROSERVICE_TOKEN=your-rag-token
 **Course Builder receives (when requesting from LearnerAI):**
 - ✅ Learning path structure (Prompt 3 format)
 - ✅ User and company info
-- ✅ Skills raw data (`skills_raw_data`) - included in career path requests
+- ✅ Skills raw data (`skills_raw_data`) - **as array of skill names** (competency structure removed) - included in career path requests
 - ✅ `preferred_language` - returned if provided in the request
 - ✅ Learning path in Prompt 3 format: `{ path_title, learner_id, total_estimated_duration_hours, learning_modules: [...] }`
 
 **Learning Analytics receives (when requesting from LearnerAI):**
 - ✅ Learning path structure (Prompt 3 format)
-- ✅ Skills raw data (`skills_raw_data`)
+- ✅ Skills raw data (`skills_raw_data`) - **as array of skill names** (competency structure removed)
+- ✅ `exam_status` - Exam status: `"pass"` or `"fail"`
 - ✅ Learning path in Prompt 3 format: `{ path_title, learner_id, total_estimated_duration_hours, learning_modules: [...] }`
-- ✅ Simple array format: `[{ competency_target_name, skills_raw_data, learning_path }, ...]`
+- ✅ Simple array format: `[{ competency_target_name, skills_raw_data (array), exam_status, learning_path }, ...]`
 
-**Note:** Both Course Builder and Learning Analytics receive learning paths in **Prompt 3 format** exactly as stored in the database. No conversion or transformation is applied.
+**Note:** 
+- Both Course Builder and Learning Analytics receive `skills_raw_data` as a **plain array** of skill names (competency names removed)
+- Learning paths are in **Prompt 3 format** exactly as stored in the database
+- Database structure remains unchanged (competency-based structure) - transformation only happens when sending to Course Builder and Learning Analytics
 
 ### Error Handling
 

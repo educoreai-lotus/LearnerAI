@@ -225,26 +225,26 @@ export function createEndpointsRouter(dependencies) {
       // Step 4: Store result in response.answer (as stringified JSON)
       requestBody.response.answer = typeof result === 'string' ? result : JSON.stringify(result);
       
-      // Step 4.5: For Course Builder get_learning_path, also populate response.learning_path and response.skills directly
-      if (requestBody.requester_service === 'course-builder' && 
+      // Step 4.5: For Course Builder get_learning_path, also populate response.learning_path and response.skills_raw_data directly
+      if ((requestBody.requester_service === 'course-builder' || requestBody.requester_service === 'course-builder-service') && 
           requestBody.payload?.action === 'get_learning_path' && 
           result) {
-        // Extract learning_path and skills from result (can be in result.data or result directly)
+        // Extract learning_path and skills_raw_data from result (can be in result.data or result directly)
         const learningPathData = result.learning_path !== undefined ? result.learning_path : 
                                  result.data?.learning_path !== undefined ? result.data.learning_path : null;
-        const skillsData = result.skills !== undefined ? result.skills : 
-                          result.data?.skills !== undefined ? result.data.skills : null;
+        const skillsRawData = result.skills_raw_data !== undefined ? result.skills_raw_data : 
+                              result.data?.skills_raw_data !== undefined ? result.data.skills_raw_data : null;
         
         // Populate response directly (Course Builder expects these fields in response object)
         if (learningPathData !== undefined && learningPathData !== null) {
           requestBody.response.learning_path = learningPathData;
         }
-        if (skillsData !== undefined && skillsData !== null) {
-          requestBody.response.skills = skillsData;
+        if (skillsRawData !== undefined && skillsRawData !== null) {
+          requestBody.response.skills_raw_data = skillsRawData;
         }
-        console.log(`✅ Populated response.learning_path and response.skills for Course Builder`);
+        console.log(`✅ Populated response.learning_path and response.skills_raw_data for Course Builder`);
         console.log(`   learning_path type: ${Array.isArray(learningPathData) ? 'array' : typeof learningPathData}, length: ${Array.isArray(learningPathData) ? learningPathData.length : 'N/A'}`);
-        console.log(`   skills type: ${Array.isArray(skillsData) ? 'array' : typeof skillsData}, keys: ${typeof skillsData === 'object' && skillsData !== null ? Object.keys(skillsData).join(', ') : 'N/A'}`);
+        console.log(`   skills_raw_data type: ${Array.isArray(skillsRawData) ? 'array' : typeof skillsRawData}, length: ${Array.isArray(skillsRawData) ? skillsRawData.length : 'N/A'}`);
       }
 
       // Step 5: Return the full object as stringified JSON (preserving requester_service, payload, and response)
@@ -351,6 +351,35 @@ export async function fillSkillsEngineData(data, { skillsGapRepository, courseRe
 }
 
 /**
+ * Convert skills_raw_data from competency-based structure to array for Learning Analytics
+ * Transforms: {"competency1": ["skill1", "skill2"], "competency2": ["skill3"]}
+ * To: ["skill1", "skill2", "skill3"]
+ * @param {Object} skillsRawData - Skills raw data from database (competency-based structure)
+ * @returns {Array} Array of skill names (strings)
+ */
+function convertSkillsToArray(skillsRawData) {
+  if (!skillsRawData || typeof skillsRawData !== 'object' || Array.isArray(skillsRawData)) {
+    return [];
+  }
+  
+  const skillsArray = [];
+  
+  // Iterate through all competencies
+  for (const [competencyName, skills] of Object.entries(skillsRawData)) {
+    if (Array.isArray(skills)) {
+      // Add each skill to the array
+      skills.forEach(skill => {
+        if (typeof skill === 'string' && skill.trim() !== '') {
+          skillsArray.push(skill);
+        }
+      });
+    }
+  }
+  
+  return skillsArray;
+}
+
+/**
  * Fill Learning Analytics data
  * Learning Analytics requests data for a specific user (on-demand mode) or batch ingestion
  * 
@@ -447,9 +476,12 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         const skills_raw_data = skillsGap?.skills_raw_data || {};
         const exam_status = skillsGap?.exam_status || '';
         
+        // Convert skills_raw_data to array for Learning Analytics (remove competency names)
+        const skillsArray = convertSkillsToArray(skills_raw_data);
+        
         learningPaths.push({
           competency_target_name: course.competency_target_name || '',
-          skills_raw_data: skills_raw_data,
+          skills_raw_data: skillsArray, // Send as array of skill names (no competency structure)
           exam_status: exam_status || '',
           learning_path: learning_path
         });
@@ -503,10 +535,13 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
           // Get exam_status from skills gap
           const exam_status = skillsGap?.exam_status || '';
           
+          // Convert skills_raw_data to array for Learning Analytics (remove competency names)
+          const skillsArray = convertSkillsToArray(skills_raw_data || {});
+          
           // Return simplified format: competency_target_name, skills_raw_data, exam_status, learning_path
           userData.push({
             competency_target_name: course.competency_target_name,
-            skills_raw_data: skills_raw_data,
+            skills_raw_data: skillsArray, // Send as array of skill names (no competency structure)
             exam_status: exam_status,
             learning_path: learning_path
           });
@@ -539,10 +574,13 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         course = await courseRepository.getCourseById(data.competency_target_name);
       }
       
+      // Convert skills_raw_data to array for Learning Analytics (remove competency names)
+      const skillsArray = convertSkillsToArray(skillsGap?.skills_raw_data || {});
+      
       // Return simplified format: competency_target_name, skills_raw_data, exam_status, learning_path
       return [{
         competency_target_name: data.competency_target_name,
-        skills_raw_data: skillsGap?.skills_raw_data || null,
+        skills_raw_data: skillsArray, // Send as array of skill names (no competency structure)
         exam_status: skillsGap?.exam_status || '',
         learning_path: course?.learning_path || null
       }];
@@ -983,9 +1021,10 @@ async function analyticsHandler(payload, dependencies) {
   const coursesArray = Array.isArray(result) ? result : [];
   
   // Transform to simplified format: competency_target_name, skills_raw_data, exam_status, learning_path
+  // Note: skills_raw_data is already converted to array in fillLearningAnalyticsData
   const simplifiedCourses = coursesArray.map(course => ({
     competency_target_name: course.competency_target_name || '',
-    skills_raw_data: course.skills_raw_data || {},
+    skills_raw_data: Array.isArray(course.skills_raw_data) ? course.skills_raw_data : [], // Ensure it's an array
     exam_status: course.exam_status || '',
     learning_path: course.learning_path || null
   }));
@@ -1090,10 +1129,13 @@ async function getCareerPathsForUser(user_id, company_id, { courseRepository, sk
       }
     }
     
+    // Convert skills_raw_data to array for Course Builder (remove competency names)
+    const skillsArray = convertSkillsToArray(skills_raw_data || {});
+    
     // Add to career_learning_paths array
     career_learning_paths.push({
       competency_target_name: competency_target_name,
-      skills_raw_data: skills_raw_data,
+      skills_raw_data: skillsArray, // Send as array of skill names (no competency structure)
       learning_path: learning_path
     });
   }
@@ -1391,11 +1433,14 @@ async function courseBuilderHandler(payload, dependencies) {
       // Don't throw - return empty arrays instead
     }
     
+    // Convert skills_raw_data to array for Course Builder (remove competency names)
+    const skillsArray = convertSkillsToArray(skillsRawData || {});
+    
     // Return data in format expected by Course Builder
     // Note: learning_path should be the full learning path object/array, not empty array if null
-    // skills should be the skills_raw_data object, not empty array if null
+    // skills_raw_data should be the array of skill names, not empty array if null
     const learningPathValue = learningPath !== null && learningPath !== undefined ? learningPath : [];
-    const skillsValue = skillsRawData !== null && skillsRawData !== undefined ? skillsRawData : [];
+    const skillsValue = Array.isArray(skillsArray) && skillsArray.length > 0 ? skillsArray : [];
     
     console.log(`📊 Returning data for Course Builder:`, {
       user_id,
@@ -1403,8 +1448,8 @@ async function courseBuilderHandler(payload, dependencies) {
       learning_path_type: Array.isArray(learningPathValue) ? 'array' : typeof learningPathValue,
       learning_path_length: Array.isArray(learningPathValue) ? learningPathValue.length : 
                            (typeof learningPathValue === 'object' && learningPathValue !== null ? Object.keys(learningPathValue).length : 0),
-      skills_type: Array.isArray(skillsValue) ? 'array' : typeof skillsValue,
-      skills_keys: typeof skillsValue === 'object' && skillsValue !== null ? Object.keys(skillsValue).join(', ') : 'N/A'
+      skills_raw_data_type: Array.isArray(skillsValue) ? 'array' : typeof skillsValue,
+      skills_raw_data_length: Array.isArray(skillsValue) ? skillsValue.length : 'N/A'
     });
     
     return {
@@ -1414,11 +1459,11 @@ async function courseBuilderHandler(payload, dependencies) {
         user_id: user_id,
         competency_target_name: competency_target_name,
         learning_path: learningPathValue,
-        skills: skillsValue
+        skills_raw_data: skillsValue
       },
       // Also include at root level for direct access in response population
       learning_path: learningPathValue,
-      skills: skillsValue
+      skills_raw_data: skillsValue
     };
   }
   
