@@ -396,14 +396,22 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 **Request Body:**
 ```json
 {
-  "requester_service": "course-builder",
+  "requester_service": "course-builder" | "course-builder-service",
   "payload": {
-    "company_id": "uuid",
-    "company_name": "string",
-    "learning_flow": "career_path_driven",
+    "company_id": "uuid",           // ✅ REQUIRED
+    "company_name": "string",        // ⚠️ OPTIONAL
+    "learning_flow": "career_path_driven",  // Optional, defaults to "career_path_driven"
     "learners": [
-      { "learner_id": "uuid1" },
-      { "learner_id": "uuid2" }
+      { 
+        "learner_id": "uuid1",
+        "learner_name": "string",        // ⚠️ OPTIONAL
+        "preferred_language": "string"  // ⚠️ OPTIONAL
+      },
+      { 
+        "learner_id": "uuid2",
+        "learner_name": "string",        // ⚠️ OPTIONAL
+        "preferred_language": "string"   // ⚠️ OPTIONAL
+      }
     ]
   }
 }
@@ -425,6 +433,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
         "company_id": "uuid",
         "company_name": "string",
         "learning_flow": "career_path_driven",
+        "preferred_language": "string",  // ⚠️ Included if provided in request
         "career_learning_paths": [
           {
             "competency_target_name": "string",
@@ -448,7 +457,12 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 - ✅ When Course Builder needs career paths for multiple learners from a company
 - ✅ Returns all courses for each learner in the `learners` array
 
-**Note:** `company_id` is **required**, `company_name` is optional. Returns Prompt 3 format learning paths.
+**Note:** 
+- `company_id` is **required**, `company_name` is optional
+- `learner_name` and `preferred_language` are optional in the `learners` array
+- If `learner_name` is provided, it will override the `user_name` fetched from the database
+- `preferred_language` is returned in the response if provided in the request
+- Returns Prompt 3 format learning paths
 
 #### 📥 **Type 2: Single Learner Career Path Request (Incoming)**
 
@@ -457,10 +471,12 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 **Request Body:**
 ```json
 {
-  "requester_service": "course-builder",
+  "requester_service": "course-builder" | "course-builder-service",
   "payload": {
     "user_id": "uuid",
     "company_id": "uuid",
+    "learner_name": "string",        // ⚠️ OPTIONAL
+    "preferred_language": "string",   // ⚠️ OPTIONAL
     "learning_flow": "career_path_driven"
   }
 }
@@ -477,6 +493,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
     "company_id": "uuid",
     "company_name": "string",
     "learning_flow": "career_path_driven",
+    "preferred_language": "string",  // ⚠️ Included if provided in request
     "career_learning_paths": [
       {
         "competency_target_name": "string",
@@ -498,7 +515,11 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 - ✅ When Course Builder needs all career paths for a single learner
 - ✅ Returns all courses for that `user_id`
 
-**Note:** Returns Prompt 3 format learning paths.
+**Note:** 
+- `learner_name` and `preferred_language` are optional in the payload
+- If `learner_name` is provided, it will override the `user_name` fetched from the database
+- `preferred_language` is returned in the response if provided in the request
+- Returns Prompt 3 format learning paths
 
 #### 📥 **Type 3: Get Learning Path Request (Incoming)**
 
@@ -507,7 +528,7 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 **Request Body:**
 ```json
 {
-  "requester_service": "course-builder",
+  "requester_service": "course-builder" | "course-builder-service",
   "payload": {
     "action": "get_learning_path",
     "user_id": "uuid",
@@ -722,10 +743,10 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
    POST /api/fill-content-metrics
    └─> Course Builder requests learning path when needed
    └─> Options:
-       - Batch learners: `learners` array + `company_id`
-       - Single learner: `learning_flow: "career_path_driven"` + `user_id`
+       - Batch learners: `learners` array (with optional `learner_name`, `preferred_language`) + `company_id`
+       - Single learner: `learning_flow: "career_path_driven"` + `user_id` (with optional `learner_name`, `preferred_language`)
        - Get path: `action: "get_learning_path"` + `user_id` + `tag`
-   └─> LearnerAI returns learning path (Prompt 3 format) + skills_raw_data
+   └─> LearnerAI returns learning path (Prompt 3 format) + skills_raw_data + `preferred_language` (if provided)
 
 6. Learning Analytics → LearnerAI (on-demand or batch, via Coordinator)
    POST /api/fill-content-metrics
@@ -772,8 +793,8 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 | **Skills Engine** | 📤 Outgoing (Type 2) | `POST /api/skills/breakdown` | Lowest layer skills (array of skill names per competency) | Array of competency names |
 | **Learning Analytics** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch request (`type: "batch"`) | Simple array: all courses with `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format) |
 | **Learning Analytics** | 📥 Incoming (On-demand) | `POST /api/fill-content-metrics` | On-demand request (`type: "on-demand"`, `user_id`) | Simple array: all courses for user with `competency_target_name`, `skills_raw_data`, `learning_path` (Prompt 3 format) |
-| **Course Builder** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch learners request (`learners` array, `company_id`) | `learners_data` array with `career_learning_paths` (Prompt 3 format) |
-| **Course Builder** | 📥 Incoming (Single) | `POST /api/fill-content-metrics` | Career path request (`learning_flow: "career_path_driven"`, `user_id`) | `career_learning_paths` array (Prompt 3 format) |
+| **Course Builder** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch learners request (`learners` array with optional `learner_name`, `preferred_language`, `company_id`) | `learners_data` array with `career_learning_paths` + `preferred_language` (Prompt 3 format) |
+| **Course Builder** | 📥 Incoming (Single) | `POST /api/fill-content-metrics` | Career path request (`learning_flow: "career_path_driven"`, `user_id`, optional `learner_name`, `preferred_language`) | `career_learning_paths` array + `preferred_language` (Prompt 3 format) |
 | **Course Builder** | 📥 Incoming (Get Path) | `POST /api/fill-content-metrics` | Get learning path (`action: "get_learning_path"`, `user_id`, `tag`) | Learning path + skills_raw_data (Prompt 3 format) |
 | **Management Reports** | 📤 Outgoing | `POST /api/fill-reports-fields` | Confirmation | Learning path data (fill-fields protocol) |
 | **RAG** | 📥 Incoming | `POST /api/fill-content-metrics` | Request for recommendations | Course recommendations |
@@ -848,6 +869,7 @@ RAG_MICROSERVICE_TOKEN=your-rag-token
 - ✅ Learning path structure (Prompt 3 format)
 - ✅ User and company info
 - ✅ Skills raw data (`skills_raw_data`) - included in career path requests
+- ✅ `preferred_language` - returned if provided in the request
 - ✅ Learning path in Prompt 3 format: `{ path_title, learner_id, total_estimated_duration_hours, learning_modules: [...] }`
 
 **Learning Analytics receives (when requesting from LearnerAI):**

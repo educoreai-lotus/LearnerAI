@@ -1133,6 +1133,8 @@ async function courseBuilderHandler(payload, dependencies) {
     
     for (const learnerItem of learners) {
       const learner_id = learnerItem.learner_id || learnerItem.user_id || learnerItem;
+      const learner_name = learnerItem.learner_name || learnerItem.user_name || null;
+      const preferred_language = learnerItem.preferred_language || null;
       
       if (!learner_id) {
         console.warn(`⚠️  Skipping learner item with no learner_id:`, learnerItem);
@@ -1152,20 +1154,32 @@ async function courseBuilderHandler(payload, dependencies) {
           learnerCareerPaths.learning_flow = finalLearningFlow;
         }
         
+        // Add learner_name and preferred_language from request if provided
+        if (learner_name) {
+          learnerCareerPaths.user_name = learner_name;
+        }
+        if (preferred_language) {
+          learnerCareerPaths.preferred_language = preferred_language;
+        }
+        
         learnersData.push(learnerCareerPaths);
       } catch (error) {
         console.error(`❌ Error processing learner ${learner_id}:`, error.message);
         // Continue with other learners even if one fails
         // Optionally add error entry to results
-        learnersData.push({
+        const errorEntry = {
           user_id: learner_id,
-          user_name: null,
+          user_name: learner_name || null,
           company_id: company_id,  // Required - validated above
           company_name: company_name || null,  // Optional - can be null if not provided
           learning_flow: finalLearningFlow,
           career_learning_paths: [],
           error: error.message
-        });
+        };
+        if (preferred_language) {
+          errorEntry.preferred_language = preferred_language;
+        }
+        learnersData.push(errorEntry);
       }
     }
     
@@ -1187,7 +1201,7 @@ async function courseBuilderHandler(payload, dependencies) {
   // Check this BEFORE action checks - data-driven approach
   // Fetch ALL courses for user_id and return as career_learning_paths array
   if (payload.learning_flow === 'career_path_driven') {
-    let { user_id, company_id } = payload;
+    let { user_id, company_id, learner_name, preferred_language } = payload;
     
     if (!user_id) {
       throw new Error('user_id is required for career_path_driven learning_flow');
@@ -1201,11 +1215,20 @@ async function courseBuilderHandler(payload, dependencies) {
         { courseRepository, skillsGapRepository, learnerRepository }
       );
       
+      // Add learner_name and preferred_language from request if provided
+      if (learner_name) {
+        careerPathsData.user_name = learner_name;
+      }
+      if (preferred_language) {
+        careerPathsData.preferred_language = preferred_language;
+      }
+      
       console.log(`📊 Returning career path data for user ${user_id}:`, {
         user_name: careerPathsData.user_name,
         company_name: careerPathsData.company_name,
         company_id: careerPathsData.company_id || 'not provided',
         learning_flow: 'career_path_driven',
+        preferred_language: careerPathsData.preferred_language || 'not provided',
         career_learning_paths_count: careerPathsData.career_learning_paths.length
       });
       
