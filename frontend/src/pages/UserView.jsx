@@ -5,15 +5,32 @@ import PrimaryButton from '../components/PrimaryButton';
 import LoadingSpinner from '../components/LoadingSpinner';
 import LearningPathTimeline from '../components/LearningPathTimeline';
 import api from '../services/api';
+import { getCurrentUser, getUrlParams } from '../utils/auth';
 
 /**
  * User View Page
  * Displays learner's courses and learning paths
  */
 export default function UserView() {
-  // Using Sara Neer's user ID from mock data: b2c3d4e5-f6a7-8901-2345-678901234567
-  // Sara has 3 learning paths: React Hooks, TypeScript Fundamentals, Node.js Backend Development
-  const [userId] = useState('b2c3d4e5-f6a7-8901-2345-678901234567'); // Sara Neer from mock data
+  // Get user_id from URL params, localStorage, or fallback to mock data
+  const getUserId = () => {
+    // First, try URL parameters (from Directory redirect)
+    const urlParams = getUrlParams();
+    if (urlParams.user_id) {
+      return urlParams.user_id;
+    }
+    
+    // Second, try localStorage (stored by initializeAuthFromUrl)
+    const user = getCurrentUser();
+    if (user && user.id) {
+      return user.id;
+    }
+    
+    // Fallback to mock data for development/testing
+    return 'b2c3d4e5-f6a7-8901-2345-678901234567'; // Sara Neer from mock data
+  };
+  
+  const [userId] = useState(getUserId());
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [learningPath, setLearningPath] = useState(null);

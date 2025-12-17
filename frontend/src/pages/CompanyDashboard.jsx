@@ -6,14 +6,32 @@ import LearningPathTimeline from '../components/LearningPathTimeline';
 import PrimaryButton from '../components/PrimaryButton';
 import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../services/api';
+import { getCurrentUser, getUrlParams } from '../utils/auth';
 
 /**
  * Company Dashboard Page
  * Displays all users in a company with their learning paths
  */
 export default function CompanyDashboard() {
-  // Using TechCorp Inc. company ID from mock data
-  const [companyId] = useState('c1d2e3f4-5678-9012-3456-789012345678'); // TechCorp Inc.
+  // Get company_id from URL params, localStorage, or fallback to mock data
+  const getCompanyId = () => {
+    // First, try URL parameters (from Directory redirect)
+    const urlParams = getUrlParams();
+    if (urlParams.company_id) {
+      return urlParams.company_id;
+    }
+    
+    // Second, try localStorage (stored by initializeAuthFromUrl)
+    const user = getCurrentUser();
+    if (user && user.company_id) {
+      return user.company_id;
+    }
+    
+    // Fallback to mock data for development/testing
+    return 'c1d2e3f4-5678-9012-3456-789012345678'; // TechCorp Inc.
+  };
+  
+  const [companyId] = useState(getCompanyId());
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedPathIndex, setSelectedPathIndex] = useState(0);
