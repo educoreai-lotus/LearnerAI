@@ -75,8 +75,8 @@ export function useChatbot({
     };
 
     const loadScript = () => {
-      // Check if script already exists
-      if (document.querySelector('script[src*="bot.js"]')) {
+      // Check if script already loaded (using EDUCORE_BOT_LOADED flag from guide)
+      if (window.EDUCORE_BOT_LOADED || document.querySelector('script[src*="bot.js"]')) {
         scriptLoadedRef.current = true;
         // Script exists, wait for it to load
         setTimeout(initChatbot, 100);
@@ -89,6 +89,7 @@ export function useChatbot({
       script.async = true;
       script.onload = () => {
         scriptLoadedRef.current = true;
+        window.EDUCORE_BOT_LOADED = true; // Set flag as per guide
         console.log('✅ Chatbot script loaded');
         initChatbot();
       };
