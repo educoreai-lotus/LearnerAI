@@ -385,6 +385,13 @@ export class GenerateLearningPathUseCase {
         console.warn(`⚠️ Using mock skill breakdown due to Skills Engine failure`);
       }
 
+      // Normalize skill breakdown: Extract only skill names, ignore skill_id if present
+      // Skills Engine may send skills as objects with skill_id and skill_name
+      if (skillBreakdown) {
+        skillBreakdown = this._normalizeSkillBreakdown(skillBreakdown);
+        console.log(`✅ Normalized skill breakdown: extracted skill names (removed skill_id if present)`);
+      }
+
       // In update mode: Filter skill breakdown and competencies to only include remaining skills
       if (isUpdateMode && skillBreakdown && skillsRawData) {
         console.log(`🔍 UPDATE MODE: Filtering skill breakdown to match remaining skills only`);
@@ -412,16 +419,18 @@ export class GenerateLearningPathUseCase {
               skillsToFilter = breakdown;
             } else if (breakdown && typeof breakdown === 'object') {
               // Old format: extract from microSkills/nanoSkills (backward compatibility)
+              // Note: Breakdown should already be normalized, but keep this for edge cases
               const microSkills = breakdown.microSkills || [];
               const nanoSkills = breakdown.nanoSkills || [];
               const skillsArray = breakdown.skills || [];
               
               // Combine all skills from old format
+              // Extract skill_name (ignore skill_id) for consistency
               skillsToFilter = [
                 ...microSkills,
                 ...nanoSkills,
                 ...skillsArray
-              ].map(skill => typeof skill === 'string' ? skill : (skill.name || skill.id || String(skill)));
+              ].map(skill => typeof skill === 'string' ? skill : (skill.skill_name || skill.name || skill.id || String(skill)));
             }
             
             // Filter skills to only include those in remaining gap
@@ -1687,6 +1696,68 @@ export class GenerateLearningPathUseCase {
 
     // If format is different, return as-is (can't filter)
     return prompt2Output;
+  }
+
+  /**
+   * Normalize skill breakdown from Skills Engine
+   * Extracts only skill names from objects, ignoring skill_id if present
+   * Skills Engine may send skills as objects: {skill_id: "...", skill_name: "..."}
+   * This method ensures we only keep skill names (strings)
+   * @param {Object} breakdown - Skill breakdown from Skills Engine
+   * @returns {Object} Normalized breakdown with only skill names (strings)
+   * @private
+   */
+  _normalizeSkillBreakdown(breakdown) {
+    if (!breakdown || typeof breakdown !== 'object') {
+      return breakdown;
+    }
+
+    // Helper function to extract skill names from array (removes skill_id, keeps only skill_name)
+    const extractSkillNames = (skillsArray) => {
+      if (!Array.isArray(skillsArray)) {
+        return skillsArray;
+      }
+      return skillsArray.map(skill => {
+        // If it's already a string, return as-is
+        if (typeof skill === 'string') {
+          return skill;
+        }
+        // If it's an object, extract skill_name (ignore skill_id)
+        if (typeof skill === 'object' && skill !== null) {
+          return skill.skill_name || skill.name || skill.skillName || String(skill);
+        }
+        // Fallback
+        return String(skill);
+      }).filter(name => name && name.trim() !== ''); // Remove empty strings
+    };
+
+    const normalized = {};
+
+    // Process each competency in the breakdown
+    for (const [competencyName, skills] of Object.entries(breakdown)) {
+      if (Array.isArray(skills)) {
+        // New format: direct array of skill names (or objects with skill_id/skill_name)
+        normalized[competencyName] = extractSkillNames(skills);
+      } else if (skills && typeof skills === 'object') {
+        // Old format: object with microSkills/nanoSkills (backward compatibility)
+        const microSkills = skills.microSkills || [];
+        const nanoSkills = skills.nanoSkills || [];
+        const skillsArray = skills.skills || [];
+        
+        // Combine all skills and extract names
+        const allSkills = [
+          ...microSkills,
+          ...nanoSkills,
+          ...skillsArray
+        ];
+        normalized[competencyName] = extractSkillNames(allSkills);
+      } else {
+        // Unknown format, keep as-is
+        normalized[competencyName] = skills;
+      }
+    }
+
+    return normalized;
   }
 }
 

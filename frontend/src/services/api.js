@@ -146,6 +146,14 @@ class ApiService {
       body: { status },
     });
   }
+
+  // Authentication
+  async validateToken(token) {
+    return this.request('/auth/validate-token', {
+      method: 'POST',
+      body: { token },
+    });
+  }
 }
 
 export default new ApiService();

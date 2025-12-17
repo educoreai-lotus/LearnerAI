@@ -808,6 +808,20 @@ async function skillsEngineHandler(payload, dependencies) {
     }
     const competencyTargetName = competency_target_name || competency_name;
     
+    // Skip processing if competency_target_name is missing (null/undefined/empty)
+    // Don't return error, just silently ignore the request
+    if (!competencyTargetName) {
+      console.warn(`⚠️  Skipping skills gap processing: competency_target_name is missing (user_id: ${user_id})`);
+      return {
+        success: true,
+        action: payload.action || 'process_skills_gap',
+        data: {
+          message: 'Request received but skipped: competency_target_name is missing',
+          skipped: true
+        }
+      };
+    }
+    
     // Process the skills gap update
     const skillsGap = await processGapUpdateUseCase.execute({
       user_id,

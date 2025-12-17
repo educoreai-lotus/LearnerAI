@@ -78,11 +78,88 @@ export function clearAuth() {
 
 /**
  * Check if user is authenticated
- * @returns {boolean} True if user and token exist
+ * @returns {boolean} True if user exists (token is optional)
  */
 export function isAuthenticated() {
   const user = getCurrentUser();
-  const token = getAuthToken();
-  return !!(user && token);
+  // Token is optional - only require user to be authenticated
+  return !!user;
+}
+
+/**
+ * Extract URL parameters from query string
+ * @returns {Object} Object with user_id, role, token, company_id, etc.
+ */
+export function getUrlParams() {
+  const params = new URLSearchParams(window.location.search);
+  return {
+    user_id: params.get('user_id'),
+    company_id: params.get('company_id'),
+    role: params.get('role'),
+    token: params.get('token'),
+  };
+}
+
+/**
+ * Initialize auth from URL parameters (called when redirected from Directory)
+ * Works with just user_id (token is optional)
+ * Reads URL params and stores in localStorage
+ * @returns {Promise<Object|null>} User object if successful, null otherwise
+ */
+export async function initializeAuthFromUrl() {
+  const urlParams = getUrlParams();
+  
+  // If no user_id or company_id, return null (not redirected from Directory)
+  if (!urlParams.user_id && !urlParams.company_id) {
+    return null;
+  }
+
+  // If token is provided, optionally validate it (but don't require it)
+  let validatedUserInfo = null;
+  if (urlParams.token) {
+    try {
+      const api = (await import('../services/api')).default;
+      try {
+        validatedUserInfo = await api.validateToken(urlParams.token);
+      } catch (validationError) {
+        // Token validation is optional - continue without it
+        console.log('Token validation skipped (optional):', validationError.message);
+      }
+    } catch (error) {
+      console.log('Token validation not available (optional):', error.message);
+    }
+  }
+
+  // Use validated info if available, otherwise use URL params directly
+  const user = {
+    id: validatedUserInfo?.user_id || urlParams.user_id || urlParams.company_id,
+    company_id: validatedUserInfo?.company_id || urlParams.company_id,
+    role: validatedUserInfo?.role || urlParams.role || 'learner',
+    tenantId: validatedUserInfo?.company_id || urlParams.company_id,
+  };
+
+  // Store user info (token is optional - can be null)
+  setAuth(user, urlParams.token || null);
+  
+  // Clean URL by removing query parameters
+  const cleanUrl = window.location.pathname;
+  window.history.replaceState({}, '', cleanUrl);
+  
+  return user;
+}
+
+/**
+ * Get user role from localStorage or URL
+ * @returns {string|null} User role ('learner', 'company', 'decision_maker') or null
+ */
+export function getUserRole() {
+  const user = getCurrentUser();
+  if (user && user.role) {
+    return user.role;
+  }
+  
+  // Fallback: check URL params
+  const urlParams = getUrlParams();
+  return urlParams.role || null;
 }
 

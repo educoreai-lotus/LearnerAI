@@ -253,9 +253,26 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 }
 ```
 
+**OR Skills Engine may send skills with IDs:**
+```json
+{
+  "React Hooks": [
+    { "skill_id": "mgs-1", "skill_name": "State Management" },
+    { "skill_id": "mgs-2", "skill_name": "Side Effects" },
+    { "skill_id": "mgs-3", "skill_name": "Custom Hooks" }
+  ],
+  "TypeScript Fundamentals": [
+    { "skill_id": "mgs-4", "skill_name": "Type Annotations" },
+    { "skill_id": "mgs-5", "skill_name": "Interfaces" }
+  ]
+}
+```
+
 **Note:** 
 - Skills Engine returns **only the skills in the LOWEST layer** for each competency
-- Response is a **simple array of skill names** (strings) - no IDs, no micro/nano separation
+- Skills Engine may send skills as **strings** (skill names) or as **objects** with `skill_id` and `skill_name`
+- **LearnerAI normalizes the response:** Extracts only `skill_name` from objects (ignores `skill_id`)
+- After normalization, LearnerAI uses **only skill names** (strings) - no IDs, no micro/nano separation
 - This matches the level of the initial skills gap for consistency
 
 **When LearnerAI Calls:**
@@ -269,8 +286,9 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 2. Prompt 1: Expand skills gap (AI)
 3. Prompt 2: Identify competencies from expanded skills (AI)
 4. LearnerAI → Skills Engine: Request breakdown for expanded competencies (Type 2)
-5. Skills Engine → LearnerAI: Returns lowest layer skills (array of skill names)
-6. Prompt 3: Create learning path using gap + breakdown (AI)
+5. Skills Engine → LearnerAI: Returns lowest layer skills (may include skill_id + skill_name)
+6. LearnerAI normalizes breakdown: Extracts only skill_name (ignores skill_id)
+7. Prompt 3: Create learning path using gap + normalized breakdown (AI)
 ```
 
 ---
