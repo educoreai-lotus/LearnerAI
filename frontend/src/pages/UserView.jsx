@@ -30,12 +30,41 @@ export default function UserView() {
     return 'b2c3d4e5-f6a7-8901-2345-678901234567'; // Sara Neer from mock data
   };
   
-  const [userId] = useState(getUserId());
+  const [userId, setUserId] = useState(getUserId());
   const [courses, setCourses] = useState([]);
   const [selectedCourse, setSelectedCourse] = useState(null);
   const [learningPath, setLearningPath] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pathLoading, setPathLoading] = useState(false);
+
+  // Update userId when auth changes (check after auth initialization completes)
+  useEffect(() => {
+    // Wait a bit for App.jsx auth initialization to complete
+    const checkAuth = () => {
+      const newUserId = getUserId();
+      if (newUserId !== userId) {
+        setUserId(newUserId);
+      }
+    };
+
+    // Check immediately
+    checkAuth();
+
+    // Check again after a short delay (to catch auth initialization from App.jsx)
+    const timeout = setTimeout(checkAuth, 1000);
+
+    // Listen for storage events (when auth is updated)
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [userId]);
 
   useEffect(() => {
     loadUserData();

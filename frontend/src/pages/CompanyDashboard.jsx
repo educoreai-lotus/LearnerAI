@@ -31,13 +31,42 @@ export default function CompanyDashboard() {
     return 'c1d2e3f4-5678-9012-3456-789012345678'; // TechCorp Inc.
   };
   
-  const [companyId] = useState(getCompanyId());
+  const [companyId, setCompanyId] = useState(getCompanyId());
   const [users, setUsers] = useState([]);
   const [selectedUser, setSelectedUser] = useState(null);
   const [selectedPathIndex, setSelectedPathIndex] = useState(0);
   const [learningPaths, setLearningPaths] = useState({});
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
+
+  // Update companyId when auth changes (check after auth initialization completes)
+  useEffect(() => {
+    // Wait a bit for App.jsx auth initialization to complete
+    const checkAuth = () => {
+      const newCompanyId = getCompanyId();
+      if (newCompanyId !== companyId) {
+        setCompanyId(newCompanyId);
+      }
+    };
+
+    // Check immediately
+    checkAuth();
+
+    // Check again after a short delay (to catch auth initialization from App.jsx)
+    const timeout = setTimeout(checkAuth, 1000);
+
+    // Listen for storage events (when auth is updated)
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [companyId]);
 
   useEffect(() => {
     loadCompanyData();
