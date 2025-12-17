@@ -2,7 +2,6 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { useEffect, useState } from 'react';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
-import ViewSwitcher from './components/ViewSwitcher';
 import ChatbotContainer from './components/ChatbotContainer';
 import CompanyDashboard from './pages/CompanyDashboard';
 import UserView from './pages/UserView';
@@ -83,7 +82,6 @@ function App() {
           <Route path="/approvals/:approvalId" element={<ApprovalReview />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        <ViewSwitcher />
         
         {/* Chatbot Container - will initialize when user and token are available */}
         <ChatbotContainer 
