@@ -27,15 +27,31 @@ function App() {
           setUser(urlUser);
           setToken(getAuthToken());
           
-          // Route based on role
-          const role = urlUser.role || getUserRole();
-          if (role === 'company') {
+          // Get current path to avoid unnecessary redirects
+          const currentPath = location.pathname;
+          
+          // Infer role from path if role is missing
+          let role = urlUser.role || getUserRole();
+          if (!role) {
+            // Infer role from current path
+            if (currentPath.startsWith('/company')) {
+              role = 'company';
+            } else if (currentPath.startsWith('/approvals')) {
+              role = 'decision_maker';
+            } else {
+              role = 'learner';
+            }
+          }
+          
+          // Only navigate if user is NOT already on the correct page
+          if (role === 'company' && currentPath !== '/company') {
             navigate('/company', { replace: true });
-          } else if (role === 'decision_maker') {
+          } else if (role === 'decision_maker' && currentPath !== '/approvals' && !currentPath.startsWith('/approvals/')) {
             navigate('/approvals', { replace: true });
-          } else {
+          } else if (role === 'learner' && currentPath !== '/') {
             navigate('/', { replace: true });
           }
+          // If already on correct page, don't navigate
         } else {
           // No URL params, use existing localStorage auth
           const existingUser = getCurrentUser();
@@ -59,8 +75,36 @@ function App() {
   }, [navigate]);
 
   // Get user and token for chatbot initialization
-  const currentUser = user || getCurrentUser();
-  const currentToken = token || getAuthToken();
+  // Fallback to mock data for local development/testing (same as UserView)
+  const getChatbotUser = () => {
+    // First, try from auth state or localStorage
+    const authUser = user || getCurrentUser();
+    if (authUser && authUser.id) {
+      return authUser;
+    }
+    
+    // Fallback to mock user for local development (Sara Neer)
+    return {
+      id: 'b2c3d4e5-f6a7-8901-2345-678901234567',
+      tenantId: 'c1d2e3f4-5678-9012-3456-789012345678', // TechCorp Inc.
+      company_id: 'c1d2e3f4-5678-9012-3456-789012345678'
+    };
+  };
+
+  const getChatbotToken = () => {
+    // First, try from auth state or localStorage
+    const authToken = token || getAuthToken();
+    if (authToken) {
+      return authToken;
+    }
+    
+    // Fallback to mock token for local development
+    // This allows chatbot to initialize for testing
+    return 'mock-token-for-local-development';
+  };
+
+  const currentUser = getChatbotUser();
+  const currentToken = getChatbotToken();
 
   // Show loading spinner while initializing auth
   if (isInitializing) {

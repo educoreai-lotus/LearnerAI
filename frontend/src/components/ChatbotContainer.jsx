@@ -1,3 +1,4 @@
+import { useEffect } from 'react';
 import { useChatbot } from '../hooks/useChatbot';
 
 /**
@@ -24,6 +25,17 @@ export default function ChatbotContainer({
   tenantId,
   containerId = "edu-bot-container" 
 }) {
+  // Debug logging
+  useEffect(() => {
+    console.log('🤖 ChatbotContainer render:', {
+      userId: userId || 'MISSING',
+      token: token ? `${token.substring(0, 20)}...` : 'MISSING',
+      tenantId: tenantId || 'not provided',
+      enabled: !!(userId && token),
+      '⚠️ Issue': !userId ? 'userId is missing' : !token ? 'token is missing' : 'OK'
+    });
+  }, [userId, token, tenantId]);
+
   // Initialize chatbot when user and token are available
   useChatbot({
     userId: userId,
@@ -35,6 +47,7 @@ export default function ChatbotContainer({
 
   // Always render the container div (widget will mount here and create its own floating UI)
   // Container should be in DOM before widget initialization
+  // Widget creates its own floating button, so container doesn't need styling
   return <div id={containerId}></div>;
 }
 

@@ -5,6 +5,7 @@ import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import LoadingSpinner from '../components/LoadingSpinner';
 import api from '../services/api';
+import { getCurrentUser, getUrlParams } from '../utils/auth';
 
 /**
  * Approvals List Page
@@ -16,11 +17,54 @@ export default function ApprovalsList() {
   const [approvals, setApprovals] = useState([]);
   const [error, setError] = useState(null);
   
-  // In a real app, this would come from authentication context
-  // For now, using a mock decision maker ID for testing (must be a valid UUID)
-  // TODO: Replace with actual auth context
-  // Using a valid UUID from sample data: '550e8400-e29b-41d4-a716-446655440010' (John Manager from TechCorp)
-  const [decisionMakerId] = useState('550e8400-e29b-41d4-a716-446655440010'); // Mock decision maker ID (valid UUID)
+  // Get decision maker user_id from URL params, localStorage, or fallback to mock data
+  const getDecisionMakerId = () => {
+    // First, try URL parameters (from Directory redirect)
+    const urlParams = getUrlParams();
+    if (urlParams.user_id) {
+      return urlParams.user_id;
+    }
+    
+    // Second, try localStorage (stored by initializeAuthFromUrl)
+    const user = getCurrentUser();
+    if (user && user.id) {
+      return user.id;
+    }
+    
+    // Fallback to mock data for development/testing
+    return '550e8400-e29b-41d4-a716-446655440010'; // John Manager from TechCorp
+  };
+  
+  const [decisionMakerId, setDecisionMakerId] = useState(getDecisionMakerId());
+
+  // Update decisionMakerId when auth changes (check after auth initialization completes)
+  useEffect(() => {
+    // Wait a bit for App.jsx auth initialization to complete
+    const checkAuth = () => {
+      const newDecisionMakerId = getDecisionMakerId();
+      if (newDecisionMakerId !== decisionMakerId) {
+        setDecisionMakerId(newDecisionMakerId);
+      }
+    };
+
+    // Check immediately
+    checkAuth();
+
+    // Check again after a short delay (to catch auth initialization from App.jsx)
+    const timeout = setTimeout(checkAuth, 1000);
+
+    // Listen for storage events (when auth is updated)
+    const handleStorageChange = () => {
+      checkAuth();
+    };
+
+    window.addEventListener('storage', handleStorageChange);
+
+    return () => {
+      clearTimeout(timeout);
+      window.removeEventListener('storage', handleStorageChange);
+    };
+  }, [decisionMakerId]);
 
   useEffect(() => {
     loadApprovals();

@@ -30,8 +30,26 @@ export function useChatbot({
   const scriptLoadedRef = useRef(false);
 
   useEffect(() => {
+    // Debug logging
+    console.log('🔍 useChatbot check:', {
+      enabled,
+      userId: userId || 'MISSING',
+      token: token ? `${token.substring(0, 20)}...` : 'MISSING',
+      tenantId: tenantId || 'not provided',
+      container,
+      willInitialize: !!(enabled && userId && token),
+      '⚠️ Why disabled': !enabled ? 'enabled=false' : !userId ? 'userId missing' : !token ? 'token missing' : 'OK'
+    });
+
     // Don't initialize if disabled or missing required params
     if (!enabled || !userId || !token) {
+      if (!enabled) {
+        console.warn('⚠️ Chatbot disabled');
+      } else if (!userId) {
+        console.warn('⚠️ Chatbot: userId is missing');
+      } else if (!token) {
+        console.warn('⚠️ Chatbot: token is missing - chatbot requires authentication token');
+      }
       return;
     }
 
@@ -60,6 +78,14 @@ export function useChatbot({
             return;
           }
 
+          console.log('🚀 Calling initializeEducoreBot with:', {
+            microservice: "LEARNER_AI",
+            userId,
+            token: token ? `${token.substring(0, 20)}...` : 'MISSING',
+            tenantId: tenantId || userId,
+            container
+          });
+
           window.initializeEducoreBot({
             microservice: "LEARNER_AI", // LearnerAI microservice name
             userId: userId,
@@ -67,10 +93,54 @@ export function useChatbot({
             tenantId: tenantId || userId, // Use userId as tenantId if tenantId not provided
             container: container
           });
+          
           initializedRef.current = true;
-          console.log('✅ Chatbot initialized successfully', { userId, tenantId, container });
+          console.log('✅ Chatbot initialized successfully', { userId, tenantId: tenantId || userId, container });
+          
+          // Check if widget was actually created after a delay
+          setTimeout(() => {
+            const widget = containerElement.querySelector('[class*="chat"], [class*="bot"], [id*="chat"], [id*="bot"], iframe');
+            if (widget) {
+              console.log('✅ Chatbot widget found in DOM:', widget);
+              console.log('   Widget ID:', widget.id);
+              console.log('   Widget classes:', widget.className);
+              console.log('   Widget computed styles:', {
+                display: window.getComputedStyle(widget).display,
+                visibility: window.getComputedStyle(widget).visibility,
+                opacity: window.getComputedStyle(widget).opacity,
+                position: window.getComputedStyle(widget).position,
+                zIndex: window.getComputedStyle(widget).zIndex,
+                width: window.getComputedStyle(widget).width,
+                height: window.getComputedStyle(widget).height
+              });
+              console.log('   Widget children:', widget.children.length);
+              console.log('   Widget innerHTML length:', widget.innerHTML.length);
+              
+              // Check for floating button specifically
+              const floatingButton = widget.querySelector('button, [role="button"], [class*="float"], [class*="button"]');
+              if (floatingButton) {
+                console.log('✅ Floating button found:', floatingButton);
+                console.log('   Button styles:', {
+                  display: window.getComputedStyle(floatingButton).display,
+                  visibility: window.getComputedStyle(floatingButton).visibility,
+                  opacity: window.getComputedStyle(floatingButton).opacity,
+                  position: window.getComputedStyle(floatingButton).position,
+                  bottom: window.getComputedStyle(floatingButton).bottom,
+                  right: window.getComputedStyle(floatingButton).right,
+                  zIndex: window.getComputedStyle(floatingButton).zIndex
+                });
+              } else {
+                console.warn('⚠️ Floating button not found in widget');
+              }
+            } else {
+              console.warn('⚠️ Chatbot widget not found in DOM after initialization. Container:', containerElement);
+              console.warn('   Container children:', containerElement.children.length);
+              console.warn('   Container HTML:', containerElement.innerHTML);
+            }
+          }, 3000); // Increased delay to 3 seconds
         } catch (error) {
           console.error('❌ Failed to initialize chatbot:', error);
+          console.error('   Error details:', error.message, error.stack);
           initializedRef.current = false; // Allow retry on error
         }
       } else {
@@ -101,6 +171,7 @@ export function useChatbot({
         scriptLoadedRef.current = true;
         window.EDUCORE_BOT_LOADED = true; // Set flag as per guide
         console.log('✅ Chatbot script loaded');
+        console.log('   window.initializeEducoreBot available:', typeof window.initializeEducoreBot);
         initChatbot();
       };
       script.onerror = () => {
