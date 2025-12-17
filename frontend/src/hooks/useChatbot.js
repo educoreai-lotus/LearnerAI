@@ -41,27 +41,37 @@ export function useChatbot({
     }
 
     const initChatbot = () => {
-      // Check if container exists
+      // Check if container exists - retry if not found
       const containerElement = document.querySelector(container);
       if (!containerElement) {
-        console.warn(`Chatbot container not found: ${container}`);
+        console.warn(`Chatbot container not found: ${container}, retrying...`);
+        // Retry after a short delay to allow React to render the container
+        setTimeout(initChatbot, 200);
         return;
       }
 
       // Check if script is loaded
       if (window.initializeEducoreBot) {
         try {
+          // Check if widget already exists in container (prevent double initialization)
+          const existingWidget = containerElement.querySelector('[class*="chat"], [class*="bot"], [id*="chat"], [id*="bot"]');
+          if (existingWidget && initializedRef.current) {
+            console.log('✅ Chatbot already initialized');
+            return;
+          }
+
           window.initializeEducoreBot({
             microservice: "LEARNER_AI", // LearnerAI microservice name
             userId: userId,
             token: token,
-            tenantId: tenantId,
+            tenantId: tenantId || userId, // Use userId as tenantId if tenantId not provided
             container: container
           });
           initializedRef.current = true;
-          console.log('✅ Chatbot initialized successfully');
+          console.log('✅ Chatbot initialized successfully', { userId, tenantId, container });
         } catch (error) {
           console.error('❌ Failed to initialize chatbot:', error);
+          initializedRef.current = false; // Allow retry on error
         }
       } else {
         // Script not loaded yet, try again
@@ -99,11 +109,21 @@ export function useChatbot({
       document.head.appendChild(script);
     };
 
-    // Initialize when DOM is ready
+    // Wait a bit for React to render the container, then initialize
+    // Use requestAnimationFrame to ensure DOM is ready
+    const initializeWhenReady = () => {
+      requestAnimationFrame(() => {
+        // Small delay to ensure container is rendered
+        setTimeout(() => {
+          loadScript();
+        }, 100);
+      });
+    };
+
     if (document.readyState === 'loading') {
-      document.addEventListener('DOMContentLoaded', loadScript);
+      document.addEventListener('DOMContentLoaded', initializeWhenReady);
     } else {
-      loadScript();
+      initializeWhenReady();
     }
 
     // Cleanup function

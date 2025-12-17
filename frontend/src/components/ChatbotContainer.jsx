@@ -33,6 +33,8 @@ export default function ChatbotContainer({
     enabled: !!userId && !!token
   });
 
+  // Always render the container div (widget will mount here and create its own floating UI)
+  // Container should be in DOM before widget initialization
   return <div id={containerId}></div>;
 }
 
