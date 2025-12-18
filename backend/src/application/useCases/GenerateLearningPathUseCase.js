@@ -96,7 +96,8 @@ export class GenerateLearningPathUseCase {
         exam_status: examStatus,
         skills_raw_data: skillsRawArray,
         learning_path: this._buildPrompt3LearningPath(pathData, null)
-      }
+      },
+      response: {}
     };
 
     try {

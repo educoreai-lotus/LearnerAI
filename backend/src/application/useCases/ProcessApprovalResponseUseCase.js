@@ -67,7 +67,8 @@ export class ProcessApprovalResponseUseCase {
         exam_status: skillsGap?.exam_status || null,
         skills_raw_data: skillsRawArray,
         learning_path: this._buildPrompt3LearningPath(pathData, null)
-      }
+      },
+      response: {}
     };
 
     try {
