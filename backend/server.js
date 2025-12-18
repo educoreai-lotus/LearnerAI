@@ -54,6 +54,7 @@ import {
   fillCourseBuilderData, 
   fillManagementReportingData 
 } from './src/api/routes/endpoints.js';
+import { grpcServer } from './src/grpc/server.js';
 
 // Load environment variables
 dotenv.config();
@@ -476,13 +477,23 @@ const server = app.listen(PORT, HOST, () => {
   console.log(`📊 Coordinator request logging is ENABLED - all requests will be logged`);
 });
 
+// Start GRPC server (Coordinator -> GRPC)
+grpcServer.start().catch((error) => {
+  console.error('❌ Failed to start GRPC server:', error.message);
+});
+
 // Graceful shutdown handling for Railway
 const gracefulShutdown = (signal) => {
   console.log(`\n${signal} received. Starting graceful shutdown...`);
-  server.close(() => {
-    console.log('✅ HTTP server closed');
-    process.exit(0);
-  });
+  Promise.resolve()
+    .then(() => grpcServer.shutdown())
+    .catch((e) => console.error('⚠️  GRPC shutdown error:', e.message))
+    .finally(() => {
+      server.close(() => {
+        console.log('✅ HTTP server closed');
+        process.exit(0);
+      });
+    });
   
   // Force shutdown after 10 seconds
   setTimeout(() => {
