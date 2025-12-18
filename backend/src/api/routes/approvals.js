@@ -15,7 +15,9 @@ export function createApprovalsRouter(dependencies) {
     notificationService,
     courseRepository,
     companyRepository,
-    learnerRepository
+    learnerRepository,
+    skillsGapRepository,
+    coordinatorClient
   } = dependencies;
 
   if (!approvalRepository) {
@@ -28,7 +30,9 @@ export function createApprovalsRouter(dependencies) {
     distributePathUseCase,
     notificationService,
     courseRepository,
-    learnerRepository
+    learnerRepository,
+    skillsGapRepository,
+    coordinatorClient
   });
 
   const getApprovalDetailsUseCase = new GetApprovalDetailsUseCase({

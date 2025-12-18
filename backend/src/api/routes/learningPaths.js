@@ -13,6 +13,7 @@ export function createLearningPathsRouter(dependencies) {
   const {
     geminiClient,
     skillsEngineClient,
+    coordinatorClient,
     repository,
     jobRepository,
     promptLoader,
@@ -27,6 +28,7 @@ export function createLearningPathsRouter(dependencies) {
   const generatePathUseCase = new GenerateLearningPathUseCase({
     geminiClient,
     skillsEngineClient,
+    coordinatorClient,
     repository,
     jobRepository,
     promptLoader,

@@ -11,6 +11,7 @@ export class GenerateLearningPathUseCase {
   constructor({ 
     geminiClient, 
     skillsEngineClient, 
+    coordinatorClient,
     repository, 
     jobRepository, 
     promptLoader, 
@@ -23,6 +24,7 @@ export class GenerateLearningPathUseCase {
   }) {
     this.geminiClient = geminiClient;
     this.skillsEngineClient = skillsEngineClient;
+    this.coordinatorClient = coordinatorClient || null;
     this.repository = repository;
     this.jobRepository = jobRepository;
     this.promptLoader = promptLoader;
@@ -32,6 +34,79 @@ export class GenerateLearningPathUseCase {
     this.distributePathUseCase = distributePathUseCase;
     this.skillsGapRepository = skillsGapRepository;
     this.skillsExpansionRepository = skillsExpansionRepository;
+  }
+
+  _convertSkillsToArray(skillsRawData) {
+    if (!skillsRawData) return [];
+    if (Array.isArray(skillsRawData)) return skillsRawData.filter(Boolean);
+    if (typeof skillsRawData !== 'object') return [];
+    const out = [];
+    for (const value of Object.values(skillsRawData)) {
+      if (Array.isArray(value)) out.push(...value);
+      else if (typeof value === 'string') out.push(value);
+    }
+    return Array.from(new Set(out.filter(Boolean)));
+  }
+
+  _buildPrompt3LearningPath(pathData, onlyModule = null) {
+    // enforce Prompt 3 structure/order
+    const lp = {};
+    lp.path_title = pathData?.path_title || 'Learning Path';
+    lp.learner_id = pathData?.learner_id;
+    if (pathData?.total_estimated_duration_hours !== undefined) {
+      lp.total_estimated_duration_hours = pathData.total_estimated_duration_hours;
+    } else {
+      lp.total_estimated_duration_hours = 0;
+    }
+    const modules = Array.isArray(pathData?.learning_modules) ? pathData.learning_modules : [];
+    lp.learning_modules = onlyModule ? [onlyModule] : modules;
+    return lp;
+  }
+
+  async _pushApprovedLearningPathToCourseBuilder(skillsGap, pathData) {
+    if (!this.coordinatorClient || !this.coordinatorClient.isConfigured()) {
+      console.warn('⚠️  CoordinatorClient not configured - skipping push_learning_path');
+      return;
+    }
+
+    const modules = Array.isArray(pathData?.learning_modules) ? pathData.learning_modules : [];
+    if (modules.length === 0) {
+      console.warn('⚠️  No learning_modules found - skipping push_learning_path');
+      return;
+    }
+
+    const skillsRawArray = this._convertSkillsToArray(skillsGap.skillsRawData || skillsGap.skills_raw_data);
+    const preferredLanguage = skillsGap.preferred_language || skillsGap.preferredLanguage || null;
+    const userName = skillsGap.userName || skillsGap.user_name || null;
+    const companyName = skillsGap.companyName || skillsGap.company_name || null;
+    const examStatus = skillsGap.examStatus || skillsGap.exam_status || null;
+
+    // One request per course (learning module)
+    for (const mod of modules) {
+      const requestBody = {
+        requester_service: 'learnerAI',
+        payload: {
+          action: 'push_learning_path',
+          description: 'Send an approved learning path immediately to Course Builder (auto: after generation; manual: after decision maker approval).',
+          user_id: skillsGap.userId,
+          user_name: userName,
+          preferred_language: preferredLanguage,
+          company_id: skillsGap.companyId,
+          company_name: companyName,
+          competency_target_name: skillsGap.competencyTargetName,
+          exam_status: examStatus,
+          skills_raw_data: skillsRawArray,
+          learning_path: this._buildPrompt3LearningPath(pathData, mod)
+        }
+      };
+
+      try {
+        await this.coordinatorClient.postFillContentMetrics(requestBody);
+        console.log(`✅ push_learning_path sent to Coordinator for module: ${mod?.module_title || mod?.title || 'unknown'}`);
+      } catch (e) {
+        console.error(`❌ push_learning_path failed for module: ${mod?.module_title || mod?.title || 'unknown'}: ${e.message}`);
+      }
+    }
   }
 
   /**
@@ -628,6 +703,13 @@ export class GenerateLearningPathUseCase {
       // Check approval policy and handle distribution
       // Skip approval if this is an update after exam failure
       await this._handlePathDistribution(savedPath, skillsGap, isUpdateAfterFailure);
+
+      // Proactively push approved learning paths to Course Builder via Coordinator
+      // - auto-approval: immediately after generation
+      // - update-after-failure: also auto-approved in our logic
+      if (learningPath.status === 'approved') {
+        await this._pushApprovedLearningPathToCourseBuilder(skillsGap, pathData);
+      }
 
       // Mark job as completed
       await this.jobRepository.updateJob(job.id, {

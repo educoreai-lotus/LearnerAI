@@ -3,12 +3,88 @@
  * Handles approval, rejection, or changes request for learning paths
  */
 export class ProcessApprovalResponseUseCase {
-  constructor({ approvalRepository, distributePathUseCase, notificationService, courseRepository, learnerRepository }) {
+  constructor({ approvalRepository, distributePathUseCase, notificationService, courseRepository, learnerRepository, skillsGapRepository, coordinatorClient }) {
     this.approvalRepository = approvalRepository;
     this.distributePathUseCase = distributePathUseCase;
     this.notificationService = notificationService;
     this.courseRepository = courseRepository;
     this.learnerRepository = learnerRepository;
+    this.skillsGapRepository = skillsGapRepository || null;
+    this.coordinatorClient = coordinatorClient || null;
+  }
+
+  _convertSkillsToArray(skillsRawData) {
+    if (!skillsRawData) return [];
+    if (Array.isArray(skillsRawData)) return skillsRawData.filter(Boolean);
+    if (typeof skillsRawData !== 'object') return [];
+    const out = [];
+    for (const value of Object.values(skillsRawData)) {
+      if (Array.isArray(value)) out.push(...value);
+      else if (typeof value === 'string') out.push(value);
+    }
+    return Array.from(new Set(out.filter(Boolean)));
+  }
+
+  _buildPrompt3LearningPath(pathData, onlyModule = null) {
+    const lp = {};
+    lp.path_title = pathData?.path_title || 'Learning Path';
+    lp.learner_id = pathData?.learner_id;
+    lp.total_estimated_duration_hours = pathData?.total_estimated_duration_hours ?? 0;
+    const modules = Array.isArray(pathData?.learning_modules) ? pathData.learning_modules : [];
+    lp.learning_modules = onlyModule ? [onlyModule] : modules;
+    return lp;
+  }
+
+  async _pushApprovedLearningPathToCourseBuilder({ course, skillsGap }) {
+    if (!this.coordinatorClient || !this.coordinatorClient.isConfigured()) {
+      console.warn('⚠️  CoordinatorClient not configured - skipping push_learning_path');
+      return;
+    }
+
+    let pathData = course?.learning_path || {};
+    if (typeof pathData === 'string') {
+      try { pathData = JSON.parse(pathData); } catch { pathData = {}; }
+    }
+
+    const modules = Array.isArray(pathData?.learning_modules) ? pathData.learning_modules : [];
+    if (modules.length === 0) {
+      console.warn('⚠️  No learning_modules found - skipping push_learning_path');
+      return;
+    }
+
+    const skillsRawArray = this._convertSkillsToArray(skillsGap?.skills_raw_data);
+    const requestBase = {
+      requester_service: 'learnerAI',
+      payload: {
+        action: 'push_learning_path',
+        description: 'Send an approved learning path immediately to Course Builder (auto: after generation; manual: after decision maker approval).',
+        user_id: course.user_id,
+        user_name: skillsGap?.user_name || null,
+        preferred_language: skillsGap?.preferred_language || null,
+        company_id: skillsGap?.company_id || null,
+        company_name: skillsGap?.company_name || null,
+        competency_target_name: course.competency_target_name,
+        exam_status: skillsGap?.exam_status || null,
+        skills_raw_data: skillsRawArray
+      }
+    };
+
+    for (const mod of modules) {
+      const requestBody = {
+        ...requestBase,
+        payload: {
+          ...requestBase.payload,
+          learning_path: this._buildPrompt3LearningPath(pathData, mod)
+        }
+      };
+
+      try {
+        await this.coordinatorClient.postFillContentMetrics(requestBody);
+        console.log(`✅ push_learning_path sent to Coordinator for module: ${mod?.module_title || mod?.title || 'unknown'}`);
+      } catch (e) {
+        console.error(`❌ push_learning_path failed for module: ${mod?.module_title || mod?.title || 'unknown'}: ${e.message}`);
+      }
+    }
   }
 
   /**
@@ -61,11 +137,26 @@ export class ProcessApprovalResponseUseCase {
         try {
           await this.courseRepository.updateCourse(approval.learningPathId, { approved: true });
           console.log(`✅ Course ${approval.learningPathId} marked as approved in courses table`);
-          console.log(`📋 Course Builder can request this learning path data on-demand when needed`);
         } catch (error) {
           console.error(`⚠️  Failed to update course approved status: ${error.message}`);
           // Don't fail the approval process if course update fails
         }
+      }
+
+      // Proactively push to Course Builder via Coordinator (one request per course/module)
+      try {
+        if (this.courseRepository && this.skillsGapRepository) {
+          const course = await this.courseRepository.getCourseById(approval.learningPathId);
+          if (course) {
+            const skillsGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(
+              course.user_id,
+              course.competency_target_name
+            );
+            await this._pushApprovedLearningPathToCourseBuilder({ course, skillsGap });
+          }
+        }
+      } catch (e) {
+        console.error(`⚠️  Failed to push approved learning path to Coordinator: ${e.message}`);
       }
     }
 

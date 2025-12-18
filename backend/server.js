@@ -10,6 +10,7 @@ import { CourseBuilderClient } from './src/infrastructure/clients/CourseBuilderC
 import { AnalyticsClient } from './src/infrastructure/clients/AnalyticsClient.js';
 import { ReportsClient } from './src/infrastructure/clients/ReportsClient.js';
 import { RAGMicroserviceClient } from './src/infrastructure/clients/RAGMicroserviceClient.js';
+import { CoordinatorClient } from './src/infrastructure/clients/CoordinatorClient.js';
 import { SupabaseRepository } from './src/infrastructure/repositories/SupabaseRepository.js';
 import { JobRepository } from './src/infrastructure/repositories/JobRepository.js';
 // CourseSuggestionsRepository removed - was part of old schema
@@ -81,6 +82,11 @@ try {
   // Initialize clients
   const geminiClient = new GeminiApiClient(process.env.GEMINI_API_KEY);
   const httpClient = new HttpClient();
+  const coordinatorClient = new CoordinatorClient({
+    baseUrl: process.env.COORDINATOR_URL,
+    serviceName: process.env.SERVICE_NAME || 'learnerAI-service',
+    privateKey: process.env.LEARNERAI_PRIVATE_KEY || process.env['LEARNERAI_PRIVATE-KEY'] || process.env.COORDINATOR_PRIVATE_KEY
+  });
   const skillsEngineClient = new SkillsEngineClient({
     baseUrl: process.env.SKILLS_ENGINE_URL || 'http://localhost:5001',
     serviceToken: process.env.SKILLS_ENGINE_TOKEN,
@@ -201,6 +207,7 @@ try {
   dependencies = {
     geminiClient,
     skillsEngineClient,
+    coordinatorClient,
     repository,
     jobRepository,
     suggestionsRepository,
