@@ -72,7 +72,7 @@ function App() {
     };
 
     initAuth();
-  }, [navigate]);
+  }, [navigate, location.pathname]);
 
   // Get user and token for chatbot initialization
   // Fallback to mock data for local development/testing (same as UserView)

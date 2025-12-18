@@ -141,9 +141,20 @@ export async function initializeAuthFromUrl() {
   // Store user info (token is optional - can be null)
   setAuth(user, urlParams.token || null);
   
-  // Clean URL by removing query parameters
-  const cleanUrl = window.location.pathname;
-  window.history.replaceState({}, '', cleanUrl);
+  // Keep user_id / company_id visible in the URL (Directory-style deep links).
+  // Only strip sensitive params like token to avoid leaking it in the browser history.
+  try {
+    const url = new URL(window.location.href);
+    const params = url.searchParams;
+    if (params.has('token')) {
+      params.delete('token');
+      // Note: keep role/user_id/company_id so the URL remains shareable and debuggable
+      const next = `${url.pathname}${params.toString() ? `?${params.toString()}` : ''}${url.hash || ''}`;
+      window.history.replaceState({}, '', next);
+    }
+  } catch {
+    // If URL parsing fails for any reason, don't mutate the URL.
+  }
   
   return user;
 }
