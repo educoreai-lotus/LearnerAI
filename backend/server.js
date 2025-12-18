@@ -206,6 +206,7 @@ try {
     ragClient: ragClient || null, // Allow null RAG client
     promptLoader,
     suggestionsRepository,
+    recommendationRepository,
     learningPathRepository: repository,
     jobRepository
   });

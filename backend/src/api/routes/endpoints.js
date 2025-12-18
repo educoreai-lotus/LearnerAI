@@ -694,7 +694,8 @@ async function skillsEngineHandler(payload, dependencies) {
     skillsExpansionRepository,
     checkApprovalPolicyUseCase,
     requestPathApprovalUseCase,
-    distributePathUseCase
+    distributePathUseCase,
+    detectCompletionUseCase
   } = dependencies;
   
   // Check if this is a skills gap update (has 'gap' field)
@@ -808,6 +809,12 @@ async function skillsEngineHandler(payload, dependencies) {
       const normalizedExamStatus = payload.exam_status.toString().toLowerCase();
       finalStatus = (normalizedExamStatus === 'pass' || normalizedExamStatus === 'fail') ? normalizedExamStatus : null;
     }
+
+    // User requirement: If exam_status is missing, treat it as FAIL.
+    // This keeps the system generating a learning path by default unless a PASS is explicitly provided.
+    if (!finalStatus) {
+      finalStatus = 'fail';
+    }
     const competencyTargetName = competency_target_name || competency_name;
     
     // Skip processing if competency_target_name is missing (null/undefined/empty)
@@ -836,46 +843,73 @@ async function skillsEngineHandler(payload, dependencies) {
       gap,
       preferred_language
     });
-    
-    // Automatically trigger learning path generation after skills gap is processed
+
+    // Branch based on exam_status:
+    // - PASS: do NOT generate learning path; generate suggestions (Prompt 4) and store to DB
+    // - FAIL (or missing): generate learning path as usual
     let jobId = null;
-    try {
-      if (geminiClient && repository && jobRepository && promptLoader) {
-        const { GenerateLearningPathUseCase } = await import('../../application/useCases/GenerateLearningPathUseCase.js');
-        const { SkillsGap } = await import('../../domain/entities/SkillsGap.js');
-        
-        const generatePathUseCase = new GenerateLearningPathUseCase({
-          geminiClient,
-          skillsEngineClient,
-          repository,
-          jobRepository,
-          promptLoader,
-          cacheRepository,
-          skillsGapRepository,
-          skillsExpansionRepository,
-          checkApprovalPolicyUseCase,
-          requestPathApprovalUseCase,
-          distributePathUseCase
-        });
-        
-        // Create SkillsGap entity for learning path generation
-        const skillsGapEntity = new SkillsGap({
-          userId: user_id,
-          companyId: company_id,
-          competencyTargetName: competencyTargetName
-        });
-        
-        // Trigger learning path generation (async - fire and forget)
-        const result = await generatePathUseCase.execute(skillsGapEntity);
-        jobId = result.jobId;
-        
-        console.log(`✅ Learning path generation triggered for user ${user_id}, competency ${competencyTargetName}, jobId: ${jobId}`);
-      } else {
-        console.warn('⚠️  Cannot trigger learning path generation: missing dependencies');
+    let suggestionsJobId = null;
+
+    if (finalStatus === 'pass') {
+      try {
+        if (detectCompletionUseCase && typeof detectCompletionUseCase.execute === 'function') {
+          const completionResult = await detectCompletionUseCase.execute({
+            userId: user_id,
+            competencyTargetName,
+            passed: true,
+            completionDetails: {
+              companyId: company_id,
+              companyName: company_name
+            }
+          });
+          suggestionsJobId = completionResult.jobId || null;
+          console.log(`✅ PASS detected: suggestions generation triggered for user ${user_id}, competency ${competencyTargetName}, jobId: ${suggestionsJobId}`);
+        } else {
+          console.warn('⚠️  PASS detected but detectCompletionUseCase not available - skipping suggestions generation');
+        }
+      } catch (error) {
+        console.error(`❌ Failed to trigger suggestions generation (PASS): ${error.message}`, error);
       }
-    } catch (error) {
-      // Log error but don't fail the skills gap update
-      console.error(`❌ Failed to trigger learning path generation: ${error.message}`, error);
+    } else {
+      // Automatically trigger learning path generation after skills gap is processed
+      try {
+        if (geminiClient && repository && jobRepository && promptLoader) {
+          const { GenerateLearningPathUseCase } = await import('../../application/useCases/GenerateLearningPathUseCase.js');
+          const { SkillsGap } = await import('../../domain/entities/SkillsGap.js');
+          
+          const generatePathUseCase = new GenerateLearningPathUseCase({
+            geminiClient,
+            skillsEngineClient,
+            repository,
+            jobRepository,
+            promptLoader,
+            cacheRepository,
+            skillsGapRepository,
+            skillsExpansionRepository,
+            checkApprovalPolicyUseCase,
+            requestPathApprovalUseCase,
+            distributePathUseCase
+          });
+          
+          // Create SkillsGap entity for learning path generation
+          const skillsGapEntity = new SkillsGap({
+            userId: user_id,
+            companyId: company_id,
+            competencyTargetName: competencyTargetName
+          });
+          
+          // Trigger learning path generation (async - fire and forget)
+          const result = await generatePathUseCase.execute(skillsGapEntity);
+          jobId = result.jobId;
+          
+          console.log(`✅ Learning path generation triggered for user ${user_id}, competency ${competencyTargetName}, jobId: ${jobId}`);
+        } else {
+          console.warn('⚠️  Cannot trigger learning path generation: missing dependencies');
+        }
+      } catch (error) {
+        // Log error but don't fail the skills gap update
+        console.error(`❌ Failed to trigger learning path generation: ${error.message}`, error);
+      }
     }
     
     return {
@@ -884,7 +918,8 @@ async function skillsEngineHandler(payload, dependencies) {
       data: {
         message: 'Skills gap processed successfully',
         skillsGap,
-        ...(jobId && { jobId, learningPathGenerationStarted: true })
+        ...(jobId && { jobId, learningPathGenerationStarted: true }),
+        ...(suggestionsJobId && { suggestionsJobId, suggestionsGenerationStarted: true })
       }
     };
   }

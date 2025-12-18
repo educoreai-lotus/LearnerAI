@@ -11,6 +11,7 @@ export class GenerateCourseSuggestionsUseCase {
     ragClient,
     promptLoader,
     suggestionsRepository,
+    recommendationRepository,
     learningPathRepository,
     jobRepository
   }) {
@@ -18,6 +19,7 @@ export class GenerateCourseSuggestionsUseCase {
     this.ragClient = ragClient;
     this.promptLoader = promptLoader;
     this.suggestionsRepository = suggestionsRepository; // May be null if old schema removed
+    this.recommendationRepository = recommendationRepository || null;
     this.learningPathRepository = learningPathRepository;
     this.jobRepository = jobRepository;
   }
@@ -151,7 +153,26 @@ export class GenerateCourseSuggestionsUseCase {
       });
 
       let savedSuggestion = null;
-      if (this.suggestionsRepository) {
+      if (this.recommendationRepository && typeof this.recommendationRepository.createRecommendation === 'function') {
+        // Persist to the current schema (recommendations table)
+        const created = await this.recommendationRepository.createRecommendation({
+          user_id: userId,
+          base_course_name: competencyTargetName,
+          suggested_courses: {
+            originalSuggestions: suggestions,
+            enhancedSuggestions: enhancedSuggestions,
+            ragProcessed: this.ragClient !== null
+          },
+          sent_to_rag: this.ragClient !== null
+        });
+
+        savedSuggestion = {
+          id: created.recommendation_id,
+          userId,
+          competencyTargetName,
+          suggestionData: created.suggested_courses
+        };
+      } else if (this.suggestionsRepository) {
         savedSuggestion = await this.suggestionsRepository.saveSuggestion({
           userId,
           competencyTargetName,
@@ -163,7 +184,7 @@ export class GenerateCourseSuggestionsUseCase {
           status: 'pending'
         });
       } else {
-        console.warn('⚠️  CourseSuggestionsRepository not available - suggestions not saved to database');
+        console.warn('⚠️  No suggestions repository available - suggestions not saved to database');
         // Create a mock suggestion object for job result
         savedSuggestion = {
           id: `temp_${Date.now()}`,
