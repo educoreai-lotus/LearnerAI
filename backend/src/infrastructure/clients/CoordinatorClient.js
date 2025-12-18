@@ -34,7 +34,7 @@ function formatPrivateKeyPem(key) {
  * - LEARNERAI_PRIVATE_KEY (required for signing)
  */
 export class CoordinatorClient {
-  constructor({ baseUrl, serviceName, privateKey, timeoutMs = 20000 } = {}) {
+  constructor({ baseUrl, serviceName, privateKey, timeoutMs } = {}) {
     this.baseUrl = String(baseUrl || getEnv('COORDINATOR_URL', '') || '')
       .trim()
       .replace(/\/+$/, '');
@@ -45,7 +45,16 @@ export class CoordinatorClient {
       getEnv('LEARNERAI_PRIVATE-KEY') ||
       getEnv('COORDINATOR_PRIVATE_KEY')
     );
-    this.timeoutMs = timeoutMs;
+
+    const envTimeout = getEnv('COORDINATOR_TIMEOUT_MS');
+    const parsedEnvTimeout = envTimeout ? Number(envTimeout) : null;
+    const parsedArgTimeout = timeoutMs !== undefined ? Number(timeoutMs) : null;
+
+    // Default to 60s to avoid aborting slow coordinator routes / cold starts
+    this.timeoutMs =
+      (Number.isFinite(parsedArgTimeout) && parsedArgTimeout > 0 && parsedArgTimeout) ||
+      (Number.isFinite(parsedEnvTimeout) && parsedEnvTimeout > 0 && parsedEnvTimeout) ||
+      60000;
   }
 
   isConfigured() {

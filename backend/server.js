@@ -86,7 +86,8 @@ try {
   const coordinatorClient = new CoordinatorClient({
     baseUrl: process.env.COORDINATOR_URL,
     serviceName: process.env.SERVICE_NAME || 'learnerAI-service',
-    privateKey: process.env.LEARNERAI_PRIVATE_KEY || process.env['LEARNERAI_PRIVATE-KEY'] || process.env.COORDINATOR_PRIVATE_KEY
+    privateKey: process.env.LEARNERAI_PRIVATE_KEY || process.env['LEARNERAI_PRIVATE-KEY'] || process.env.COORDINATOR_PRIVATE_KEY,
+    timeoutMs: process.env.COORDINATOR_TIMEOUT_MS ? Number(process.env.COORDINATOR_TIMEOUT_MS) : undefined
   });
   console.log('🔧 Coordinator push config:', {
     enabled: coordinatorClient.isConfigured(),
