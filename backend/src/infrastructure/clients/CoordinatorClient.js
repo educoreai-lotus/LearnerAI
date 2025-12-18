@@ -2,15 +2,25 @@ import { generateSignature } from '../../utils/signature.js';
 
 function getEnv(name, fallback = undefined) {
   const v = process.env[name];
-  return v !== undefined && v !== '' ? v : fallback;
+  if (v === undefined || v === null) return fallback;
+  const trimmed = typeof v === 'string' ? v.trim() : v;
+  return trimmed !== '' ? trimmed : fallback;
 }
 
 function formatPrivateKeyPem(key) {
   if (!key) return null;
-  if (key.includes('BEGIN PRIVATE KEY') || key.includes('BEGIN ENCRYPTED PRIVATE KEY')) {
-    return key;
+  const k = typeof key === 'string' ? key.trim() : key;
+  if (!k) return null;
+
+  // Accept common PEM headers as-is (including EC keys)
+  if (
+    k.includes('BEGIN PRIVATE KEY') ||
+    k.includes('BEGIN ENCRYPTED PRIVATE KEY') ||
+    k.includes('BEGIN EC PRIVATE KEY')
+  ) {
+    return k;
   }
-  const cleanKey = key.replace(/\s/g, '');
+  const cleanKey = String(k).replace(/\s/g, '');
   return `-----BEGIN PRIVATE KEY-----\n${cleanKey}\n-----END PRIVATE KEY-----`;
 }
 
@@ -25,7 +35,9 @@ function formatPrivateKeyPem(key) {
  */
 export class CoordinatorClient {
   constructor({ baseUrl, serviceName, privateKey, timeoutMs = 20000 } = {}) {
-    this.baseUrl = (baseUrl || getEnv('COORDINATOR_URL', '')).replace(/\/+$/, '');
+    this.baseUrl = String(baseUrl || getEnv('COORDINATOR_URL', '') || '')
+      .trim()
+      .replace(/\/+$/, '');
     this.serviceName = serviceName || getEnv('SERVICE_NAME', 'learnerAI-service');
     this.privateKeyPem = formatPrivateKeyPem(
       privateKey ||
@@ -37,7 +49,14 @@ export class CoordinatorClient {
   }
 
   isConfigured() {
-    return !!(this.baseUrl && this.serviceName && this.privateKeyPem);
+    return !!(
+      typeof this.baseUrl === 'string' &&
+      this.baseUrl.trim().length > 0 &&
+      typeof this.serviceName === 'string' &&
+      this.serviceName.trim().length > 0 &&
+      typeof this.privateKeyPem === 'string' &&
+      this.privateKeyPem.trim().length > 0
+    );
   }
 
   async postFillContentMetrics(body) {

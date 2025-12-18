@@ -88,6 +88,16 @@ try {
     serviceName: process.env.SERVICE_NAME || 'learnerAI-service',
     privateKey: process.env.LEARNERAI_PRIVATE_KEY || process.env['LEARNERAI_PRIVATE-KEY'] || process.env.COORDINATOR_PRIVATE_KEY
   });
+  console.log('🔧 Coordinator push config:', {
+    enabled: coordinatorClient.isConfigured(),
+    hasCoordinatorUrl: !!(process.env.COORDINATOR_URL && String(process.env.COORDINATOR_URL).trim()),
+    hasPrivateKey: !!(
+      (process.env.LEARNERAI_PRIVATE_KEY && String(process.env.LEARNERAI_PRIVATE_KEY).trim()) ||
+      (process.env['LEARNERAI_PRIVATE-KEY'] && String(process.env['LEARNERAI_PRIVATE-KEY']).trim()) ||
+      (process.env.COORDINATOR_PRIVATE_KEY && String(process.env.COORDINATOR_PRIVATE_KEY).trim())
+    ),
+    serviceName: process.env.SERVICE_NAME || 'learnerAI-service'
+  });
   const skillsEngineClient = new SkillsEngineClient({
     baseUrl: process.env.SKILLS_ENGINE_URL || 'http://localhost:5001',
     serviceToken: process.env.SKILLS_ENGINE_TOKEN,
