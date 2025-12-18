@@ -50,6 +50,7 @@ CREATE TABLE IF NOT EXISTS skills_gap (
     skills_raw_data JSONB NOT NULL,
     exam_status TEXT CHECK (exam_status IN ('pass', 'fail')),
     competency_target_name TEXT NOT NULL,
+    preferred_language VARCHAR,
     CONSTRAINT fk_skills_gap_user FOREIGN KEY (user_id) REFERENCES learners(user_id) ON DELETE CASCADE,
     CONSTRAINT fk_skills_gap_company FOREIGN KEY (company_id) REFERENCES companies(company_id) ON DELETE CASCADE
 );

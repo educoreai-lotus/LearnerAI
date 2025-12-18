@@ -720,7 +720,8 @@ async function skillsEngineHandler(payload, dependencies) {
       competency_name: 'string',
       status: 'string (pass|fail)',
       gap: 'object (competency map)',
-      exam_status: 'string (pass|fail)'
+      exam_status: 'string (pass|fail)',
+      preferred_language: 'string'
     };
     
     // Use AI-powered mapping to handle ANY field name mismatch (falls back to predefined if AI unavailable)
@@ -780,7 +781,8 @@ async function skillsEngineHandler(payload, dependencies) {
       competency_name,
       exam_status,
       status,
-      gap
+      gap,
+      preferred_language
     } = normalizedPayload;
     
     // Handle both status and exam_status (exam_status may be mapped to status by field mapper)
@@ -831,7 +833,8 @@ async function skillsEngineHandler(payload, dependencies) {
       competency_target_name: competencyTargetName,
       competency_name,
       status: finalStatus,
-      gap
+      gap,
+      preferred_language
     });
     
     // Automatically trigger learning path generation after skills gap is processed

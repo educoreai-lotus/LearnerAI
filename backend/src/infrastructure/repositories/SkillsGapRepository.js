@@ -28,7 +28,8 @@ export class SkillsGapRepository {
         user_name: gapData.user_name,
         skills_raw_data: gapData.skills_raw_data,
         exam_status: gapData.exam_status || null,
-        competency_target_name: gapData.competency_target_name || null
+        competency_target_name: gapData.competency_target_name || null,
+        preferred_language: gapData.preferred_language || null
       })
       .select()
       .single();
@@ -177,6 +178,7 @@ export class SkillsGapRepository {
     if (updates.competency_target_name !== undefined) updateData.competency_target_name = updates.competency_target_name;
     if (updates.company_name !== undefined) updateData.company_name = updates.company_name;
     if (updates.user_name !== undefined) updateData.user_name = updates.user_name;
+    if (updates.preferred_language !== undefined) updateData.preferred_language = updates.preferred_language;
 
     const { data, error } = await this.client
       .from('skills_gap')
@@ -355,6 +357,7 @@ export class SkillsGapRepository {
       skills_raw_data: record.skills_raw_data,
       exam_status: record.exam_status,
       competency_target_name: record.competency_target_name,
+      preferred_language: record.preferred_language,
       created_at: record.created_at,
       last_modified_at: record.last_modified_at
     };

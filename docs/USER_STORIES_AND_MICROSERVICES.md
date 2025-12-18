@@ -157,6 +157,7 @@ X-Signature: <ECDSA signature>
     "competency_target_name": "JavaScript Modern Development",
     "status": "pass" | "fail",
     "exam_status": "PASS" | "FAIL",
+    "preferred_language": "string",  // ⚠️ OPTIONAL - Learner's preferred language (VARCHAR)
     "gap": {
       "Competency_Front_End_Development": [
         "MGS_React_Hooks_Advanced",
@@ -186,6 +187,7 @@ X-Signature: <ECDSA signature>
 - LearnerAI uses AI-powered field mapping to handle field name mismatches (e.g., `trainer_id` → `user_id`, `the_gap` → `gap`).
 - If Skills Engine sends gap data with objects containing `skill_id` and `skill_name` (e.g., `{"skill_id": "mgs-1", "skill_name": "lists"}`), LearnerAI extracts only the `skill_name` and removes `skill_id` before saving to database.
 - The database stores `skills_raw_data` in competency-based structure: `{"competency_name": ["skill1", "skill2"]}` (only skill names, no IDs).
+- `preferred_language` is **optional** - if provided, it will be stored in the `skills_gap` table and can be used for personalized learning path generation.
 
 **When Skills Engine Calls:**
 - ✅ After each exam completion
@@ -821,7 +823,7 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 | Microservice | Direction | Endpoint | What LearnerAI Receives | What LearnerAI Sends |
 |--------------|-----------|----------|------------------------|---------------------|
 | **Directory** | 📥 Incoming | `POST /api/fill-content-metrics` | Company registration/update data (company_id, name, approval_policy, decision_maker) | Response with company data |
-| **Skills Engine** | 📥 Incoming (Type 1) | `POST /api/fill-content-metrics` | Skills gap data (user_id, competency, gap, exam_status) | Response with job_id |
+| **Skills Engine** | 📥 Incoming (Type 1) | `POST /api/fill-content-metrics` | Skills gap data (user_id, competency, gap, exam_status, preferred_language) | Response with job_id |
 | **Skills Engine** | 📤 Outgoing (Type 2) | `POST /api/skills/breakdown` | Lowest layer skills (array of skill names per competency) | Array of competency names |
 | **Learning Analytics** | 📥 Incoming (Batch) | `POST /api/fill-content-metrics` | Batch request (`type: "batch"`) | Simple array: all courses with `competency_target_name`, `skills_raw_data` (array), `exam_status`, `learning_path` (Prompt 3 format) |
 | **Learning Analytics** | 📥 Incoming (On-demand) | `POST /api/fill-content-metrics` | On-demand request (`type: "on-demand"`, `user_id`) | Simple array: all courses for user with `competency_target_name`, `skills_raw_data` (array), `exam_status`, `learning_path` (Prompt 3 format) |

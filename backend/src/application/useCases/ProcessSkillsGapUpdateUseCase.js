@@ -43,7 +43,8 @@ export class ProcessSkillsGapUpdateUseCase {
       competency_target_name, // Primary field
       competency_name, // Accepted for backward compatibility
       status,
-      gap // JSONB with list of skills at the lowest level in Skills Engine hierarchy (saved directly to skills_raw_data)
+      gap, // JSONB with list of skills at the lowest level in Skills Engine hierarchy (saved directly to skills_raw_data)
+      preferred_language // Optional: preferred language for the learner
     } = gapData;
 
     // Validate required fields
@@ -137,7 +138,8 @@ export class ProcessSkillsGapUpdateUseCase {
         skills_raw_data: filteredSkills,
         exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null,
         company_name, // Update in case it changed
-        user_name // Update in case it changed
+        user_name, // Update in case it changed
+        preferred_language // Update preferred language if provided
       });
 
       console.log(`✅ Updated existing skills gap for user ${user_id}, competency ${competencyTargetName}`);
@@ -150,7 +152,8 @@ export class ProcessSkillsGapUpdateUseCase {
         user_name,
         competency_target_name: competencyTargetName,
         skills_raw_data: normalizedGap, // Use normalized format
-        exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null
+        exam_status: status === 'pass' ? 'pass' : status === 'fail' ? 'fail' : null,
+        preferred_language // Store preferred language if provided
       });
 
       console.log(`✅ Created new skills gap for user ${user_id}, competency ${competencyTargetName}`);
