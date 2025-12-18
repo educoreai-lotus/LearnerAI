@@ -687,6 +687,7 @@ async function skillsEngineHandler(payload, dependencies) {
     companyRepository,
     geminiClient,
     skillsEngineClient,
+    coordinatorClient,
     repository,
     jobRepository,
     promptLoader,
@@ -880,6 +881,7 @@ async function skillsEngineHandler(payload, dependencies) {
           const generatePathUseCase = new GenerateLearningPathUseCase({
             geminiClient,
             skillsEngineClient,
+            coordinatorClient,
             repository,
             jobRepository,
             promptLoader,
