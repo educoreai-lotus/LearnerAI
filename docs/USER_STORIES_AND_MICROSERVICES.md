@@ -69,7 +69,7 @@
 1. Skills Engine sends course completion notification (Passed: True)
 2. LearnerAI generates course suggestions (Prompt 4 - AI)
 3. LearnerAI sends to RAG Microservice for further processing
-4. Suggestions are stored and displayed to the user
+4. Suggestions are stored (in `recommendations` table) and displayed to the user
 
 **Key Components:**
 - Completion detection from Skills Engine
@@ -189,6 +189,9 @@ X-Signature: <ECDSA signature>
 - If Skills Engine sends gap data with objects containing `skill_id` and `skill_name` (e.g., `{"skill_id": "mgs-1", "skill_name": "lists"}`), LearnerAI extracts only the `skill_name` and removes `skill_id` before saving to database.
 - The database stores `skills_raw_data` in competency-based structure: `{"competency_name": ["skill1", "skill2"]}` (only skill names, no IDs).
 - `preferred_language` is **optional** - if provided, it will be stored in the `skills_gap` table and can be used for personalized learning path generation.
+- **Behavior by `exam_status`:**
+  - If `exam_status` is **`FAIL`** (or missing/invalid), LearnerAI will generate/update a learning path (Prompts 1–3).
+  - If `exam_status` is **`PASS`**, LearnerAI will **NOT** generate a learning path and will instead trigger **Prompt 4** to generate next-course suggestions and store them in the `recommendations` table.
 
 **When Skills Engine Calls:**
 - ✅ After each exam completion
@@ -205,7 +208,9 @@ X-Signature: <ECDSA signature>
 4. If not exists: Creates new `skills_gap` row
 5. Checks if learner exists (by `user_id`)
 6. If not exists: Creates learner (gets company details from `companies` table)
-7. Starts learning path generation process
+7. Branches based on `exam_status`:
+   - **FAIL (or missing)** → Starts learning path generation process (Prompts 1–3)
+   - **PASS** → Triggers suggestions generation (Prompt 4) and stores to `recommendations`
 
 **Response:**
 ```json
@@ -753,7 +758,7 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
    POST /api/fill-content-metrics
    └─> Store skills gap after exam
    └─> Create learner if doesn't exist
-   └─> Start learning path generation
+   └─> If `exam_status` is FAIL (or missing): start learning path generation
 
 3. LearnerAI generates learning path
    ├─> Prompt 1: Expand skills gap (AI - Gemini)
@@ -805,8 +810,10 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 
 ```
 1. Skills Engine → LearnerAI
-   POST /api/completions (or via skills-gaps with Passed: True)
-   └─> Course completion detected
+   Either:
+   - POST /api/completions (completion event), OR
+   - Skills gap event with `exam_status: "PASS"`
+   └─> Course completion detected (PASS)
 
 2. LearnerAI generates suggestions
    └─> Prompt 4: Generate course suggestions (AI - Gemini)
