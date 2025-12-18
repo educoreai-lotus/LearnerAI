@@ -47,14 +47,15 @@
 2. LearnerAI checks the policy
 3. If **auto** → learning path is stored as `approved: true`
 4. If **manual** → learning path is stored as `approved: false`, sends for manager approval
-5. Course Builder requests learning paths on-demand when needed
-6. Learning Analytics requests data on-demand or in batch mode
+5. If a learning path becomes **approved** (auto or manual), LearnerAI **proactively pushes** it to Course Builder **via Coordinator**
+6. Course Builder can also request learning paths on-demand when needed
+7. Learning Analytics requests data on-demand or in batch mode
 
 **Key Components:**
 - Company approval policies (auto/manual)
 - Decision maker notifications
 - Approval workflow management
-- Course Builder pulls data on-demand (no automatic push)
+- Course Builder can pull data on-demand, and also receives proactive pushes (via Coordinator) after approvals
 - Learning Analytics pulls data on-demand or batch
 
 ---
@@ -599,9 +600,9 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 - `skills_raw_data` field is returned as an array of skill names (competency structure removed)
 
 #### 📤 **What LearnerAI Sends (Outgoing):**
-- ❌ **No longer automatically sends** learning paths to Course Builder
-- ✅ Course Builder now **requests** data on-demand from LearnerAI
-- ✅ This allows Course Builder to pull data when needed, rather than LearnerAI pushing
+- ✅ When a learning path becomes **approved** (auto-approval after generation, or after decision maker approval), LearnerAI sends a **`push_learning_path`** request **to the Coordinator**, which routes it to Course Builder.
+- ✅ LearnerAI sends **one request with the full learning path JSON** (all `learning_modules` included).
+- ✅ Course Builder can still request data on-demand from LearnerAI when needed.
 
 ---
 
@@ -773,16 +774,21 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
        └─> Wait for approval
        └─> If approved → Learning path is ready (stored in database)
 
-5. Course Builder → LearnerAI (on-demand, via Coordinator)
+5. LearnerAI → Coordinator → Course Builder (proactive push after approval)
+   POST {COORDINATOR_URL}/api/fill-content-metrics
+   └─> LearnerAI sends: `action: "push_learning_path"` (one request with full learning path JSON)
+   └─> Coordinator routes to Course Builder
+
+6. Course Builder → LearnerAI (on-demand, via Coordinator)
    POST /api/fill-content-metrics
-   └─> Course Builder requests learning path when needed
+   └─> Course Builder can still request learning paths when needed
    └─> Options:
        - Batch learners: `learners` array (with optional `learner_name`, `preferred_language`) + `company_id`
        - Single learner: `learning_flow: "career_path_driven"` + `user_id` (with optional `learner_name`, `preferred_language`)
        - Get path: `action: "get_learning_path"` + `user_id` + `tag`
    └─> LearnerAI returns learning path (Prompt 3 format) + skills_raw_data + `preferred_language` (if provided)
 
-6. Learning Analytics → LearnerAI (on-demand or batch, via Coordinator)
+7. Learning Analytics → LearnerAI (on-demand or batch, via Coordinator)
    POST /api/fill-content-metrics
    └─> Learning Analytics requests data:
        - Batch: `type: "batch"` → returns all courses
@@ -790,7 +796,7 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
    └─> LearnerAI returns simple array: `[{ competency_target_name, skills_raw_data, learning_path }, ...]`
    └─> Learning path in Prompt 3 format exactly as stored
 
-7. LearnerAI → Management Reports
+8. LearnerAI → Management Reports
    POST /api/fill-reports-fields
    └─> Send learning path data
 ```
@@ -887,15 +893,23 @@ RAG_MICROSERVICE_TOKEN=your-rag-token
 
 **Learning Path Distribution:**
 - Learning paths are **stored in the database** after generation
-- **Course Builder requests** learning paths on-demand when needed (no automatic push)
+- If a learning path becomes **approved** (auto/manual), LearnerAI **proactively pushes** it to Course Builder **via Coordinator**
+- Course Builder can also request learning paths on-demand when needed
 - Approval workflow determines if path is stored as `approved: true` or `approved: false`
 - Course Builder can request paths regardless of approval status
 
 **Updates After Exam Failure:**
 - If learning path is an **update** after exam failure (course already exists + `exam_status: 'fail'`):
   - Learning path is updated in database
-  - Course Builder can request the updated path on-demand
-  - No automatic distribution to Course Builder
+  - Learning path is auto-approved in our logic
+  - LearnerAI proactively pushes the updated approved path to Course Builder (via Coordinator)
+  - Course Builder can still request the updated path on-demand
+
+**Operational Note (Proactive Push Requires Coordinator Config):**
+- If Coordinator env vars are missing, LearnerAI will skip proactive push and log: `CoordinatorClient not configured - skipping push_learning_path`
+- Required env vars for push:
+  - `COORDINATOR_URL`
+  - `LEARNERAI_PRIVATE_KEY` (or `LEARNERAI_PRIVATE-KEY` / `COORDINATOR_PRIVATE_KEY`)
 
 ### Data Differences
 

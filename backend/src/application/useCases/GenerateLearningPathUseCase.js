@@ -81,31 +81,29 @@ export class GenerateLearningPathUseCase {
     const companyName = skillsGap.companyName || skillsGap.company_name || null;
     const examStatus = skillsGap.examStatus || skillsGap.exam_status || null;
 
-    // One request per course (learning module)
-    for (const mod of modules) {
-      const requestBody = {
-        requester_service: 'learnerAI',
-        payload: {
-          action: 'push_learning_path',
-          description: 'Send an approved learning path immediately to Course Builder (auto: after generation; manual: after decision maker approval).',
-          user_id: skillsGap.userId,
-          user_name: userName,
-          preferred_language: preferredLanguage,
-          company_id: skillsGap.companyId,
-          company_name: companyName,
-          competency_target_name: skillsGap.competencyTargetName,
-          exam_status: examStatus,
-          skills_raw_data: skillsRawArray,
-          learning_path: this._buildPrompt3LearningPath(pathData, mod)
-        }
-      };
-
-      try {
-        await this.coordinatorClient.postFillContentMetrics(requestBody);
-        console.log(`✅ push_learning_path sent to Coordinator for module: ${mod?.module_title || mod?.title || 'unknown'}`);
-      } catch (e) {
-        console.error(`❌ push_learning_path failed for module: ${mod?.module_title || mod?.title || 'unknown'}: ${e.message}`);
+    // Single request containing the full learning path (all modules)
+    const requestBody = {
+      requester_service: 'learnerAI',
+      payload: {
+        action: 'push_learning_path',
+        description: 'Send an approved learning path immediately to Course Builder (auto: after generation; manual: after decision maker approval).',
+        user_id: skillsGap.userId,
+        user_name: userName,
+        preferred_language: preferredLanguage,
+        company_id: skillsGap.companyId,
+        company_name: companyName,
+        competency_target_name: skillsGap.competencyTargetName,
+        exam_status: examStatus,
+        skills_raw_data: skillsRawArray,
+        learning_path: this._buildPrompt3LearningPath(pathData, null)
       }
+    };
+
+    try {
+      await this.coordinatorClient.postFillContentMetrics(requestBody);
+      console.log('✅ push_learning_path sent to Coordinator (full learning path)');
+    } catch (e) {
+      console.error(`❌ push_learning_path failed (full learning path): ${e.message}`);
     }
   }
 

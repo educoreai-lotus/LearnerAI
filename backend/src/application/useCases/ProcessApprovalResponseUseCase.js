@@ -53,7 +53,7 @@ export class ProcessApprovalResponseUseCase {
     }
 
     const skillsRawArray = this._convertSkillsToArray(skillsGap?.skills_raw_data);
-    const requestBase = {
+    const requestBody = {
       requester_service: 'learnerAI',
       payload: {
         action: 'push_learning_path',
@@ -65,25 +65,16 @@ export class ProcessApprovalResponseUseCase {
         company_name: skillsGap?.company_name || null,
         competency_target_name: course.competency_target_name,
         exam_status: skillsGap?.exam_status || null,
-        skills_raw_data: skillsRawArray
+        skills_raw_data: skillsRawArray,
+        learning_path: this._buildPrompt3LearningPath(pathData, null)
       }
     };
 
-    for (const mod of modules) {
-      const requestBody = {
-        ...requestBase,
-        payload: {
-          ...requestBase.payload,
-          learning_path: this._buildPrompt3LearningPath(pathData, mod)
-        }
-      };
-
-      try {
-        await this.coordinatorClient.postFillContentMetrics(requestBody);
-        console.log(`✅ push_learning_path sent to Coordinator for module: ${mod?.module_title || mod?.title || 'unknown'}`);
-      } catch (e) {
-        console.error(`❌ push_learning_path failed for module: ${mod?.module_title || mod?.title || 'unknown'}: ${e.message}`);
-      }
+    try {
+      await this.coordinatorClient.postFillContentMetrics(requestBody);
+      console.log('✅ push_learning_path sent to Coordinator (full learning path)');
+    } catch (e) {
+      console.error(`❌ push_learning_path failed (full learning path): ${e.message}`);
     }
   }
 
