@@ -124,7 +124,7 @@ export default function RAGChatbotInitializer() {
             const styles = window.getComputedStyle(widget);
             const rect = widget.getBoundingClientRect();
             console.log("✅ RAG Bot: Widget found in DOM:", widget);
-            console.log("   Widget visibility:", {
+            const visibilityInfo = {
               display: styles.display,
               visibility: styles.visibility,
               opacity: styles.opacity,
@@ -134,26 +134,50 @@ export default function RAGChatbotInitializer() {
               right: styles.right,
               width: rect.width,
               height: rect.height,
-              isVisible: rect.width > 0 && rect.height > 0 && styles.display !== 'none' && styles.visibility !== 'hidden' && parseFloat(styles.opacity) > 0
-            });
+              top: rect.top,
+              left: rect.left,
+              isVisible: rect.width > 0 && rect.height > 0 && styles.display !== 'none' && styles.visibility !== 'hidden' && parseFloat(styles.opacity) > 0,
+              isInViewport: rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth
+            };
+            console.log("   Widget visibility:", visibilityInfo);
+            
+            // If widget exists but not visible, log warning
+            if (!visibilityInfo.isVisible) {
+              console.warn("⚠️ RAG Bot: Widget exists but is NOT visible!", visibilityInfo);
+            }
             
             // Check for floating button specifically
             const button = widget.querySelector('button, [role="button"], [class*="float"], [class*="button"], [class*="chat-button"]');
             if (button) {
               const buttonStyles = window.getComputedStyle(button);
               const buttonRect = button.getBoundingClientRect();
-              console.log("✅ RAG Bot: Floating button found:", {
+              const buttonInfo = {
                 element: button,
                 display: buttonStyles.display,
                 visibility: buttonStyles.visibility,
+                opacity: buttonStyles.opacity,
                 position: buttonStyles.position,
                 bottom: buttonStyles.bottom,
                 right: buttonStyles.right,
                 zIndex: buttonStyles.zIndex,
                 width: buttonRect.width,
                 height: buttonRect.height,
-                isVisible: buttonRect.width > 0 && buttonRect.height > 0
-              });
+                top: buttonRect.top,
+                left: buttonRect.left,
+                isVisible: buttonRect.width > 0 && buttonRect.height > 0 && buttonStyles.display !== 'none' && buttonStyles.visibility !== 'hidden' && parseFloat(buttonStyles.opacity) > 0,
+                isInViewport: buttonRect.top >= 0 && buttonRect.left >= 0 && buttonRect.bottom <= window.innerHeight && buttonRect.right <= window.innerWidth
+              };
+              console.log("✅ RAG Bot: Floating button found:", buttonInfo);
+              
+              // If button exists but not visible, log warning
+              if (!buttonInfo.isVisible) {
+                console.warn("⚠️ RAG Bot: Button exists but is NOT visible!", buttonInfo);
+              } else if (!buttonInfo.isInViewport) {
+                console.warn("⚠️ RAG Bot: Button is visible but OUTSIDE viewport!", buttonInfo);
+              } else {
+                console.log("✅ RAG Bot: Button is visible and in viewport - you should see it!");
+                console.log(`   Location: bottom-right corner (${buttonRect.right}px from right, ${window.innerHeight - buttonRect.bottom}px from bottom)`);
+              }
             } else {
               console.warn("⚠️ RAG Bot: Floating button not found in widget");
               console.log("   Widget children:", Array.from(widget.children).map(c => ({
@@ -162,6 +186,26 @@ export default function RAGChatbotInitializer() {
                 classes: c.className,
                 display: window.getComputedStyle(c).display
               })));
+            }
+            
+            // Check for chat panel (might be auto-opened)
+            const panel = widget.querySelector('[class*="panel"], [class*="chat-panel"], [class*="dialog"], [role="dialog"]');
+            if (panel) {
+              const panelStyles = window.getComputedStyle(panel);
+              const panelRect = panel.getBoundingClientRect();
+              console.log("📋 RAG Bot: Chat panel found:", {
+                display: panelStyles.display,
+                visibility: panelStyles.visibility,
+                position: panelStyles.position,
+                width: panelRect.width,
+                height: panelRect.height,
+                bottom: panelStyles.bottom,
+                right: panelStyles.right,
+                zIndex: panelStyles.zIndex,
+                isVisible: panelRect.width > 0 && panelRect.height > 0
+              });
+            } else {
+              console.log("ℹ️ RAG Bot: Chat panel not found (button-only mode)");
             }
           } else {
             console.warn("⚠️ RAG Bot: Widget not found in container after initialization");
@@ -199,6 +243,77 @@ export default function RAGChatbotInitializer() {
       // Small delay to ensure container is rendered
       setTimeout(initChatbot, 100);
     }
+    
+    // Add global debug helper function
+    window.debugRAGBot = function() {
+      const container = document.querySelector("#edu-bot-container");
+      if (!container) {
+        console.log("❌ Container not found");
+        return;
+      }
+      
+      const widget = container.querySelector('[id*="edu-bot"]');
+      if (!widget) {
+        console.log("❌ Widget not found in container");
+        console.log("Container HTML:", container.innerHTML);
+        return;
+      }
+      
+      const styles = window.getComputedStyle(widget);
+      const rect = widget.getBoundingClientRect();
+      
+      console.log("🔍 RAG Bot Debug Info:");
+      console.log("  Container:", container);
+      console.log("  Widget:", widget);
+      console.log("  Widget ID:", widget.id);
+      console.log("  Widget classes:", widget.className);
+      console.log("  Position:", styles.position);
+      console.log("  Display:", styles.display);
+      console.log("  Visibility:", styles.visibility);
+      console.log("  Opacity:", styles.opacity);
+      console.log("  Z-index:", styles.zIndex);
+      console.log("  Bottom:", styles.bottom);
+      console.log("  Right:", styles.right);
+      console.log("  Size:", `${rect.width}x${rect.height}`);
+      console.log("  Location:", `(${rect.left}, ${rect.top})`);
+      console.log("  Viewport:", `${window.innerWidth}x${window.innerHeight}`);
+      console.log("  Is visible:", rect.width > 0 && rect.height > 0);
+      console.log("  Is in viewport:", rect.top >= 0 && rect.left >= 0 && rect.bottom <= window.innerHeight && rect.right <= window.innerWidth);
+      
+      // Find all interactive elements
+      const buttons = widget.querySelectorAll('button, [role="button"]');
+      const panels = widget.querySelectorAll('[class*="panel"], [role="dialog"]');
+      
+      console.log(`  Buttons found: ${buttons.length}`);
+      buttons.forEach((btn, i) => {
+        const btnRect = btn.getBoundingClientRect();
+        const btnStyles = window.getComputedStyle(btn);
+        console.log(`    Button ${i + 1}:`, {
+          tag: btn.tagName,
+          classes: btn.className,
+          display: btnStyles.display,
+          position: btnStyles.position,
+          size: `${btnRect.width}x${btnRect.height}`,
+          location: `(${btnRect.left}, ${btnRect.top})`,
+          visible: btnRect.width > 0 && btnRect.height > 0
+        });
+      });
+      
+      console.log(`  Panels found: ${panels.length}`);
+      panels.forEach((panel, i) => {
+        const panelRect = panel.getBoundingClientRect();
+        const panelStyles = window.getComputedStyle(panel);
+        console.log(`    Panel ${i + 1}:`, {
+          tag: panel.tagName,
+          classes: panel.className,
+          display: panelStyles.display,
+          position: panelStyles.position,
+          size: `${panelRect.width}x${panelRect.height}`,
+          location: `(${panelRect.left}, ${panelRect.top})`,
+          visible: panelRect.width > 0 && panelRect.height > 0
+        });
+      });
+    };
   }, []); // Run once on mount
 
   // Side-effect only component - no UI
