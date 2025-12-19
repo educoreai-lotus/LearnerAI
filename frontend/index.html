@@ -25,21 +25,47 @@
           const rect = button.getBoundingClientRect();
           const styles = window.getComputedStyle(button);
           
-          // If button is positioned incorrectly (left: 0 or not at right), fix it
-          if (rect.left === 0 || styles.position !== 'fixed' || !styles.right || styles.right === 'auto') {
+          // Always fix button position and visibility
+          const needsFix = rect.left === 0 || 
+                          styles.position !== 'fixed' || 
+                          !styles.right || 
+                          styles.right === 'auto' ||
+                          parseFloat(styles.zIndex) < 99999 ||
+                          styles.opacity === '0' ||
+                          styles.visibility === 'hidden' ||
+                          styles.display === 'none';
+          
+          if (needsFix || true) { // Always apply fix
             button.style.position = 'fixed';
             button.style.right = '24px';
             button.style.bottom = '24px';
             button.style.left = 'auto';
             button.style.top = 'auto';
-            button.style.zIndex = '99999';
+            button.style.zIndex = '999999';
             button.style.display = 'flex';
             button.style.visibility = 'visible';
             button.style.opacity = '1';
+            button.style.pointerEvents = 'auto';
+            button.style.transform = 'none';
+            button.style.willChange = 'auto';
+            button.style.isolation = 'auto';
+            // Force visible styling
+            if (!button.style.backgroundColor || button.style.backgroundColor === 'transparent') {
+              button.style.backgroundColor = '#10b981';
+            }
+            button.style.border = '2px solid #ffffff';
+            button.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
+            
             console.log('🔧 Fixed RAG button position:', {
               right: button.style.right,
               bottom: button.style.bottom,
-              zIndex: button.style.zIndex
+              zIndex: button.style.zIndex,
+              opacity: button.style.opacity,
+              visibility: button.style.visibility,
+              display: button.style.display,
+              backgroundColor: button.style.backgroundColor,
+              computedZIndex: window.getComputedStyle(button).zIndex,
+              rect: button.getBoundingClientRect()
             });
           }
         });

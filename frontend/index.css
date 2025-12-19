@@ -110,11 +110,18 @@
   bottom: 24px !important;
   left: auto !important;
   top: auto !important;
-  z-index: 99999 !important;
+  z-index: 999999 !important;
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+  transform: none !important;
+  will-change: auto !important;
+  isolation: auto !important;
+  /* Force visibility with bright colors for debugging */
+  background-color: #10b981 !important;
+  border: 2px solid #ffffff !important;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Ensure the bot container and all its children don't hide the button */
