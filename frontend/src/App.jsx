@@ -2,7 +2,7 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { useEffect, useState } from 'react';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
-import ChatbotContainer from './components/ChatbotContainer';
+import RAGChatbotInitializer from './components/RAGChatbotInitializer';
 import CompanyDashboard from './pages/CompanyDashboard';
 import UserView from './pages/UserView';
 import ApprovalReview from './pages/ApprovalReview';
@@ -74,37 +74,6 @@ function App() {
     initAuth();
   }, [navigate, location.pathname]);
 
-  // Get user and token for chatbot initialization
-  // Fallback to mock data for local development/testing (same as UserView)
-  const getChatbotUser = () => {
-    // First, try from auth state or localStorage
-    const authUser = user || getCurrentUser();
-    if (authUser && authUser.id) {
-      return authUser;
-    }
-    
-    // Fallback to mock user for local development (Sara Neer)
-    return {
-      id: 'b2c3d4e5-f6a7-8901-2345-678901234567',
-      tenantId: 'c1d2e3f4-5678-9012-3456-789012345678', // TechCorp Inc.
-      company_id: 'c1d2e3f4-5678-9012-3456-789012345678'
-    };
-  };
-
-  const getChatbotToken = () => {
-    // First, try from auth state or localStorage
-    const authToken = token || getAuthToken();
-    if (authToken) {
-      return authToken;
-    }
-    
-    // Fallback to mock token for local development
-    // This allows chatbot to initialize for testing
-    return 'mock-token-for-local-development';
-  };
-
-  const currentUser = getChatbotUser();
-  const currentToken = getChatbotToken();
 
   // Show loading spinner while initializing auth
   if (isInitializing) {
@@ -126,14 +95,13 @@ function App() {
           <Route path="/approvals/:approvalId" element={<ApprovalReview />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
-        
-        {/* Chatbot Container - will initialize when user and token are available */}
-        <ChatbotContainer 
-          userId={currentUser?.id}
-          token={currentToken}
-          tenantId={currentUser?.tenantId}
-        />
       </div>
+      
+      {/* RAG Chatbot Container - CRITICAL: Must be at root level (outside App div) */}
+      <div id="edu-bot-container"></div>
+      
+      {/* RAG Chatbot Initializer - side-effect only, initializes after auth */}
+      <RAGChatbotInitializer />
     </AppProvider>
   );
 }
