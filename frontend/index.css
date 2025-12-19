@@ -91,3 +91,29 @@
   transform: none !important;
   will-change: auto !important;
 }
+
+/* Fix RAG chatbot button positioning - ensure it's at bottom-right */
+/* Target the floating chat button specifically */
+#edu-bot-container button[class*="fixed"],
+#edu-bot-container button[class*="bottom"],
+#edu-bot-container button[class*="right"],
+#edu-bot-container [class*="chat-button"],
+#edu-bot-container [class*="floating"] {
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  left: auto !important;
+  top: auto !important;
+  z-index: 9999 !important;
+}
+
+/* Also target any button inside the bot container that should be floating */
+#edu-bot-container > div > button,
+#edu-bot-container button[class*="w-16"][class*="h-16"] {
+  position: fixed !important;
+  right: 24px !important;
+  bottom: 24px !important;
+  left: auto !important;
+  top: auto !important;
+  z-index: 9999 !important;
+}
