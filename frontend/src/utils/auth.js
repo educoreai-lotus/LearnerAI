@@ -130,11 +130,24 @@ export async function initializeAuthFromUrl() {
     }
   }
 
+  // Infer role from path if not provided in URL params or validated info
+  let inferredRole = null;
+  if (!validatedUserInfo?.role && !urlParams.role) {
+    const path = window.location.pathname;
+    if (path.startsWith('/company')) {
+      inferredRole = 'company';
+    } else if (path.startsWith('/approvals')) {
+      inferredRole = 'decision_maker';
+    } else {
+      inferredRole = 'learner';
+    }
+  }
+
   // Use validated info if available, otherwise use URL params directly
   const user = {
     id: validatedUserInfo?.user_id || urlParams.user_id || urlParams.company_id,
     company_id: validatedUserInfo?.company_id || urlParams.company_id,
-    role: validatedUserInfo?.role || urlParams.role || 'learner',
+    role: validatedUserInfo?.role || urlParams.role || inferredRole || 'learner',
     tenantId: validatedUserInfo?.company_id || urlParams.company_id,
   };
 

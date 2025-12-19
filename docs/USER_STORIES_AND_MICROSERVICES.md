@@ -605,9 +605,68 @@ Authorization: Bearer {SKILLS_ENGINE_TOKEN}
 - `skills_raw_data` field is returned as an array of skill names (competency structure removed)
 
 #### 📤 **What LearnerAI Sends (Outgoing):**
-- ✅ When a learning path becomes **approved** (auto-approval after generation, or after decision maker approval), LearnerAI sends a **`push_learning_path`** request **to the Coordinator**, which routes it to Course Builder.
-- ✅ LearnerAI sends **one request with the full learning path JSON** (all `learning_modules` included).
-- ✅ Course Builder can still request data on-demand from LearnerAI when needed.
+
+**Endpoint:** `POST {COORDINATOR_URL}/api/fill-content-metrics`
+
+**Request Body:**
+```json
+{
+  "requester_service": "learnerAI",
+  "payload": {
+    "action": "push_learning_path",
+    "description": "Send an approved learning path immediately to Course Builder (auto: after generation; manual: after decision maker approval).",
+    "user_id": "uuid",
+    "user_name": "string",
+    "preferred_language": "string",
+    "company_id": "uuid",
+    "company_name": "string",
+    "competency_target_name": "string",
+    "exam_status": "pass" | "fail",
+    "skills_raw_data": ["skill1", "skill2", "skill3"],
+    "learning_path": {
+      "path_title": "string",
+      "learner_id": "uuid",
+      "total_estimated_duration_hours": number,
+      "learning_modules": [
+        {
+          "module_order": number,
+          "module_title": "string",
+          "estimated_duration_hours": number,
+          "skills_in_module": ["skill1", "skill2"],
+          "steps": [
+            {
+              "step": number,
+              "title": "string",
+              "description": "string",
+              "estimatedTime": number,
+              "skills_covered": ["skill1"]
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "response": {}
+}
+```
+
+**Headers:**
+```http
+Content-Type: application/json
+X-Service-Name: learnerAI
+X-Signature: <ECDSA signature>
+```
+
+**When LearnerAI Calls:**
+- ✅ When a learning path becomes **approved** (auto-approval after generation, or after decision maker approval)
+- ✅ LearnerAI sends **one request with the full learning path JSON** (all `learning_modules` included)
+- ✅ Sent via Coordinator, which routes it to Course Builder
+- ✅ Course Builder can still request data on-demand from LearnerAI when needed
+
+**Note:**
+- `skills_raw_data` is sent as an array of skill names (competency structure removed)
+- `learning_path` is in Prompt 3 format with complete structure including all modules and steps
+- `preferred_language` is included if available from the skills gap data
 
 ---
 
@@ -781,7 +840,12 @@ Authorization: Bearer {RAG_MICROSERVICE_TOKEN}
 
 5. LearnerAI → Coordinator → Course Builder (proactive push after approval)
    POST {COORDINATOR_URL}/api/fill-content-metrics
-   └─> LearnerAI sends: `action: "push_learning_path"` (one request with full learning path JSON)
+   └─> LearnerAI sends: `action: "push_learning_path"` with payload containing:
+       - user_id, user_name, preferred_language
+       - company_id, company_name
+       - competency_target_name, exam_status
+       - skills_raw_data (as array)
+       - full learning_path (Prompt 3 format with all learning_modules)
    └─> Coordinator routes to Course Builder
 
 6. Course Builder → LearnerAI (on-demand, via Coordinator)
