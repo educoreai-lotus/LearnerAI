@@ -83,3 +83,11 @@
     transition: all 0.3s ease;
   }
 }
+
+/* Ensure RAG chatbot container doesn't interfere with fixed positioning */
+#edu-bot-container {
+  position: static !important;
+  overflow: visible !important;
+  transform: none !important;
+  will-change: auto !important;
+}

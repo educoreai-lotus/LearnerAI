@@ -165,7 +165,10 @@ export default function RAGChatbotInitializer() {
                 top: buttonRect.top,
                 left: buttonRect.left,
                 isVisible: buttonRect.width > 0 && buttonRect.height > 0 && buttonStyles.display !== 'none' && buttonStyles.visibility !== 'hidden' && parseFloat(buttonStyles.opacity) > 0,
-                isInViewport: buttonRect.top >= 0 && buttonRect.left >= 0 && buttonRect.bottom <= window.innerHeight && buttonRect.right <= window.innerWidth
+                // For fixed elements, check if they're visible (more lenient check)
+                isInViewport: buttonStyles.position === 'fixed' 
+                  ? (buttonRect.top < window.innerHeight && buttonRect.left < window.innerWidth && buttonRect.bottom > 0 && buttonRect.right > 0)
+                  : (buttonRect.top >= 0 && buttonRect.left >= 0 && buttonRect.bottom <= window.innerHeight && buttonRect.right <= window.innerWidth)
               };
               console.log("✅ RAG Bot: Floating button found:", buttonInfo);
               
@@ -174,6 +177,35 @@ export default function RAGChatbotInitializer() {
                 console.warn("⚠️ RAG Bot: Button exists but is NOT visible!", buttonInfo);
               } else if (!buttonInfo.isInViewport) {
                 console.warn("⚠️ RAG Bot: Button is visible but OUTSIDE viewport!", buttonInfo);
+                console.warn("   Button position details:", {
+                  top: buttonRect.top,
+                  left: buttonRect.left,
+                  bottom: buttonRect.bottom,
+                  right: buttonRect.right,
+                  width: buttonRect.width,
+                  height: buttonRect.height,
+                  viewportHeight: window.innerHeight,
+                  viewportWidth: window.innerWidth,
+                  scrollY: window.scrollY,
+                  scrollX: window.scrollX,
+                  distanceFromRight: window.innerWidth - buttonRect.right,
+                  distanceFromBottom: window.innerHeight - buttonRect.bottom
+                });
+                
+                // Check if button is actually visible despite viewport check
+                const isActuallyVisible = (
+                  buttonRect.top < window.innerHeight &&
+                  buttonRect.left < window.innerWidth &&
+                  buttonRect.bottom > 0 &&
+                  buttonRect.right > 0
+                );
+                
+                if (isActuallyVisible) {
+                  console.log("✅ RAG Bot: Button IS actually visible (viewport check may be too strict)");
+                  console.log(`   You should see the button at: right=${window.innerWidth - buttonRect.right}px, bottom=${window.innerHeight - buttonRect.bottom}px`);
+                } else {
+                  console.warn("   Button is truly outside viewport. Check for CSS issues or parent transforms.");
+                }
               } else {
                 console.log("✅ RAG Bot: Button is visible and in viewport - you should see it!");
                 console.log(`   Location: bottom-right corner (${buttonRect.right}px from right, ${window.innerHeight - buttonRect.bottom}px from bottom)`);
