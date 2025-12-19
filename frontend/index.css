@@ -93,27 +93,41 @@
 }
 
 /* Fix RAG chatbot button positioning - ensure it's at bottom-right */
-/* Target the floating chat button specifically */
+/* Target ALL buttons in the bot container - be very aggressive */
+#edu-bot-container button,
+#edu-bot-container [role="button"],
 #edu-bot-container button[class*="fixed"],
 #edu-bot-container button[class*="bottom"],
 #edu-bot-container button[class*="right"],
 #edu-bot-container [class*="chat-button"],
-#edu-bot-container [class*="floating"] {
+#edu-bot-container [class*="floating"],
+#edu-bot-container > div > button,
+#edu-bot-container > div > div > button,
+#edu-bot-container button[class*="w-16"],
+#edu-bot-container button[class*="h-16"] {
   position: fixed !important;
   right: 24px !important;
   bottom: 24px !important;
   left: auto !important;
   top: auto !important;
-  z-index: 9999 !important;
+  z-index: 99999 !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  pointer-events: auto !important;
 }
 
-/* Also target any button inside the bot container that should be floating */
-#edu-bot-container > div > button,
-#edu-bot-container button[class*="w-16"][class*="h-16"] {
-  position: fixed !important;
-  right: 24px !important;
-  bottom: 24px !important;
-  left: auto !important;
-  top: auto !important;
-  z-index: 9999 !important;
+/* Ensure the bot container and all its children don't hide the button */
+#edu-bot-container,
+#edu-bot-container * {
+  overflow: visible !important;
+}
+
+/* Ensure no parent is creating a new stacking context that hides the button */
+#edu-bot-container,
+#edu-bot-container > div,
+#edu-bot-container > div > div {
+  transform: none !important;
+  will-change: auto !important;
+  isolation: auto !important;
 }

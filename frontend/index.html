@@ -12,6 +12,59 @@
     <!-- RAG Chatbot Script - Load before app script -->
     <script src="https://rag-production-3a4c.up.railway.app/embed/bot.js"></script>
     
+    <!-- Force fix RAG chatbot button position -->
+    <script>
+      // Function to fix button position
+      function fixRAGButton() {
+        const container = document.querySelector('#edu-bot-container');
+        if (!container) return;
+        
+        // Find all buttons in the container
+        const buttons = container.querySelectorAll('button, [role="button"]');
+        buttons.forEach(button => {
+          const rect = button.getBoundingClientRect();
+          const styles = window.getComputedStyle(button);
+          
+          // If button is positioned incorrectly (left: 0 or not at right), fix it
+          if (rect.left === 0 || styles.position !== 'fixed' || !styles.right || styles.right === 'auto') {
+            button.style.position = 'fixed';
+            button.style.right = '24px';
+            button.style.bottom = '24px';
+            button.style.left = 'auto';
+            button.style.top = 'auto';
+            button.style.zIndex = '99999';
+            button.style.display = 'flex';
+            button.style.visibility = 'visible';
+            button.style.opacity = '1';
+            console.log('🔧 Fixed RAG button position:', {
+              right: button.style.right,
+              bottom: button.style.bottom,
+              zIndex: button.style.zIndex
+            });
+          }
+        });
+      }
+      
+      // Run immediately and then watch for button creation
+      setTimeout(fixRAGButton, 1000);
+      setTimeout(fixRAGButton, 3000);
+      setTimeout(fixRAGButton, 5000);
+      
+      // Watch for new buttons being added
+      const observer = new MutationObserver(() => {
+        fixRAGButton();
+      });
+      
+      // Start observing when container exists
+      const checkContainer = setInterval(() => {
+        const container = document.querySelector('#edu-bot-container');
+        if (container) {
+          observer.observe(container, { childList: true, subtree: true });
+          clearInterval(checkContainer);
+        }
+      }, 500);
+    </script>
+    
     <script type="module" src="/main.jsx"></script>
   </body>
 </html>
