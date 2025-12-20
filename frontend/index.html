@@ -9,397 +9,93 @@
   <body>
     <div id="root"></div>
     
-    <!-- RAG Chatbot Script - Load before app script -->
-    <script src="https://rag-production-3a4c.up.railway.app/embed/bot.js"></script>
+    <!-- ✅ EDUCORE BOT - DO NOT MODIFY -->
+    <div id="edu-bot-container"></div>
+    <!-- ✅ END BOT CONTAINER -->
     
-    <!-- Force fix RAG chatbot button and panel position -->
+    <!-- ✅ BOT SCRIPT -->
+    <script src="https://rag-production-3a4c.up.railway.app/embed/bot.js"></script>
+    <!-- ✅ END BOT SCRIPT -->
+    
+    <!-- ✅ INITIALIZATION -->
     <script>
-      const CONFIG = {
-        buttonBottom: 24,
-        buttonRight: 24,
-        panelRight: 24,
-        panelBottom: 50,
-        panelTopOffset: 150, // 4cm ≈ 150px additional offset from header (2cm + 2cm)
-        panelWidth: 380
-      };
-      
-      // Function to get header height
-      function getHeaderHeight() {
-        const headerSelectors = ['header', '[role="banner"]', '.header', '#header', 'nav', '[class*="Header"]'];
-        for (const selector of headerSelectors) {
-          const header = document.querySelector(selector);
-          if (header) {
-            const rect = header.getBoundingClientRect();
-            if (rect.height > 0) {
-              return rect.height + 10;
-            }
-          }
-        }
-        return 80; // Default fallback
-      }
-      
-      // Function to find chat panel
-      function findChatPanel() {
-        const container = document.querySelector('#edu-bot-container');
-        if (!container) return null;
-        
-        const widget = container.querySelector('[id*="edu-bot"]');
-        if (!widget) return null;
-        
-        // Look for panel-like divs (not the button) - check all descendants
-        const allDivs = widget.querySelectorAll('div');
-        
-        for (const div of allDivs) {
-          // Skip if it's a button or inside a button
-          if (div.closest('button')) continue;
-          
-          const rect = div.getBoundingClientRect();
-          const classes = div.className || '';
-          const styles = window.getComputedStyle(div);
-          
-          // Check if it's a panel (has substantial size, or panel-like classes, or is visible)
-          const hasSize = rect.width > 200 || rect.height > 200;
-          const hasPanelClasses = classes.includes('panel') || 
-                                 classes.includes('chat') || 
-                                 classes.includes('dialog') ||
-                                 classes.includes('fixed') ||
-                                 classes.includes('w-96') ||
-                                 classes.includes('h-');
-          const isVisible = styles.display !== 'none' && 
-                           styles.visibility !== 'hidden' && 
-                           parseFloat(styles.opacity) > 0 &&
-                           rect.width > 0 && 
-                           rect.height > 0;
-          
-          if ((hasSize || hasPanelClasses || isVisible) && rect.width > 100 && rect.height > 100) {
-            return div;
-          }
-        }
-        
-        // Fallback: check direct children
-        for (let i = 0; i < widget.children.length; i++) {
-          const child = widget.children[i];
-          if (child.tagName === 'BUTTON') continue;
-          
-          const rect = child.getBoundingClientRect();
-          const classes = child.className || '';
-          
-          if (child.tagName === 'DIV' && (
-            rect.width > 200 || 
-            rect.height > 200 ||
-            classes.includes('panel') || 
-            classes.includes('chat') || 
-            classes.includes('dialog') ||
-            classes.includes('fixed')
-          )) {
-            return child;
-          }
-        }
-        
-        return null;
-      }
-      
-      // Function to fix button position and add toggle functionality
-      function fixRAGButton() {
-        const container = document.querySelector('#edu-bot-container');
-        if (!container) return;
-        
-        // Find all buttons in the container (excluding our custom close button)
-        const buttons = container.querySelectorAll('button:not([data-rag-close-button="true"]), [role="button"]:not([data-rag-close-button="true"])');
-        buttons.forEach(button => {
-          const rect = button.getBoundingClientRect();
-          const styles = window.getComputedStyle(button);
-          
-          // Check if this is the main chat toggle button (green button in bottom-right)
-          const isMainButton = rect.right > window.innerWidth - 100 && 
-                               rect.bottom > window.innerHeight - 100 &&
-                               (styles.backgroundColor.includes('10b981') || 
-                                button.style.backgroundColor === '#10b981' ||
-                                button.classList.toString().includes('emerald'));
-          
-          // Always fix button position and visibility
-          const needsFix = rect.left === 0 || 
-                          styles.position !== 'fixed' || 
-                          !styles.right || 
-                          styles.right === 'auto' ||
-                          parseFloat(styles.zIndex) < 99999 ||
-                          styles.opacity === '0' ||
-                          styles.visibility === 'hidden' ||
-                          styles.display === 'none';
-          
-          if (needsFix || true) { // Always apply fix
-            button.style.position = 'fixed';
-            button.style.right = CONFIG.buttonRight + 'px';
-            button.style.bottom = CONFIG.buttonBottom + 'px';
-            button.style.left = 'auto';
-            button.style.top = 'auto';
-            button.style.zIndex = '999999';
-            button.style.display = 'flex';
-            button.style.visibility = 'visible';
-            button.style.opacity = '1';
-            button.style.pointerEvents = 'auto';
-            button.style.transform = 'none';
-            button.style.willChange = 'auto';
-            button.style.isolation = 'auto';
-            // Force visible styling
-            if (!button.style.backgroundColor || button.style.backgroundColor === 'transparent') {
-              button.style.backgroundColor = '#10b981';
-            }
-            button.style.border = '2px solid #ffffff';
-            button.style.boxShadow = '0 4px 12px rgba(0, 0, 0, 0.3)';
-          }
-          
-          // Add toggle functionality to main chat button (green button in bottom-right)
-          // Check if button is in bottom-right corner (within 100px of corner)
-          const isInBottomRight = rect.right > window.innerWidth - 100 && 
-                                  rect.bottom > window.innerHeight - 100;
-          
-          if ((isInBottomRight || isMainButton) && !button.hasAttribute('data-rag-toggle-setup')) {
-            button.setAttribute('data-rag-toggle-setup', 'true');
+      // Wait for bot script to load
+      window.addEventListener('load', function() {
+        // Get user data from localStorage (set by React app)
+        function getUserData() {
+          try {
+            // Try localStorage first (set by React auth system)
+            const userStr = localStorage.getItem('user');
+            const token = localStorage.getItem('token');
             
-            // Add click handler (use capture to run before widget's handler)
-            button.addEventListener('click', (e) => {
-              e.stopPropagation();
-              e.preventDefault();
-              toggleChat();
-            }, true);
-          }
-        });
-      }
-      
-      // State to track if chat is open
-      let chatIsOpen = false;
-      
-      // Function to close chat panel
-      function closeChat() {
-        const panel = findChatPanel();
-        if (!panel) return;
-        
-        chatIsOpen = false;
-        panel.style.setProperty('display', 'none', 'important');
-        panel.style.setProperty('visibility', 'hidden', 'important');
-        panel.style.setProperty('opacity', '0', 'important');
-        panel.style.setProperty('pointer-events', 'none', 'important');
-        console.log('✅ Chat closed');
-      }
-      
-      // Function to open chat panel
-      function openChat() {
-        let panel = findChatPanel();
-        
-        // If panel doesn't exist, wait for it to be created (widget might create it on click)
-        if (!panel) {
-          console.log('⏳ Panel not found, waiting for widget to create it...');
-          
-          // Try to find panel multiple times with delays
-          let attempts = 0;
-          const maxAttempts = 20; // Wait up to 2 seconds (20 * 100ms)
-          
-          const checkForPanel = setInterval(() => {
-            attempts++;
-            panel = findChatPanel();
-            
-            if (panel) {
-              clearInterval(checkForPanel);
-              applyPanelStyles(panel);
-            } else if (attempts >= maxAttempts) {
-              clearInterval(checkForPanel);
-              console.warn('⚠️ Panel not found after waiting');
+            if (userStr && token) {
+              const user = JSON.parse(userStr);
+              return {
+                userId: user.id || user.user_id || 'anonymous',
+                token: token,
+                tenantId: user.tenantId || user.company_id || user.tenant_id || 'default'
+              };
             }
-          }, 100);
+            
+            // Fallback: Check URL params (for local dev)
+            const urlParams = new URLSearchParams(window.location.search);
+            const userId = urlParams.get('user_id');
+            if (userId) {
+              return {
+                userId: userId,
+                token: urlParams.get('token') || 'mock-token-for-local-development',
+                tenantId: urlParams.get('company_id') || 'default'
+              };
+            }
+            
+            return null;
+          } catch (error) {
+            console.error('Error getting user data:', error);
+            return null;
+          }
+        }
+        
+        // Initialize bot when script is loaded and user data is available
+        function initBot() {
+          if (!window.initializeEducoreBot) {
+            // Script not loaded yet, retry
+            setTimeout(initBot, 100);
+            return;
+          }
           
-          return;
-        }
-        
-        applyPanelStyles(panel);
-      }
-      
-      // Function to apply panel styles and show it
-      function applyPanelStyles(panel) {
-        if (!panel) return;
-        
-        chatIsOpen = true;
-        const headerHeight = getHeaderHeight();
-        const topPosition = headerHeight + CONFIG.panelTopOffset;
-        
-        panel.style.setProperty('position', 'fixed', 'important');
-        panel.style.setProperty('top', topPosition + 'px', 'important');
-        panel.style.setProperty('bottom', CONFIG.panelBottom + 'px', 'important');
-        panel.style.setProperty('right', CONFIG.panelRight + 'px', 'important');
-        panel.style.setProperty('left', 'auto', 'important');
-        panel.style.setProperty('width', CONFIG.panelWidth + 'px', 'important');
-        panel.style.setProperty('max-width', CONFIG.panelWidth + 'px', 'important');
-        panel.style.setProperty('z-index', '999998', 'important');
-        panel.style.setProperty('max-height', `calc(100vh - ${topPosition + CONFIG.panelBottom}px)`, 'important');
-        panel.style.setProperty('display', 'block', 'important');
-        panel.style.setProperty('visibility', 'visible', 'important');
-        panel.style.setProperty('opacity', '1', 'important');
-        panel.style.setProperty('pointer-events', 'auto', 'important');
-        
-        // Ensure close button exists
-        setTimeout(() => ensureCloseButton(panel), 100);
-        
-        console.log('✅ Chat opened', { panelFound: !!panel });
-      }
-      
-      // Function to toggle chat
-      function toggleChat() {
-        if (chatIsOpen) {
-          closeChat();
-        } else {
-          openChat();
-        }
-      }
-      
-      // Function to add close button if it doesn't exist
-      function ensureCloseButton(panel) {
-        if (!panel) return;
-        
-        // Look for existing close button
-        const existingClose = panel.querySelector('[data-rag-close-button="true"]');
-        if (existingClose) return; // Already exists
-        
-        // Try to find header area
-        const headerSelectors = [
-          '[class*="header"]',
-          '[class*="Header"]',
-          '[class*="title"]',
-          '[class*="Title"]',
-          'header',
-          'div:first-child'
-        ];
-        
-        let header = null;
-        for (const selector of headerSelectors) {
-          header = panel.querySelector(selector);
-          if (header) break;
-        }
-        
-        // If no header found, use first child or create one
-        if (!header) {
-          header = panel.firstElementChild;
-          if (!header || header.tagName === 'BUTTON') {
-            // Create a header div
-            header = document.createElement('div');
-            header.style.cssText = 'display: flex; justify-content: space-between; align-items: center; padding: 12px 16px; border-bottom: 1px solid #e5e7eb;';
-            panel.insertBefore(header, panel.firstChild);
+          const userData = getUserData();
+          
+          if (!userData || !userData.userId || !userData.token) {
+            // User not authenticated yet, retry (React app might still be loading)
+            setTimeout(initBot, 500);
+            return;
+          }
+          
+          // Prevent double initialization
+          if (window.EDUCORE_BOT_INITIALIZED) {
+            return;
+          }
+          
+          try {
+            window.initializeEducoreBot({
+              microservice: 'LEARNER_AI',
+              userId: userData.userId,
+              token: userData.token,
+              tenantId: userData.tenantId
+            });
+            
+            window.EDUCORE_BOT_INITIALIZED = true;
+            console.log('✅ RAG Bot: Initialized successfully');
+          } catch (error) {
+            console.error('❌ RAG Bot: Initialization failed:', error);
           }
         }
         
-        // Create close button
-        const closeButton = document.createElement('button');
-        closeButton.setAttribute('data-rag-close-button', 'true');
-        closeButton.setAttribute('aria-label', 'Close chat');
-        closeButton.innerHTML = '×';
-        closeButton.style.cssText = `
-          background: transparent;
-          border: none;
-          font-size: 28px;
-          line-height: 1;
-          color: #6b7280;
-          cursor: pointer;
-          padding: 4px 8px;
-          margin-left: auto;
-          display: flex;
-          align-items: center;
-          justify-content: center;
-          width: 32px;
-          height: 32px;
-          border-radius: 4px;
-          transition: background-color 0.2s, color 0.2s;
-        `;
-        
-        // Hover effect
-        closeButton.addEventListener('mouseenter', () => {
-          closeButton.style.backgroundColor = '#f3f4f6';
-          closeButton.style.color = '#1f2937';
-        });
-        closeButton.addEventListener('mouseleave', () => {
-          closeButton.style.backgroundColor = 'transparent';
-          closeButton.style.color = '#6b7280';
-        });
-        
-        // Click handler
-        closeButton.addEventListener('click', (e) => {
-          e.stopPropagation();
-          e.preventDefault();
-          closeChat();
-        });
-        
-        // Ensure header has flex layout
-        if (header) {
-          header.style.display = 'flex';
-          header.style.justifyContent = 'space-between';
-          header.style.alignItems = 'center';
-          header.appendChild(closeButton);
-        }
-        
-        console.log('✅ Close button added to chat panel');
-      }
-      
-      // Function to fix panel position (moved down by 2cm)
-      function fixRAGPanel() {
-        const panel = findChatPanel();
-        if (!panel) {
-          // Panel doesn't exist yet - that's OK if chat is closed
-          if (chatIsOpen) {
-            // Chat should be open but panel not found - try to open it
-            openChat();
-          }
-          return;
-        }
-        
-        // If panel is visible, keep it open; otherwise keep it closed
-        const styles = window.getComputedStyle(panel);
-        const isCurrentlyVisible = styles.display !== 'none' && 
-                                   styles.visibility !== 'hidden' && 
-                                   parseFloat(styles.opacity) > 0;
-        
-        if (isCurrentlyVisible && !chatIsOpen) {
-          // Panel is visible but we think it should be closed - close it
-          closeChat();
-        } else if (chatIsOpen) {
-          // Panel should be open - position it correctly
-          applyPanelStyles(panel);
-        } else if (!isCurrentlyVisible && !chatIsOpen) {
-          // Panel should be closed - make sure it's hidden
-          closeChat();
-        }
-      }
-      
-      // Run fixes immediately and periodically
-      function runFixes() {
-        fixRAGButton();
-        fixRAGPanel();
-      }
-      
-      // Initial setup - ensure panel starts closed
-      setTimeout(() => {
-        const panel = findChatPanel();
-        if (panel) {
-          chatIsOpen = false;
-          closeChat();
-        }
-      }, 2000);
-      
-      setTimeout(runFixes, 1000);
-      setTimeout(runFixes, 3000);
-      setInterval(runFixes, 500); // Check every 500ms
-      
-      // Watch for new elements being added
-      const observer = new MutationObserver(() => {
-        runFixes();
+        // Start initialization
+        initBot();
       });
-      
-      // Start observing when container exists
-      const checkContainer = setInterval(() => {
-        const container = document.querySelector('#edu-bot-container');
-        if (container) {
-          observer.observe(container, { childList: true, subtree: true, attributes: true });
-          clearInterval(checkContainer);
-        }
-      }, 500);
     </script>
+    <!-- ✅ END INITIALIZATION -->
     
     <script type="module" src="/main.jsx"></script>
   </body>

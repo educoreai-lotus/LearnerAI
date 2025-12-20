@@ -2,7 +2,6 @@ import { Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-
 import { useEffect, useState } from 'react';
 import { AppProvider } from './context/AppContext';
 import Header from './components/Header';
-import RAGChatbotInitializer from './components/RAGChatbotInitializer';
 import CompanyDashboard from './pages/CompanyDashboard';
 import UserView from './pages/UserView';
 import ApprovalReview from './pages/ApprovalReview';
@@ -96,12 +95,6 @@ function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </div>
-      
-      {/* RAG Chatbot Container - CRITICAL: Must be at root level (outside App div) */}
-      <div id="edu-bot-container"></div>
-      
-      {/* RAG Chatbot Initializer - side-effect only, initializes after auth */}
-      <RAGChatbotInitializer />
     </AppProvider>
   );
 }
