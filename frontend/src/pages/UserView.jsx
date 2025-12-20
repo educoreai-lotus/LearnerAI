@@ -328,11 +328,6 @@ export default function UserView() {
                           <strong>Estimated Completion:</strong> {learningPath.estimatedCompletion}
                         </span>
                       )}
-                      {learningPath.totalSteps && (
-                        <span>
-                          <strong>Total Steps:</strong> {learningPath.totalSteps}
-                        </span>
-                      )}
                       {learningPath.approved !== undefined && (
                         <span className={`px-2 py-1 rounded text-xs ${
                           learningPath.approved 
