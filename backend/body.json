@@ -1,0 +1,9 @@
+{
+  "requester_service": "learnerAI",
+  "payload": {
+    "action": "request_skills_breakdown",
+    "description": "request skills in the lowest layer of the sended competences",
+    "competencies":["mongodb"]
+  },
+  "response": {}
+}

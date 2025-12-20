@@ -1,12 +1,13 @@
 /**
  * SkillsEngineClient
- * Handles communication with the Skills Engine microservice
+ * Handles communication with the Skills Engine microservice via Coordinator
  */
 export class SkillsEngineClient {
-  constructor({ baseUrl, serviceToken, httpClient }) {
+  constructor({ baseUrl, serviceToken, httpClient, coordinatorClient }) {
     this.baseUrl = baseUrl;
     this.serviceToken = serviceToken;
     this.httpClient = httpClient;
+    this.coordinatorClient = coordinatorClient || null;
   }
 
   /**
@@ -51,6 +52,111 @@ export class SkillsEngineClient {
       return comp.name || comp.competency_name || String(comp);
     });
 
+    // Use Coordinator if available, otherwise fallback to direct HTTP
+    if (this.coordinatorClient && this.coordinatorClient.isConfigured()) {
+      return this._requestViaCoordinator(competencyNames, options);
+    } else {
+      // Fallback to direct HTTP if Coordinator not configured
+      console.warn('⚠️  Coordinator not configured, using direct HTTP call to Skills Engine');
+      return this._requestDirect(competencyNames, options);
+    }
+  }
+
+  /**
+   * Request skill breakdown via Coordinator
+   * @private
+   */
+  async _requestViaCoordinator(competencyNames, options = {}) {
+    const {
+      maxRetries = 3,
+      retryDelay = 1000,
+      useMockData = false
+    } = options;
+
+    if (useMockData) {
+      return this._getMockSkillBreakdown(competencyNames.map(c => typeof c === 'string' ? c : (c.name || c.competency_name || String(c))));
+    }
+
+    let lastError;
+    for (let attempt = 1; attempt <= maxRetries; attempt++) {
+      try {
+        // Build payload in Coordinator format
+        const coordinatorPayload = {
+          requester_service: "learnerAI",
+          payload: {
+            action: "request_skills_breakdown",
+            description: "request skills in the lowest layer of the sended competences",
+            competencies: competencyNames
+          },
+          response: {}
+        };
+
+        console.log(`📤 Requesting skill breakdown via Coordinator for ${competencyNames.length} competencies (lowest level)`);
+        console.log(`   Competencies: ${competencyNames.join(', ')}`);
+
+        const response = await this.coordinatorClient.postFillContentMetrics(coordinatorPayload);
+
+        // Extract the breakdown from Coordinator response
+        // Coordinator response format: { requester_service, payload, response: { answer: <data> } }
+        let breakdown = null;
+        
+        // Check if response has nested structure
+        if (response && response.response && response.response.answer) {
+          // Coordinator returns data in response.answer
+          const answerData = response.response.answer;
+          breakdown = typeof answerData === 'string' ? JSON.parse(answerData) : answerData;
+        } else if (response && response.data) {
+          breakdown = response.data;
+        } else if (response && response.payload) {
+          // If Coordinator returns stringified payload, parse it
+          try {
+            breakdown = typeof response.payload === 'string' ? JSON.parse(response.payload) : response.payload;
+          } catch (e) {
+            breakdown = response.payload;
+          }
+        } else if (response && typeof response === 'object' && !Array.isArray(response)) {
+          // Response might be the breakdown directly (object with competency keys)
+          breakdown = response;
+        }
+
+        if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
+          console.log(`✅ Skills Engine returned breakdown via Coordinator for ${Object.keys(breakdown).length} competencies`);
+          return breakdown;
+        } else {
+          throw new Error(`Invalid response format from Coordinator: ${JSON.stringify(response).substring(0, 200)}`);
+        }
+      } catch (error) {
+        lastError = error;
+        console.warn(`Skills Engine request via Coordinator attempt ${attempt} failed:`, error.message);
+
+        if (attempt < maxRetries) {
+          const delay = retryDelay * Math.pow(2, attempt - 1);
+          await this._sleep(delay);
+        }
+      }
+    }
+
+    // Fallback to mock data if all retries fail
+    console.warn('Skills Engine unavailable via Coordinator, using mock data');
+    return this._getMockSkillBreakdown(competencyNames.map(c => typeof c === 'string' ? c : (c.name || c.competency_name || String(c))));
+  }
+
+  /**
+   * Request skill breakdown via direct HTTP (fallback)
+   * @private
+   */
+  async _requestDirect(competencyNames, options = {}) {
+    const {
+      maxRetries = 3,
+      retryDelay = 1000,
+      useMockData = false,
+      includeExpansions = true
+    } = options;
+
+    if (useMockData) {
+      return this._getMockSkillBreakdown(competencyNames.map(c => typeof c === 'string' ? c : (c.name || c.competency_name || String(c))));
+    }
+
     let lastError;
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
@@ -64,7 +170,7 @@ export class SkillsEngineClient {
           granularity: "lowest"     // Request lowest level granularity
         };
 
-        console.log(`📤 Requesting skill breakdown for ${competencyNames.length} competencies (lowest level/expansions: ${includeExpansions})`);
+        console.log(`📤 Requesting skill breakdown directly for ${competencyNames.length} competencies (lowest level/expansions: ${includeExpansions})`);
 
         const response = await this.httpClient.post(
           `${this.baseUrl}/api/skills/breakdown`,
@@ -92,7 +198,7 @@ export class SkillsEngineClient {
 
     // Fallback to mock data if all retries fail
     console.warn('Skills Engine unavailable, using mock data');
-    return this._getMockSkillBreakdown(competencies);
+    return this._getMockSkillBreakdown(competencyNames.map(c => typeof c === 'string' ? c : (c.name || c.competency_name || String(c))));
   }
 
   /**

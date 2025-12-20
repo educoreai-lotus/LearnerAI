@@ -156,6 +156,25 @@ export function createEndpointsRouter(dependencies) {
             if (ragAction === 'get_recommendations' && ragDataWithoutAction.user_id && recommendationRepository) {
               try {
                 const recommendations = await recommendationRepository.getRecommendationsByUser(ragDataWithoutAction.user_id);
+                
+                // Mark all fetched recommendations as sent_to_rag: true (if not already marked)
+                // This ensures we track that RAG has received the recommendations in any way
+                if (recommendations && recommendations.length > 0) {
+                  for (const rec of recommendations) {
+                    if (!rec.sent_to_rag) {
+                      try {
+                        await recommendationRepository.updateRecommendation(rec.recommendation_id, {
+                          sent_to_rag: true
+                        });
+                        console.log(`[Endpoints] Marked recommendation ${rec.recommendation_id} as sent_to_rag: true`);
+                      } catch (updateError) {
+                        // Log but don't fail the request if update fails
+                        console.warn(`[Endpoints] Could not update sent_to_rag flag for recommendation ${rec.recommendation_id}:`, updateError.message);
+                      }
+                    }
+                  }
+                }
+                
                 result = {
                   success: true,
                   action: ragAction,

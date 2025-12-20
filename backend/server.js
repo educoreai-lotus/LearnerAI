@@ -102,7 +102,8 @@ try {
   const skillsEngineClient = new SkillsEngineClient({
     baseUrl: process.env.SKILLS_ENGINE_URL || 'http://localhost:5001',
     serviceToken: process.env.SKILLS_ENGINE_TOKEN,
-    httpClient
+    httpClient,
+    coordinatorClient // Pass Coordinator client for routing requests via Coordinator
   });
 
   // Initialize repositories
