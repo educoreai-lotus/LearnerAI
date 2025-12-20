@@ -35,13 +35,10 @@ export default function LearningPathTimeline({ path, className = '' }) {
 
   return (
     <div className={`relative ${className}`}>
-      {/* Header with total duration */}
+      {/* Header with total duration - Title removed (shown in parent Card) */}
       {totalDuration > 0 && (
         <div className="mb-8 flex items-center justify-between">
-          <div>
-            <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-1">
-              {path.pathTitle || pathData.path_title || 'Learning Path'}
-            </h2>
+          <div style={{ marginLeft: '75px' }}>
             <p className="text-sm text-neutral-600 dark:text-neutral-400">
               {modules.length} {modules.length === 1 ? 'Module' : 'Modules'} • {totalDuration} hours total
             </p>
@@ -101,28 +98,6 @@ export default function LearningPathTimeline({ path, className = '' }) {
                     </div>
                   </div>
 
-                  {/* Skills in Module */}
-                  {skillsInModule.length > 0 && (
-                    <div className="mb-6">
-                      <h4 className="text-sm font-semibold text-neutral-700 dark:text-neutral-300 mb-3 flex items-center gap-2">
-                        <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4M7.835 4.697a3.42 3.42 0 001.946-.806 3.42 3.42 0 014.438 0 3.42 3.42 0 001.946.806 3.42 3.42 0 013.138 3.138 3.42 3.42 0 00.806 1.946 3.42 3.42 0 010 4.438 3.42 3.42 0 00-.806 1.946 3.42 3.42 0 01-3.138 3.138 3.42 3.42 0 00-1.946.806 3.42 3.42 0 01-4.438 0 3.42 3.42 0 00-1.946-.806 3.42 3.42 0 01-3.138-3.138 3.42 3.42 0 00-.806-1.946 3.42 3.42 0 010-4.438 3.42 3.42 0 00.806-1.946 3.42 3.42 0 013.138-3.138z" />
-                        </svg>
-                        Skills Covered ({skillsInModule.length})
-                      </h4>
-                      <div className="flex flex-wrap gap-2">
-                        {skillsInModule.map((skill, skillIndex) => (
-                          <span
-                            key={skillIndex}
-                            className="inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-medium bg-gradient-to-r from-primary-50 to-primary-100 dark:from-primary-900/40 dark:to-primary-800/40 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700"
-                          >
-                            {skill}
-                          </span>
-                        ))}
-                      </div>
-                    </div>
-                  )}
-
                   {/* Steps */}
                   {steps.length > 0 && (
                     <div className="mt-6 pt-6 border-t border-neutral-200 dark:border-neutral-700">
@@ -170,30 +145,6 @@ export default function LearningPathTimeline({ path, className = '' }) {
                                 <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4 leading-relaxed pl-11">
                                   {stepDescription}
                                 </p>
-                              )}
-
-                              {/* Skills Covered in This Step */}
-                              {skillsCovered.length > 0 && (
-                                <div className="mt-4 pt-4 border-t border-neutral-200 dark:border-neutral-700 pl-11">
-                                  <div className="flex items-center gap-2 mb-2">
-                                    <svg className="w-3.5 h-3.5 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-                                    </svg>
-                                    <span className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 uppercase tracking-wide">
-                                      Skills in this step
-                                    </span>
-                                  </div>
-                                  <div className="flex flex-wrap gap-1.5">
-                                    {skillsCovered.map((skill, skillIdx) => (
-                                      <span
-                                        key={skillIdx}
-                                        className="inline-flex items-center px-2 py-1 rounded-md text-xs font-medium bg-white dark:bg-slate-700 text-primary-600 dark:text-primary-400 border border-primary-200 dark:border-primary-700"
-                                      >
-                                        {skill}
-                                      </span>
-                                    ))}
-                                  </div>
-                                </div>
                               )}
                             </div>
                           );
