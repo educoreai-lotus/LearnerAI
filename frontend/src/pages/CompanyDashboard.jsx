@@ -476,18 +476,13 @@ export default function CompanyDashboard() {
                             <strong>Estimated Completion:</strong> {pathForTimeline.estimatedCompletion}
                           </span>
                         )}
-                        {pathForTimeline.totalSteps && (
-                          <span>
-                            <strong>Total Steps:</strong> {pathForTimeline.totalSteps}
-                          </span>
-                        )}
                         {path.approved !== undefined && (
                           <span className={`px-2 py-1 rounded text-xs ${
-                            path.approved 
+                            path.approved === true || path.approved === 1 || path.approved === 'true' || path.approved === 'approved'
                               ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
                               : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
                           }`}>
-                            {path.approved ? 'Approved' : 'Pending Approval'}
+                            {path.approved === true || path.approved === 1 || path.approved === 'true' || path.approved === 'approved' ? 'Approved' : 'Pending Approval'}
                           </span>
                         )}
                       </div>
