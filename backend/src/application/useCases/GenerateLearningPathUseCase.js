@@ -679,6 +679,16 @@ export class GenerateLearningPathUseCase {
         
       } while (validationAttempts < maxValidationAttempts);
 
+      // TEMPORARY: Disable learning path generation - always return null
+      console.log('🚫 TEMPORARY: Learning path generation disabled. Returning null.');
+      await this.jobRepository.updateJob(job.id, {
+        status: 'completed',
+        progress: 100,
+        currentStage: 'completed',
+        result: { learningPathId: null, message: 'Temporarily disabled' }
+      });
+      return null;
+
       // Create learning path entity
       // pathData should always have learning_modules now (converted from old format if needed)
       const learningPath = new LearningPath({
