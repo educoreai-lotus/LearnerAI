@@ -289,6 +289,28 @@ export class GenerateLearningPathUseCase {
           maxRetries: 3
         });
 
+        // Validate Prompt 1 output: Must have exactly 2 competencies
+        try {
+          const prompt1Parsed = typeof prompt1Result === 'string' 
+            ? JSON.parse(prompt1Result) 
+            : prompt1Result;
+          
+          if (prompt1Parsed && prompt1Parsed.expanded_competencies_list) {
+            const competencyCount = prompt1Parsed.expanded_competencies_list.length;
+            if (competencyCount > 2) {
+              console.warn(`⚠️ Prompt 1 generated ${competencyCount} competencies, but maximum is 2. Truncating to first 2.`);
+              prompt1Parsed.expanded_competencies_list = prompt1Parsed.expanded_competencies_list.slice(0, 2);
+              prompt1Result = prompt1Parsed; // Update result with truncated list
+            } else if (competencyCount < 2) {
+              console.warn(`⚠️ Prompt 1 generated only ${competencyCount} competency(ies), but should have exactly 2. Continuing anyway.`);
+            } else {
+              console.log(`✅ Prompt 1 generated exactly 2 competencies as required`);
+            }
+          }
+        } catch (validationError) {
+          console.warn(`⚠️ Could not validate Prompt 1 competency count: ${validationError.message}`);
+        }
+
         // Save Prompt 1 output to skills_expansions table
         if (this.skillsExpansionRepository && expansionId) {
           try {
@@ -1345,6 +1367,30 @@ export class GenerateLearningPathUseCase {
     }
     
     const modules = pathData.learning_modules;
+    
+    // Check 0: Module and step count constraints (Course Builder requirement)
+    if (modules.length > 2) {
+      errors.push(`Learning path has ${modules.length} modules, but maximum allowed is 2 modules`);
+    }
+    
+    if (modules.length < 2) {
+      errors.push(`Learning path has ${modules.length} module(s), but must have exactly 2 modules`);
+    }
+    
+    modules.forEach(module => {
+      if (!module.steps || !Array.isArray(module.steps)) {
+        errors.push(`Module ${module.module_order} has no steps`);
+        return;
+      }
+      
+      if (module.steps.length > 2) {
+        errors.push(`Module ${module.module_order} has ${module.steps.length} steps, but maximum allowed is 2 steps per module`);
+      }
+      
+      if (module.steps.length < 2) {
+        errors.push(`Module ${module.module_order} has ${module.steps.length} step(s), but must have exactly 2 steps per module`);
+      }
+    });
     
     // Check 1: Module order is sequential
     for (let i = 0; i < modules.length; i++) {

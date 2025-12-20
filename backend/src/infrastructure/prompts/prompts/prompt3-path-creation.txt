@@ -34,7 +34,17 @@ All skills are indivisible and must appear exactly once in the learning path.
 
 Objectives
 
-Build a learning path with up to 10 modules.
+CRITICAL CONSTRAINT: Build a learning path with EXACTLY 2 modules.
+
+Each module MUST contain EXACTLY 2 steps.
+
+Total: 2 modules × 2 steps = 4 steps maximum.
+
+You MUST distribute ALL skills across these 4 steps:
+- Module 1, Step 1: First group of skills (foundational)
+- Module 1, Step 2: Second group of skills (intermediate)
+- Module 2, Step 1: Third group of skills (advanced)
+- Module 2, Step 2: Final group of skills (mastery)
 
 Each module must:
 
@@ -42,15 +52,21 @@ Group closely related skills of similar difficulty
 
 Contain steps that teach skills in a clear, ordered sequence
 
-All skills must be included exactly once.
+All skills must be included exactly once across all 4 steps.
 
 Order by priority and difficulty (foundational → intermediate → advanced)
 
-Module order = macro-level progression
+Module order = macro-level progression (Module 1 → Module 2)
 
-Step order within module = micro-level progression
+Step order within module = micro-level progression (Step 1 → Step 2)
 
 Skills in later steps must never be more foundational than skills in earlier steps
+
+Distribute skills evenly: If you have 14 skills total, distribute them as:
+- Module 1, Step 1: ~3-4 skills
+- Module 1, Step 2: ~3-4 skills  
+- Module 2, Step 1: ~3-4 skills
+- Module 2, Step 2: ~3-4 skills
 
 Assign estimated time to every step and module
 
@@ -74,7 +90,7 @@ JSON structure:
       "module_title": "Module Name",
       "estimated_duration_hours": 0,
       "skills_in_module": [
-        "ordered list of skills"
+        "ordered list of skills for this module"
       ],
       "steps": [
         {
@@ -85,11 +101,52 @@ JSON structure:
           "skills_covered": [
             "subset of skills_in_module introduced in this step"
           ]
+        },
+        {
+          "step": 2,
+          "title": "Step Title",
+          "description": "Step description explaining the skill(s)",
+          "estimatedTime": 0,
+          "skills_covered": [
+            "remaining subset of skills_in_module introduced in this step"
+          ]
+        }
+      ]
+    },
+    {
+      "module_order": 2,
+      "module_title": "Module Name",
+      "estimated_duration_hours": 0,
+      "skills_in_module": [
+        "ordered list of skills for this module"
+      ],
+      "steps": [
+        {
+          "step": 1,
+          "title": "Step Title",
+          "description": "Step description explaining the skill(s)",
+          "estimatedTime": 0,
+          "skills_covered": [
+            "subset of skills_in_module introduced in this step"
+          ]
+        },
+        {
+          "step": 2,
+          "title": "Step Title",
+          "description": "Step description explaining the skill(s)",
+          "estimatedTime": 0,
+          "skills_covered": [
+            "remaining subset of skills_in_module introduced in this step"
+          ]
         }
       ]
     }
   ]
 }
+
+CRITICAL: The learning_modules array MUST contain EXACTLY 2 modules.
+Each module's steps array MUST contain EXACTLY 2 steps.
+Total: 2 modules × 2 steps = 4 steps.
 
 
 Strict Rules:

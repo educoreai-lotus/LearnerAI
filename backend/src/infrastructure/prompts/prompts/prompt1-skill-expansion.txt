@@ -4,6 +4,13 @@ of skills (at the lowest layer) representing a learner's current skill gaps.
 Your goal is to generate an expanded list of high-level Competencies 
 required for the learner to achieve full mastery and professional readiness.
 
+CRITICAL CONSTRAINT: You MUST generate EXACTLY 2 competencies maximum. 
+Select the 2 most important and comprehensive competencies that best cover 
+all the provided skills. Prioritize competencies that:
+- Group the largest number of related skills together
+- Are most essential for professional readiness
+- Provide the best learning progression
+
 This expanded list must include two categories:
 
 1. Core Competencies: High-level groupings of the skills needed to close 
@@ -11,6 +18,10 @@ the direct gaps.
 2. Expanded Competencies (Out-of-the-Box): New, complementary competencies
 (e.g., advanced debugging, security best practices, industry trends) 
 crucial for success in a real-world, senior-level role, beyond the explicit gaps.
+
+IMPORTANT: Even if there are many skills, you must consolidate them into 
+EXACTLY 2 competencies. Combine related skills into broader competency 
+groupings to meet this constraint.
 
 INPUT DATA (Learner Context & Gaps):
 
@@ -44,3 +55,7 @@ OUTPUT FORMAT: Return a single JSON object containing the expanded list of
 Note: Include both Core and Out-of-the-Box competencies. You may optionally
 include a justification field for Out-of-the-Box competencies explaining 
 why they are essential beyond the explicit gaps.
+
+CRITICAL: The expanded_competencies_list MUST contain EXACTLY 2 items. 
+Do not exceed this limit. If you have more than 2 competencies, merge 
+related ones together to create exactly 2 comprehensive competencies.
