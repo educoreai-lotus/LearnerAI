@@ -95,8 +95,35 @@ export default function LearningPathTimeline({ path, className = '' }) {
                       <h3 className="text-xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
                         {moduleTitle}
                       </h3>
+                      {module.module_description && (
+                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mt-2">
+                          {module.module_description}
+                        </p>
+                      )}
                     </div>
                   </div>
+
+                  {/* Module-level Skills */}
+                  {skillsInModule && skillsInModule.length > 0 && (
+                    <div className="mb-4">
+                      <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-2 flex items-center gap-1">
+                        <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                        </svg>
+                        Module Skills:
+                      </p>
+                      <div className="flex flex-wrap gap-2">
+                        {skillsInModule.map((skill, skillIndex) => (
+                          <span
+                            key={skillIndex}
+                            className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-50 dark:bg-primary-900/20 text-primary-700 dark:text-primary-300 border border-primary-200 dark:border-primary-700"
+                          >
+                            {typeof skill === 'string' ? skill : skill.name || skill.title || JSON.stringify(skill)}
+                          </span>
+                        ))}
+                      </div>
+                    </div>
+                  )}
 
                   {/* Steps */}
                   {steps.length > 0 && (
@@ -145,6 +172,28 @@ export default function LearningPathTimeline({ path, className = '' }) {
                                 <p className="text-sm text-neutral-700 dark:text-neutral-300 mb-4 leading-relaxed pl-11">
                                   {stepDescription}
                                 </p>
+                              )}
+
+                              {/* Skills Covered */}
+                              {skillsCovered && skillsCovered.length > 0 && (
+                                <div className="pl-11 mt-4">
+                                  <p className="text-xs font-semibold text-neutral-600 dark:text-neutral-400 mb-2 flex items-center gap-1">
+                                    <svg className="w-4 h-4 text-primary-600 dark:text-primary-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z" />
+                                    </svg>
+                                    Skills Covered:
+                                  </p>
+                                  <div className="flex flex-wrap gap-2">
+                                    {skillsCovered.map((skill, skillIndex) => (
+                                      <span
+                                        key={skillIndex}
+                                        className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary-100 dark:bg-primary-900/30 text-primary-800 dark:text-primary-300 border border-primary-200 dark:border-primary-700"
+                                      >
+                                        {typeof skill === 'string' ? skill : skill.name || skill.title || JSON.stringify(skill)}
+                                      </span>
+                                    ))}
+                                  </div>
+                                </div>
                               )}
                             </div>
                           );

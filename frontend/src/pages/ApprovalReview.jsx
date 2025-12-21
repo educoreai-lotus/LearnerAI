@@ -5,6 +5,7 @@ import Card from '../components/Card';
 import PrimaryButton from '../components/PrimaryButton';
 import LoadingSpinner from '../components/LoadingSpinner';
 import Toast from '../components/Toast';
+import LearningPathTimeline from '../components/LearningPathTimeline';
 import api from '../services/api';
 
 /**
@@ -226,6 +227,18 @@ export default function ApprovalReview() {
   const modules = learningPath.modules || [];
   const pathTitle = learningPath.title || 'Learning Path';
   const pathDescription = learningPath.description || learningPath.goal || '';
+  
+  // Prepare path data for LearningPathTimeline component
+  const pathDataForTimeline = {
+    pathData: {
+      learning_modules: modules,
+      total_estimated_duration_hours: learningPath.duration || 0,
+      path_title: pathTitle,
+      path_description: pathDescription
+    },
+    pathTitle: pathTitle,
+    totalDurationHours: learningPath.duration || 0
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-neutral-50 to-neutral-100 dark:from-slate-900 dark:to-slate-800">
@@ -326,45 +339,13 @@ export default function ApprovalReview() {
               )}
             </Card>
 
-            {/* Modules */}
+            {/* Full Learning Path with Modules, Steps, and Skills */}
             {modules.length > 0 && (
               <Card>
-                <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-4">
-                  Learning Modules
+                <h3 className="text-xl font-bold text-neutral-900 dark:text-white mb-6">
+                  Learning Path Details
                 </h3>
-                <div className="space-y-4">
-                  {modules.map((module, index) => (
-                    <div
-                      key={index}
-                      className="border border-neutral-200 dark:border-neutral-700 rounded-lg p-4 bg-neutral-50 dark:bg-slate-700/50"
-                    >
-                      <h4 className="font-semibold text-neutral-900 dark:text-white mb-2">
-                        {module.module_title || module.title || `Module ${index + 1}`}
-                      </h4>
-                      {module.module_description && (
-                        <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-3">
-                          {module.module_description}
-                        </p>
-                      )}
-                      {module.subtopics && module.subtopics.length > 0 && (
-                        <div>
-                          <p className="text-xs font-medium text-neutral-500 dark:text-neutral-400 mb-2">
-                            Subtopics:
-                          </p>
-                          <ul className="list-disc list-inside text-sm text-neutral-700 dark:text-neutral-300 space-y-1">
-                            {module.subtopics.map((subtopic, subIndex) => (
-                              <li key={subIndex}>
-                                {typeof subtopic === 'string' 
-                                  ? subtopic 
-                                  : subtopic.title || subtopic.name || JSON.stringify(subtopic)}
-                              </li>
-                            ))}
-                          </ul>
-                        </div>
-                      )}
-                    </div>
-                  ))}
-                </div>
+                <LearningPathTimeline path={pathDataForTimeline} />
               </Card>
             )}
           </div>
