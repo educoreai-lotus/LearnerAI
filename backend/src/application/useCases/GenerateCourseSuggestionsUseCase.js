@@ -125,26 +125,15 @@ export class GenerateCourseSuggestionsUseCase {
       // Parse suggestions from Prompt 4 result
       const suggestions = this._parseSuggestions(prompt4Result, userId, competencyTargetName);
 
-      // Send to RAG microservice for enhancement
+      // NOTE: RAG microservice will request recommendations on-demand via batch/demand/GRPC
+      // We do NOT automatically send recommendations to RAG - it pulls data when needed
       await this.jobRepository.updateJob(job.id, {
-        currentStage: 'rag-processing',
-        progress: 70
+        currentStage: 'saving',
+        progress: 80
       });
 
-      let enhancedSuggestions = suggestions;
-      if (this.ragClient) {
-        try {
-          const ragResult = await this.ragClient.processCourseSuggestions(suggestions, {
-            userId,
-            competencyTargetName,
-            completionDate
-          });
-          enhancedSuggestions = ragResult.enhancedSuggestions || suggestions;
-        } catch (error) {
-          console.warn('RAG processing failed, using original suggestions:', error.message);
-          // Continue with original suggestions if RAG fails
-        }
-      }
+      // Use original suggestions (RAG will enhance them when it requests the data)
+      const enhancedSuggestions = suggestions;
 
       // Save suggestions to database (if repository available)
       await this.jobRepository.updateJob(job.id, {
@@ -155,15 +144,16 @@ export class GenerateCourseSuggestionsUseCase {
       let savedSuggestion = null;
       if (this.recommendationRepository && typeof this.recommendationRepository.createRecommendation === 'function') {
         // Persist to the current schema (recommendations table)
+        // NOTE: sent_to_rag will be set to true when RAG requests the data via batch/demand/GRPC
         const created = await this.recommendationRepository.createRecommendation({
           user_id: userId,
           base_course_name: competencyTargetName,
           suggested_courses: {
             originalSuggestions: suggestions,
             enhancedSuggestions: enhancedSuggestions,
-            ragProcessed: this.ragClient !== null
+            ragProcessed: false // RAG will process when it requests the data
           },
-          sent_to_rag: this.ragClient !== null
+          sent_to_rag: false // RAG will request data on-demand, not automatically
         });
 
         savedSuggestion = {
@@ -179,7 +169,7 @@ export class GenerateCourseSuggestionsUseCase {
           suggestionData: {
             originalSuggestions: suggestions,
             enhancedSuggestions: enhancedSuggestions,
-            ragProcessed: this.ragClient !== null
+            ragProcessed: false // RAG will process when it requests the data
           },
           status: 'pending'
         });

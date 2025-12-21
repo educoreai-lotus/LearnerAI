@@ -168,14 +168,18 @@ export class ProcessHandler {
   }
 
   async queryCourses({ limit, offset, since, userId }) {
+    // Select ONLY the specified fields for RAG sync
     let q = this.client
       .from('courses')
-      .select('*')
+      .select('competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
       .order('created_at', { ascending: false })
       .range(offset, offset + limit - 1);
 
+    // Handle incremental sync: check BOTH created_at AND last_modified_at
     if (since) {
-      q = q.gte('created_at', since);
+      const sinceDate = since; // Keep as ISO string for Supabase
+      // Use OR filter: records where created_at >= since OR last_modified_at >= since
+      q = q.or(`created_at.gte.${sinceDate},last_modified_at.gte.${sinceDate}`);
     }
     if (userId) {
       q = q.eq('user_id', userId);
@@ -191,8 +195,11 @@ export class ProcessHandler {
       .from('courses')
       .select('competency_target_name', { count: 'exact', head: true });
 
+    // Handle incremental sync: check BOTH created_at AND last_modified_at
     if (since) {
-      q = q.gte('created_at', since);
+      const sinceDate = since; // Keep as ISO string for Supabase
+      // Use OR filter: records where created_at >= since OR last_modified_at >= since
+      q = q.or(`created_at.gte.${sinceDate},last_modified_at.gte.${sinceDate}`);
     }
     if (userId) {
       q = q.eq('user_id', userId);
@@ -204,9 +211,10 @@ export class ProcessHandler {
   }
 
   async getRecentCourses({ userId, limit }) {
+    // Select ONLY the specified fields for RAG sync
     let q = this.client
       .from('courses')
-      .select('*')
+      .select('competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
       .order('created_at', { ascending: false })
       .limit(limit);
 
@@ -220,9 +228,10 @@ export class ProcessHandler {
   }
 
   async getCourseByCompetencyTargetName(competencyTargetName) {
+    // Select ONLY the specified fields for RAG sync
     const { data, error } = await this.client
       .from('courses')
-      .select('*')
+      .select('competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
       .eq('competency_target_name', competencyTargetName)
       .maybeSingle();
 
