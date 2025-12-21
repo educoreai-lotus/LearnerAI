@@ -135,21 +135,23 @@ export class ProcessApprovalResponseUseCase {
         }
       }
 
+      // TEMPORARY: Disable automatic sending to Course Builder
       // Proactively push to Course Builder via Coordinator (one request per course/module)
-      try {
-        if (this.courseRepository && this.skillsGapRepository) {
-          const course = await this.courseRepository.getCourseById(approval.learningPathId);
-          if (course) {
-            const skillsGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(
-              course.user_id,
-              course.competency_target_name
-            );
-            await this._pushApprovedLearningPathToCourseBuilder({ course, skillsGap });
-          }
-        }
-      } catch (e) {
-        console.error(`⚠️  Failed to push approved learning path to Coordinator: ${e.message}`);
-      }
+      // try {
+      //   if (this.courseRepository && this.skillsGapRepository) {
+      //     const course = await this.courseRepository.getCourseById(approval.learningPathId);
+      //     if (course) {
+      //       const skillsGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(
+      //         course.user_id,
+      //         course.competency_target_name
+      //       );
+      //       await this._pushApprovedLearningPathToCourseBuilder({ course, skillsGap });
+      //     }
+      //   }
+      // } catch (e) {
+      //   console.error(`⚠️  Failed to push approved learning path to Coordinator: ${e.message}`);
+      // }
+      console.log(`🚫 TEMPORARY: Automatic push to Course Builder disabled. Approval ${approvalId} processed but learning path not sent.`);
     }
 
     // Send notification to requester (if approved or changes_requested)

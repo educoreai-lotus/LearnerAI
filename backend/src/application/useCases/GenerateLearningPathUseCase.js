@@ -679,16 +679,6 @@ export class GenerateLearningPathUseCase {
         
       } while (validationAttempts < maxValidationAttempts);
 
-      // TEMPORARY: Disable learning path generation - always return null
-      console.log('🚫 TEMPORARY: Learning path generation disabled. Returning null.');
-      await this.jobRepository.updateJob(job.id, {
-        status: 'completed',
-        progress: 100,
-        currentStage: 'completed',
-        result: { learningPathId: null, message: 'Temporarily disabled' }
-      });
-      return null;
-
       // Create learning path entity
       // pathData should always have learning_modules now (converted from old format if needed)
       const learningPath = new LearningPath({
@@ -735,11 +725,15 @@ export class GenerateLearningPathUseCase {
       // Skip approval if this is an update after exam failure
       await this._handlePathDistribution(savedPath, skillsGap, isUpdateAfterFailure);
 
+      // TEMPORARY: Disable automatic sending to Course Builder
       // Proactively push approved learning paths to Course Builder via Coordinator
       // - auto-approval: immediately after generation
       // - update-after-failure: also auto-approved in our logic
+      // if (learningPath.status === 'approved') {
+      //   await this._pushApprovedLearningPathToCourseBuilder(skillsGap, pathData);
+      // }
       if (learningPath.status === 'approved') {
-        await this._pushApprovedLearningPathToCourseBuilder(skillsGap, pathData);
+        console.log('🚫 TEMPORARY: Automatic push to Course Builder disabled. Learning path approved but not sent.');
       }
 
       // Mark job as completed
