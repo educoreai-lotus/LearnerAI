@@ -103,7 +103,14 @@ export class SkillsEngineClient {
         console.log(`🔍 [COORDINATOR RESPONSE DEBUG]`);
         console.log(`   Response type: ${typeof response}`);
         console.log(`   Response keys: ${response && typeof response === 'object' ? Object.keys(response).join(', ') : 'N/A'}`);
-        console.log(`   Full response: ${JSON.stringify(response, null, 2).substring(0, 1000)}`);
+        if (response && response.response) {
+          console.log(`   response.response keys: ${Object.keys(response.response).join(', ')}`);
+          if (response.response.answer) {
+            console.log(`   response.response.answer type: ${typeof response.response.answer}`);
+            console.log(`   response.response.answer preview: ${typeof response.response.answer === 'string' ? response.response.answer.substring(0, 500) : JSON.stringify(response.response.answer).substring(0, 500)}`);
+          }
+        }
+        console.log(`   Full response: ${JSON.stringify(response, null, 2).substring(0, 2000)}`);
 
         // Extract the breakdown from Coordinator response
         // Coordinator response format: { requester_service, payload, response: { answer: <data> } }
@@ -113,8 +120,49 @@ export class SkillsEngineClient {
         if (response && response.response && response.response.answer) {
           // Coordinator returns data in response.answer
           const answerData = response.response.answer;
-          breakdown = typeof answerData === 'string' ? JSON.parse(answerData) : answerData;
-          console.log(`   ✅ Found breakdown in response.response.answer`);
+          console.log(`   📋 Attempting to parse response.response.answer...`);
+          console.log(`   answerData type: ${typeof answerData}`);
+          console.log(`   answerData preview: ${typeof answerData === 'string' ? answerData.substring(0, 500) : JSON.stringify(answerData).substring(0, 500)}`);
+          
+          try {
+            breakdown = typeof answerData === 'string' ? JSON.parse(answerData) : answerData;
+            console.log(`   ✅ Parsed breakdown from response.response.answer`);
+            console.log(`   Breakdown type: ${typeof breakdown}`);
+            console.log(`   Breakdown keys: ${breakdown && typeof breakdown === 'object' ? Object.keys(breakdown).join(', ') : 'N/A'}`);
+            
+            // Check if breakdown is nested (e.g., { data: {...} } or { payload: {...} })
+            if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
+              // If it has 'data' field, try that
+              if (breakdown.data && typeof breakdown.data === 'object') {
+                console.log(`   🔍 Found nested 'data' field, using that as breakdown`);
+                breakdown = breakdown.data;
+              }
+              // If it has 'payload' field, try that
+              else if (breakdown.payload && typeof breakdown.payload === 'object') {
+                const payloadData = typeof breakdown.payload === 'string' ? JSON.parse(breakdown.payload) : breakdown.payload;
+                // Check if payload is the request (has action) or the breakdown
+                if (payloadData && !payloadData.action && !payloadData.description) {
+                  console.log(`   🔍 Found nested 'payload' field without action/description, using as breakdown`);
+                  breakdown = payloadData;
+                }
+              }
+              // If it has 'response' field with nested data
+              else if (breakdown.response && breakdown.response.data) {
+                console.log(`   🔍 Found nested 'response.data' field, using that as breakdown`);
+                breakdown = breakdown.response.data;
+              }
+            }
+          } catch (parseError) {
+            console.error(`   ❌ Failed to parse answerData: ${parseError.message}`);
+            // Try to extract from nested structure if answer is an object
+            if (typeof answerData === 'object' && answerData.data) {
+              breakdown = answerData.data;
+              console.log(`   ✅ Found breakdown in answerData.data`);
+            } else if (typeof answerData === 'object' && answerData.payload) {
+              breakdown = typeof answerData.payload === 'string' ? JSON.parse(answerData.payload) : answerData.payload;
+              console.log(`   ✅ Found breakdown in answerData.payload`);
+            }
+          }
         } else if (response && response.data) {
           breakdown = response.data;
           console.log(`   ✅ Found breakdown in response.data`);
@@ -165,17 +213,42 @@ export class SkillsEngineClient {
         if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
           // Validate breakdown structure: should have competency names as keys with arrays of skills
           const breakdownKeys = Object.keys(breakdown);
+          console.log(`   🔍 Validating breakdown structure...`);
+          console.log(`   Breakdown keys: ${breakdownKeys.join(', ')}`);
+          
           const isValidBreakdown = breakdownKeys.some(key => 
             Array.isArray(breakdown[key]) && breakdown[key].length > 0
           );
           
           if (isValidBreakdown) {
+            // Log sample of breakdown to verify it's not mock data
+            const sampleKey = breakdownKeys[0];
+            const sampleSkills = breakdown[sampleKey];
+            console.log(`   ✅ Valid breakdown structure found`);
+            console.log(`   Sample competency "${sampleKey}": ${sampleSkills.length} skills`);
+            console.log(`   Sample skills: ${JSON.stringify(sampleSkills.slice(0, 3))}`);
+            
+            // Check if it's mock data (has "- Skill 1" pattern)
+            const isMockData = sampleSkills.some(skill => 
+              typeof skill === 'string' && skill.includes(' - Skill ')
+            );
+            if (isMockData) {
+              console.warn(`   ⚠️ WARNING: Breakdown appears to be mock data (contains "- Skill " pattern)`);
+              console.warn(`   This means Skills Engine did not return actual breakdown. Check Coordinator/Skills Engine integration.`);
+            }
+            
             console.log(`✅ Skills Engine returned breakdown via Coordinator for ${breakdownKeys.length} competencies`);
             return breakdown;
           } else {
+            console.error(`   ❌ Invalid breakdown structure: keys don't contain skill arrays`);
+            breakdownKeys.forEach(key => {
+              console.error(`   Key "${key}": ${typeof breakdown[key]}, isArray: ${Array.isArray(breakdown[key])}, length: ${Array.isArray(breakdown[key]) ? breakdown[key].length : 'N/A'}`);
+            });
             throw new Error(`Invalid breakdown structure: keys don't contain skill arrays. Keys: ${breakdownKeys.join(', ')}`);
           }
         } else {
+          console.error(`   ❌ Breakdown is null or not an object`);
+          console.error(`   Breakdown type: ${typeof breakdown}, isArray: ${Array.isArray(breakdown)}`);
           throw new Error(`Invalid response format from Coordinator: ${JSON.stringify(response).substring(0, 500)}`);
         }
       } catch (error) {
