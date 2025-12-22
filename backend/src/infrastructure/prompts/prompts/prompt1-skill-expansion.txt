@@ -1,27 +1,70 @@
 Act as a Senior Adaptive Learning Architect. Analyze the provided list
 of skills (at the lowest layer) representing a learner's current skill gaps.
 
-Your goal is to generate an expanded list of high-level Competencies 
-required for the learner to achieve full mastery and professional readiness.
+Your goal is to generate an expanded list of high-level Technical Competencies 
+based on the provided skill gaps. Generate EXACTLY 2 competencies:
+
+1. Core Competency: Group and expand the gap skills into a broader, minimal learning domain
+2. Out-of-the-Box Competency: A technical competency that is somewhat related to the gap 
+   (not completely unrelated, but expands beyond just grouping the gap skills)
 
 CRITICAL CONSTRAINT: You MUST generate EXACTLY 2 competencies maximum. 
-Select the 2 most important and comprehensive competencies that best cover 
-all the provided skills. Prioritize competencies that:
-- Group the largest number of related skills together
-- Are most essential for professional readiness
-- Provide the best learning progression
 
-This expanded list must include two categories:
+For the Core Competency:
+- Group the gap skills into a broader, minimal category
+- Expand the gap skills into a broader learning domain (e.g., if gap has "for loop", "conditionals" → "Control Flow and Logic")
 
-1. Core Competencies: High-level groupings of the skills needed to close 
-the direct gaps.
-2. Expanded Competencies (Out-of-the-Box): New, complementary competencies
-(e.g., advanced debugging, security best practices, industry trends) 
-crucial for success in a real-world, senior-level role, beyond the explicit gaps.
+For the Out-of-the-Box Competency:
+- Choose a technical competency that is somewhat related to the gap domain
+- It should be a natural extension or complement to the gap skills
+- It should be minimal and high-level (not a detailed list)
+- Examples: If gap is Python basics → "Error Handling and Debugging" or "Code Quality and Best Practices"
+- DO NOT choose completely unrelated topics (e.g., if gap is Python → don't choose "Web Development" or "Database Design")
+
+MINIMAL COMPETENCY CONSTRAINT: The competencies you generate MUST be MINIMAL and HIGH-LEVEL:
+- Each competency should be a broad, high-level category (e.g., "Python Programming Fundamentals", "Software Engineering Practices")
+- DO NOT create competencies with many sub-topics or granular details
+- DO NOT break down into "baby skills" or micro-skills within the competency name
+- Keep competency names concise and focused on the overall domain/area
+- Avoid overly specific or narrow competencies that would require many sub-skills
+- Think of competencies as major learning domains, not detailed skill lists
+
+Examples of GOOD minimal competencies:
+✅ "Python Programming Fundamentals"
+✅ "Software Engineering Practices"
+✅ "Data Structures and Algorithms"
+✅ "System Design and Architecture"
+
+Examples of BAD (too granular, too many topics):
+❌ "Python Syntax, Variables, Data Types, Control Flow, Functions, Classes, Modules, Packages"
+❌ "Basic Python, Intermediate Python, Advanced Python, Python Libraries, Python Frameworks"
+❌ "Error Handling, Debugging, Testing, Logging, Monitoring, Performance Optimization"
+
+COMPETENCY GENERATION RULES:
+
+1. Core Competency (First): Analyze the gap skills and group them into a broader, 
+   minimal competency category. For example:
+   - If gap has: "for loop", "conditionals", "defining functions" → Create: "Control Flow and Functions"
+   - If gap has: "error handling", "debugging" → Create: "Error Handling and Debugging"
+   - If gap has: "lists", "dictionaries", "tuples" → Create: "Data Structures"
+
+2. Out-of-the-Box Competency (Second): Choose a technical competency that is 
+   somewhat related to the gap domain, but expands beyond just grouping the gap skills.
+   It should be a natural technical extension. For example:
+   - If gap is Python basics → "Error Handling and Debugging" or "Code Quality and Best Practices"
+   - If gap is control flow → "Advanced Programming Patterns" or "Software Design Principles"
+   - If gap is data structures → "Algorithm Design" or "Performance Optimization"
+   - DO NOT choose completely unrelated topics (e.g., if gap is Python → don't choose "Web Development")
+
+3. Keep minimal and high-level: Both competencies should be broad categories, 
+   not detailed lists of sub-topics. Think of them as major technical learning domains.
 
 IMPORTANT: Even if there are many skills, you must consolidate them into 
-EXACTLY 2 competencies. Combine related skills into broader competency 
+EXACTLY 2 competencies. Combine related skills into broader, MINIMAL competency 
 groupings to meet this constraint.
+
+Remember: Each competency should be a high-level learning domain, not a detailed 
+list of topics or sub-skills. Think big picture, not granular details.
 
 INPUT DATA (Learner Context & Gaps):
 
@@ -37,24 +80,21 @@ OUTPUT FORMAT: Return a single JSON object containing the expanded list of
    were chosen and how they relate to the target goal.]",
   "expanded_competencies_list": [
     {
-      "competency_name": "Advanced Data Structures and Algorithm Optimization"
+      "competency_name": "Control Flow and Functions",
+      "type": "core"
     },
     {
-      "competency_name": "Production System Debugging and Error Handling",
-      "justification": "Essential for maintaining models in production;
-       goes beyond basic coding."
-    },
-    {
-      "competency_name": "Cloud Security and Compliance Fundamentals 
-      (e.g., Data Anonymization)",
-      "justification": "Mandatory context for modern, cloud-based data projects."
+      "competency_name": "Error Handling and Debugging",
+      "type": "out-of-the-box",
+      "justification": "Essential technical competency that complements the gap skills"
     }
   ]
 }
 
-Note: Include both Core and Out-of-the-Box competencies. You may optionally
-include a justification field for Out-of-the-Box competencies explaining 
-why they are essential beyond the explicit gaps.
+Note: 
+- First competency should group and expand the gap skills into a broader domain
+- Second competency should be an out-of-the-box technical competency that is 
+  somewhat related to the gap (a natural technical extension), but not completely unrelated
 
 CRITICAL: The expanded_competencies_list MUST contain EXACTLY 2 items. 
 Do not exceed this limit. If you have more than 2 competencies, merge 
