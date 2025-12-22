@@ -131,25 +131,57 @@ export class SkillsEngineClient {
             console.log(`   Breakdown keys: ${breakdown && typeof breakdown === 'object' ? Object.keys(breakdown).join(', ') : 'N/A'}`);
             
             // Check if breakdown is nested (e.g., { data: {...} } or { payload: {...} })
+            // Coordinator wraps Skills Engine response in result object: { success, action, data: {...} }
             if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
-              // If it has 'data' field, try that
+              // PRIORITY 1: If it has 'data' field (Coordinator result format), use that
+              // This is the most common case - Coordinator wraps Skills Engine response
               if (breakdown.data && typeof breakdown.data === 'object') {
-                console.log(`   🔍 Found nested 'data' field, using that as breakdown`);
-                breakdown = breakdown.data;
+                console.log(`   🔍 Found nested 'data' field (Coordinator result format), extracting breakdown from data`);
+                const extractedData = breakdown.data;
+                console.log(`   Extracted data keys: ${Object.keys(extractedData).join(', ')}`);
+                breakdown = extractedData;
               }
-              // If it has 'payload' field, try that
-              else if (breakdown.payload && typeof breakdown.payload === 'object') {
-                const payloadData = typeof breakdown.payload === 'string' ? JSON.parse(breakdown.payload) : breakdown.payload;
-                // Check if payload is the request (has action) or the breakdown
-                if (payloadData && !payloadData.action && !payloadData.description) {
-                  console.log(`   🔍 Found nested 'payload' field without action/description, using as breakdown`);
-                  breakdown = payloadData;
+              // PRIORITY 2: Check if breakdown itself is the skills breakdown (has competency keys with arrays)
+              // This happens if Skills Engine returns breakdown directly without Coordinator wrapper
+              else {
+                const breakdownKeys = Object.keys(breakdown);
+                const hasCompetencyStructure = breakdownKeys.some(key => 
+                  Array.isArray(breakdown[key]) && breakdown[key].length > 0
+                );
+                const hasResultFields = breakdownKeys.some(key => 
+                  ['success', 'action', 'message', 'error'].includes(key)
+                );
+                
+                // If it has competency structure but no result fields, it's already the breakdown
+                if (hasCompetencyStructure && !hasResultFields) {
+                  console.log(`   ✅ Breakdown is already in correct format (has competency keys with skill arrays)`);
+                  // breakdown stays as is
+                }
+                // If it has result fields but no data field, log warning
+                else if (hasResultFields && !breakdown.data) {
+                  console.warn(`   ⚠️ Breakdown appears to be Coordinator result wrapper, but no 'data' field found. Keys: ${breakdownKeys.join(', ')}`);
+                  console.warn(`   This might indicate Skills Engine returned an error or unexpected format.`);
                 }
               }
-              // If it has 'response' field with nested data
-              else if (breakdown.response && breakdown.response.data) {
-                console.log(`   🔍 Found nested 'response.data' field, using that as breakdown`);
-                breakdown = breakdown.response.data;
+              
+              // PRIORITY 3: If it has 'payload' field, try that (fallback)
+              if (!breakdown || (typeof breakdown === 'object' && Object.keys(breakdown).some(k => ['success', 'action'].includes(k)))) {
+                if (breakdown && breakdown.payload && typeof breakdown.payload === 'object') {
+                  const payloadData = typeof breakdown.payload === 'string' ? JSON.parse(breakdown.payload) : breakdown.payload;
+                  // Check if payload is the request (has action) or the breakdown
+                  if (payloadData && !payloadData.action && !payloadData.description) {
+                    console.log(`   🔍 Found nested 'payload' field without action/description, using as breakdown`);
+                    breakdown = payloadData;
+                  }
+                }
+              }
+              
+              // PRIORITY 4: If it has 'response' field with nested data (fallback)
+              if (!breakdown || (typeof breakdown === 'object' && Object.keys(breakdown).some(k => ['success', 'action'].includes(k)))) {
+                if (breakdown && breakdown.response && breakdown.response.data) {
+                  console.log(`   🔍 Found nested 'response.data' field, using that as breakdown`);
+                  breakdown = breakdown.response.data;
+                }
               }
             }
           } catch (parseError) {
@@ -334,19 +366,85 @@ export class SkillsEngineClient {
    */
   _getMockSkillBreakdown(competencies) {
     const breakdown = {};
+    
+    // Map of competency patterns to realistic skill names
+    const skillMappings = {
+      // Control Flow and Functions - Out-of-the-box skills (complementary, not directly from gap)
+      'control flow': ['advanced iteration patterns', 'generator functions', 'async/await patterns', 'functional programming concepts', 'design patterns', 'code optimization techniques'],
+      'functions': ['decorators', 'higher-order functions', 'function composition', 'currying', 'memoization', 'callback patterns'],
+      
+      // Error Handling and Debugging
+      'error handling': ['try-except blocks', 'exception types', 'error messages', 'error logging', 'custom exceptions'],
+      'debugging': ['print debugging', 'debugger usage', 'breakpoints', 'stack traces', 'error diagnosis'],
+      
+      // Data Structures
+      'data structures': ['lists', 'dictionaries', 'tuples', 'sets', 'arrays', 'linked lists', 'stacks', 'queues'],
+      'collections': ['list comprehension', 'dictionary comprehension', 'set operations', 'nested structures'],
+      
+      // Programming Fundamentals
+      'programming fundamentals': ['variables', 'data types', 'operators', 'expressions', 'statements', 'syntax'],
+      'fundamentals': ['variables', 'data types', 'operators', 'expressions', 'statements'],
+      
+      // Algorithms
+      'algorithms': ['sorting algorithms', 'searching algorithms', 'time complexity', 'space complexity', 'algorithm design'],
+      'algorithm': ['sorting', 'searching', 'complexity analysis', 'optimization'],
+      
+      // Software Engineering
+      'software engineering': ['code organization', 'modular design', 'code reusability', 'maintainability', 'documentation'],
+      'best practices': ['code style', 'naming conventions', 'code comments', 'version control', 'testing'],
+      
+      // Object-Oriented Programming
+      'object oriented': ['classes', 'objects', 'inheritance', 'polymorphism', 'encapsulation', 'abstraction'],
+      'oop': ['classes', 'objects', 'inheritance', 'polymorphism', 'encapsulation'],
+      
+      // Default fallback skills
+      'default': ['basic concepts', 'intermediate concepts', 'advanced concepts', 'practical application', 'best practices']
+    };
+    
     competencies.forEach((comp, index) => {
       // Extract competency name - handle both strings and objects
       const compName = typeof comp === 'string' 
         ? comp 
         : (comp.name || comp.competency_name || `Competency ${index + 1}`);
       
-      // Return array of skill names at the lowest level (no IDs, no micro/nano separation)
-      breakdown[compName] = [
-        `${compName} - Skill 1`,
-        `${compName} - Skill 2`,
-        `${compName} - Skill 3`
-      ];
+      // Find matching skills based on competency name (case-insensitive)
+      const compLower = compName.toLowerCase();
+      let skills = null;
+      
+      // Try to find matching skills
+      for (const [pattern, skillList] of Object.entries(skillMappings)) {
+        if (compLower.includes(pattern)) {
+          skills = [...skillList]; // Copy array
+          break;
+        }
+      }
+      
+      // If no match found, use default or generate based on competency name
+      if (!skills) {
+        // Try to extract key terms and generate relevant skills
+        if (compLower.includes('python')) {
+          skills = ['variables and data types', 'control structures', 'functions and modules', 'file handling', 'error handling'];
+        } else if (compLower.includes('javascript') || compLower.includes('js')) {
+          skills = ['variables and scoping', 'functions and closures', 'objects and arrays', 'DOM manipulation', 'async programming'];
+        } else if (compLower.includes('java')) {
+          skills = ['classes and objects', 'inheritance and polymorphism', 'interfaces', 'collections', 'exception handling'];
+        } else {
+          // Generic skills based on competency name
+          skills = [
+            `${compName.split(' ')[0]} basics`,
+            `${compName.split(' ')[0]} intermediate concepts`,
+            `${compName.split(' ')[0]} advanced topics`,
+            'practical application',
+            'best practices'
+          ];
+        }
+      }
+      
+      // Return 4-6 skills (realistic number for a competency)
+      const numSkills = Math.min(skills.length, 6);
+      breakdown[compName] = skills.slice(0, numSkills);
     });
+    
     return breakdown;
   }
 
