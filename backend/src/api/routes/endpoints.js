@@ -962,6 +962,7 @@ async function skillsEngineHandler(payload, dependencies) {
  * 
  * Actions:
  * - "sending_decision_maker_to_approve_learning_path": Update company with decision maker and approval policy
+ * - "sending_new_decision_maker_to_learner_ai": Update company with new decision maker and approval policy
  * - "update_company" or "register_company": Update/register company (same as above)
  * - "fill_directory_data" or no action: Fill company/learner data (read-only)
  */
@@ -975,6 +976,7 @@ async function directoryHandler(payload, dependencies) {
   
   // Handle company updates from Directory
   if (action === 'sending_decision_maker_to_approve_learning_path' || 
+      action === 'sending_new_decision_maker_to_learner_ai' ||
       action === 'update_company' || 
       action === 'register_company') {
     
