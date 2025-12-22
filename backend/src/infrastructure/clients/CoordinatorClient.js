@@ -68,7 +68,7 @@ export class CoordinatorClient {
     );
   }
 
-  async postFillContentMetrics(body) {
+  async postFillContentMetrics(body, options = {}) {
     if (!this.baseUrl) {
       throw new Error('COORDINATOR_URL is not set');
     }
@@ -76,11 +76,17 @@ export class CoordinatorClient {
       throw new Error('LEARNERAI_PRIVATE_KEY is not set');
     }
 
+    // Allow per-request timeout override (useful for long-running requests like Skills Engine)
+    const timeoutMs = options.timeoutMs !== undefined ? Number(options.timeoutMs) : this.timeoutMs;
+    if (!Number.isFinite(timeoutMs) || timeoutMs <= 0) {
+      throw new Error(`Invalid timeout: ${options.timeoutMs}`);
+    }
+
     const signature = generateSignature(this.serviceName, this.privateKeyPem, body);
     const url = `${this.baseUrl}/api/fill-content-metrics`;
 
     const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), this.timeoutMs);
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
     try {
       const res = await fetch(url, {

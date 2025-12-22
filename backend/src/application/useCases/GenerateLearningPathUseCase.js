@@ -467,7 +467,8 @@ export class GenerateLearningPathUseCase {
           maxRetries: 3,
           retryDelay: 1000,
           useMockData: false, // Will automatically use mock data if all retries fail
-          includeExpansions: true // Explicitly request lowest level skills (expansions competencies)
+          includeExpansions: true, // Explicitly request lowest level skills (expansions competencies)
+          timeoutMs: 300000 // 5 minutes timeout for Skills Engine breakdown (can take long)
         });
         console.log(`✅ Skills Engine breakdown received for ${competencies.length} competencies (lowest level skills/expansions)`);
         
@@ -497,7 +498,8 @@ export class GenerateLearningPathUseCase {
         // Continue with mock data breakdown
         skillBreakdown = await this.skillsEngineClient.requestSkillBreakdown(competencies, {
           useMockData: true, // Force mock data
-          includeExpansions: true // Still request expansions even in mock mode
+          includeExpansions: true, // Still request expansions even in mock mode
+          timeoutMs: 300000 // 5 minutes timeout (even for mock, keep consistent)
         });
         console.warn(`⚠️ Using mock skill breakdown due to Skills Engine failure`);
         console.log(`📋 [MOCK SKILLS BREAKDOWN]`);

@@ -36,7 +36,8 @@ export class SkillsEngineClient {
       maxRetries = 3,
       retryDelay = 1000,
       useMockData = false,
-      includeExpansions = true // Default to true: always request lowest layer (expansions)
+      includeExpansions = true, // Default to true: always request lowest layer (expansions)
+      timeoutMs = 300000 // Default 5 minutes (300000ms) for Skills Engine breakdown requests
     } = options;
 
     if (useMockData) {
@@ -54,11 +55,11 @@ export class SkillsEngineClient {
 
     // Use Coordinator if available, otherwise fallback to direct HTTP
     if (this.coordinatorClient && this.coordinatorClient.isConfigured()) {
-      return this._requestViaCoordinator(competencyNames, options);
+      return this._requestViaCoordinator(competencyNames, { ...options, timeoutMs });
     } else {
       // Fallback to direct HTTP if Coordinator not configured
       console.warn('⚠️  Coordinator not configured, using direct HTTP call to Skills Engine');
-      return this._requestDirect(competencyNames, options);
+      return this._requestDirect(competencyNames, { ...options, timeoutMs });
     }
   }
 
@@ -70,7 +71,8 @@ export class SkillsEngineClient {
     const {
       maxRetries = 3,
       retryDelay = 1000,
-      useMockData = false
+      useMockData = false,
+      timeoutMs = 300000 // Default 5 minutes for Skills Engine requests
     } = options;
 
     if (useMockData) {
@@ -93,8 +95,9 @@ export class SkillsEngineClient {
 
         console.log(`📤 Requesting skill breakdown via Coordinator for ${competencyNames.length} competencies (lowest level)`);
         console.log(`   Competencies: ${competencyNames.join(', ')}`);
+        console.log(`   Timeout: ${timeoutMs}ms (${Math.round(timeoutMs / 1000)}s)`);
 
-        const response = await this.coordinatorClient.postFillContentMetrics(coordinatorPayload);
+        const response = await this.coordinatorClient.postFillContentMetrics(coordinatorPayload, { timeoutMs });
 
         // Extract the breakdown from Coordinator response
         // Coordinator response format: { requester_service, payload, response: { answer: <data> } }
