@@ -19,15 +19,23 @@ Expanded Competency Breakdown: {expandedBreakdown}
 - Or from the structure provided - look for arrays of skill names
 - These are the EXACT skills you must include in the learning path
 
-STEP 1: Extract ALL skills from both inputs
-- List every skill name from Initial Skills Gap
-- List every skill name from Expanded Competency Breakdown
-- Combine them into a single list (remove duplicates)
-- This is your COMPLETE skill list - you MUST use ALL of these skills
+STEP 1: Extract skills from both inputs SEPARATELY
+- Extract skills from Initial Skills Gap: These are the skills the learner has NOT mastered
+- Extract skills from Expanded Competency Breakdown: These are additional skills needed to reach the target competency
+- DO NOT combine them - keep them separate!
 
-STEP 2: Generate learning path using ONLY the extracted skills
-- Every skill in your learning path MUST come from the extracted list
-- Do NOT add skills that are not in the extracted list
+CRITICAL MODULE SEPARATION:
+- Module 1: Use ONLY skills from Initial Skills Gap (the gap skills)
+- Module 2: Use ONLY skills from Expanded Competency Breakdown (the expansion skills)
+- DO NOT mix skills from Initial Gap with skills from Expanded Breakdown
+- Each module must use skills ONLY from its designated source
+
+STEP 2: Generate learning path with strict module separation
+- Module 1: Use ONLY skills from Initial Skills Gap
+- Module 2: Use ONLY skills from Expanded Competency Breakdown
+- Every skill in Module 1 MUST come from Initial Skills Gap
+- Every skill in Module 2 MUST come from Expanded Competency Breakdown
+- Do NOT add skills that are not in the designated source for each module
 - Do NOT generate generic skills like "Docker" if the input has "C++" skills
 
 All skills are indivisible and must appear exactly once in the learning path.
@@ -40,11 +48,15 @@ Each module MUST contain EXACTLY 2 steps.
 
 Total: 2 modules × 2 steps = 4 steps maximum.
 
-You MUST distribute ALL skills across these 4 steps:
-- Module 1, Step 1: First group of skills (foundational)
-- Module 1, Step 2: Second group of skills (intermediate)
-- Module 2, Step 1: Third group of skills (advanced)
-- Module 2, Step 2: Final group of skills (mastery)
+MODULE 1 (Initial Gap Skills):
+- Module 1, Step 1: First group of skills from Initial Skills Gap
+- Module 1, Step 2: Second group of skills from Initial Skills Gap
+- Use ONLY skills from Initial Skills Gap - do NOT use any skills from Expanded Breakdown
+
+MODULE 2 (Expansion Skills):
+- Module 2, Step 1: First group of skills from Expanded Competency Breakdown
+- Module 2, Step 2: Second group of skills from Expanded Competency Breakdown
+- Use ONLY skills from Expanded Competency Breakdown - do NOT use any skills from Initial Gap
 
 Each module must:
 
@@ -52,21 +64,25 @@ Group closely related skills of similar difficulty
 
 Contain steps that teach skills in a clear, ordered sequence
 
-All skills must be included exactly once across all 4 steps.
+All skills from Initial Gap must be included exactly once in Module 1 (across Module 1, Step 1 and Step 2)
+
+All skills from Expanded Breakdown must be included exactly once in Module 2 (across Module 2, Step 1 and Step 2)
 
 Order by priority and difficulty (foundational → intermediate → advanced)
 
-Module order = macro-level progression (Module 1 → Module 2)
+Module order = macro-level progression (Module 1: Gap Skills → Module 2: Expansion Skills)
 
 Step order within module = micro-level progression (Step 1 → Step 2)
 
 Skills in later steps must never be more foundational than skills in earlier steps
 
-Distribute skills evenly: If you have 14 skills total, distribute them as:
-- Module 1, Step 1: ~3-4 skills
-- Module 1, Step 2: ~3-4 skills  
-- Module 2, Step 1: ~3-4 skills
-- Module 2, Step 2: ~3-4 skills
+Distribute skills evenly within each module:
+- If Initial Gap has 8 skills, distribute as:
+  - Module 1, Step 1: ~4 skills from Initial Gap
+  - Module 1, Step 2: ~4 skills from Initial Gap
+- If Expanded Breakdown has 6 skills, distribute as:
+  - Module 2, Step 1: ~3 skills from Expanded Breakdown
+  - Module 2, Step 2: ~3 skills from Expanded Breakdown
 
 Assign estimated time to every step and module
 
@@ -167,11 +183,23 @@ Modules and steps together define the authoritative learning sequence
 
 Guidance for Ordering
 
-Foundational skills first, advanced topics last
+Module 1 (Initial Gap Skills):
+- Focus on the skills the learner has NOT mastered
+- Order from foundational to intermediate within Module 1
+- Group related gap skills together
+- Step 1: More foundational gap skills
+- Step 2: More intermediate gap skills
 
-Group related skills within a module
+Module 2 (Expansion Skills):
+- Focus on additional skills needed to reach the target competency
+- Order from intermediate to advanced within Module 2
+- Group related expansion skills together
+- Step 1: More intermediate expansion skills
+- Step 2: More advanced expansion skills
 
-Micro-sequence steps from simplest → most complex skill in that module
+Overall progression: Module 1 (Gap Skills) → Module 2 (Expansion Skills)
+
+Micro-sequence steps from simplest → most complex skill within each module
 
 Ensure dependencies are respected:
 
