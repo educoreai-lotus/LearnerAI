@@ -470,6 +470,27 @@ export class GenerateLearningPathUseCase {
           includeExpansions: true // Explicitly request lowest level skills (expansions competencies)
         });
         console.log(`✅ Skills Engine breakdown received for ${competencies.length} competencies (lowest level skills/expansions)`);
+        
+        // DETAILED LOG: Print the full skills breakdown structure
+        console.log(`📋 [SKILLS BREAKDOWN FROM SKILLS ENGINE]`);
+        console.log(`   Competencies requested: ${competencies.length}`);
+        console.log(`   Competencies: ${JSON.stringify(competencies.map(c => c.name || c.competency_name || c), null, 2)}`);
+        console.log(`   Skills breakdown structure:`);
+        console.log(`   ${JSON.stringify(skillBreakdown, null, 2)}`);
+        
+        // Log breakdown summary by competency
+        if (skillBreakdown && typeof skillBreakdown === 'object') {
+          Object.keys(skillBreakdown).forEach(competencyName => {
+            const skills = skillBreakdown[competencyName];
+            const skillCount = Array.isArray(skills) ? skills.length : (typeof skills === 'object' ? Object.keys(skills).length : 0);
+            console.log(`   - ${competencyName}: ${skillCount} skills`);
+            if (Array.isArray(skills) && skills.length > 0) {
+              // Show first few skills as sample
+              const sampleSkills = skills.slice(0, 5).map(s => typeof s === 'string' ? s : (s.skill_name || s.name || JSON.stringify(s)));
+              console.log(`     Sample skills: ${sampleSkills.join(', ')}${skills.length > 5 ? '...' : ''}`);
+            }
+          });
+        }
       } catch (error) {
         console.error(`❌ Skills Engine request failed: ${error.message}`);
         // SkillsEngineClient already falls back to mock data, but log the error
@@ -479,13 +500,25 @@ export class GenerateLearningPathUseCase {
           includeExpansions: true // Still request expansions even in mock mode
         });
         console.warn(`⚠️ Using mock skill breakdown due to Skills Engine failure`);
+        console.log(`📋 [MOCK SKILLS BREAKDOWN]`);
+        console.log(`   ${JSON.stringify(skillBreakdown, null, 2)}`);
       }
 
       // Normalize skill breakdown: Extract only skill names, ignore skill_id if present
       // Skills Engine may send skills as objects with skill_id and skill_name
       if (skillBreakdown) {
+        const breakdownBeforeNormalization = JSON.parse(JSON.stringify(skillBreakdown)); // Deep copy for logging
         skillBreakdown = this._normalizeSkillBreakdown(skillBreakdown);
         console.log(`✅ Normalized skill breakdown: extracted skill names (removed skill_id if present)`);
+        
+        // DETAILED LOG: Print normalized breakdown
+        console.log(`📋 [NORMALIZED SKILLS BREAKDOWN]`);
+        console.log(`   ${JSON.stringify(skillBreakdown, null, 2)}`);
+        
+        // Log comparison if structure changed
+        if (JSON.stringify(breakdownBeforeNormalization) !== JSON.stringify(skillBreakdown)) {
+          console.log(`   ⚠️ Breakdown structure changed during normalization`);
+        }
       }
 
       // In update mode: Filter skill breakdown and competencies to only include remaining skills
