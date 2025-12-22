@@ -99,6 +99,12 @@ export class SkillsEngineClient {
 
         const response = await this.coordinatorClient.postFillContentMetrics(coordinatorPayload, { timeoutMs });
 
+        // DEBUG: Log full response structure to understand Coordinator format
+        console.log(`🔍 [COORDINATOR RESPONSE DEBUG]`);
+        console.log(`   Response type: ${typeof response}`);
+        console.log(`   Response keys: ${response && typeof response === 'object' ? Object.keys(response).join(', ') : 'N/A'}`);
+        console.log(`   Full response: ${JSON.stringify(response, null, 2).substring(0, 1000)}`);
+
         // Extract the breakdown from Coordinator response
         // Coordinator response format: { requester_service, payload, response: { answer: <data> } }
         let breakdown = null;
@@ -108,25 +114,69 @@ export class SkillsEngineClient {
           // Coordinator returns data in response.answer
           const answerData = response.response.answer;
           breakdown = typeof answerData === 'string' ? JSON.parse(answerData) : answerData;
+          console.log(`   ✅ Found breakdown in response.response.answer`);
         } else if (response && response.data) {
           breakdown = response.data;
+          console.log(`   ✅ Found breakdown in response.data`);
         } else if (response && response.payload) {
-          // If Coordinator returns stringified payload, parse it
-          try {
-            breakdown = typeof response.payload === 'string' ? JSON.parse(response.payload) : response.payload;
-          } catch (e) {
-            breakdown = response.payload;
+          // Check if payload is the request (has action/description) or the actual breakdown
+          const payloadData = typeof response.payload === 'string' ? JSON.parse(response.payload) : response.payload;
+          
+          // If payload has 'action' or 'description', it's the request, not the breakdown
+          if (payloadData && (payloadData.action || payloadData.description)) {
+            console.warn(`   ⚠️ Response.payload contains request data, not breakdown. Looking for breakdown elsewhere...`);
+            // Try to find breakdown in other fields
+            if (response.response && response.response.data) {
+              breakdown = typeof response.response.data === 'string' ? JSON.parse(response.response.data) : response.response.data;
+              console.log(`   ✅ Found breakdown in response.response.data`);
+            } else {
+              // Last resort: check if response itself is the breakdown (object with competency keys, no action/description)
+              const responseKeys = Object.keys(response);
+              const hasCompetencyStructure = responseKeys.some(key => 
+                Array.isArray(response[key]) && response[key].length > 0 && typeof response[key][0] === 'string'
+              );
+              if (hasCompetencyStructure && !response.action && !response.description) {
+                breakdown = response;
+                console.log(`   ✅ Using response directly as breakdown (has competency structure)`);
+              } else {
+                throw new Error(`Response payload contains request data, not breakdown. Full response: ${JSON.stringify(response).substring(0, 500)}`);
+              }
+            }
+          } else {
+            // Payload is the breakdown
+            breakdown = payloadData;
+            console.log(`   ✅ Found breakdown in response.payload`);
           }
         } else if (response && typeof response === 'object' && !Array.isArray(response)) {
-          // Response might be the breakdown directly (object with competency keys)
-          breakdown = response;
+          // Check if response itself is the breakdown (object with competency keys, no action/description)
+          const hasActionOrDescription = response.action || response.description;
+          const hasCompetencyStructure = Object.keys(response).some(key => 
+            Array.isArray(response[key]) && response[key].length > 0 && typeof response[key][0] === 'string'
+          );
+          
+          if (!hasActionOrDescription && hasCompetencyStructure) {
+            breakdown = response;
+            console.log(`   ✅ Using response directly as breakdown (has competency structure, no action/description)`);
+          } else if (hasActionOrDescription) {
+            throw new Error(`Response contains request data (action/description), not breakdown. Full response: ${JSON.stringify(response).substring(0, 500)}`);
+          }
         }
 
         if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
-          console.log(`✅ Skills Engine returned breakdown via Coordinator for ${Object.keys(breakdown).length} competencies`);
-          return breakdown;
+          // Validate breakdown structure: should have competency names as keys with arrays of skills
+          const breakdownKeys = Object.keys(breakdown);
+          const isValidBreakdown = breakdownKeys.some(key => 
+            Array.isArray(breakdown[key]) && breakdown[key].length > 0
+          );
+          
+          if (isValidBreakdown) {
+            console.log(`✅ Skills Engine returned breakdown via Coordinator for ${breakdownKeys.length} competencies`);
+            return breakdown;
+          } else {
+            throw new Error(`Invalid breakdown structure: keys don't contain skill arrays. Keys: ${breakdownKeys.join(', ')}`);
+          }
         } else {
-          throw new Error(`Invalid response format from Coordinator: ${JSON.stringify(response).substring(0, 200)}`);
+          throw new Error(`Invalid response format from Coordinator: ${JSON.stringify(response).substring(0, 500)}`);
         }
       } catch (error) {
         lastError = error;
