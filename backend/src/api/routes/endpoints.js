@@ -1032,7 +1032,13 @@ async function directoryHandler(payload, dependencies) {
     } = normalizedPayload;
     
     // Use approval_policy or decision_maker_policy (both are valid)
-    const finalApprovalPolicy = approval_policy || decision_maker_policy;
+    let finalApprovalPolicy = approval_policy || decision_maker_policy;
+    
+    // If decision_maker is null/empty and policy is manual, automatically change to auto
+    if ((!decision_maker || decision_maker === null || (typeof decision_maker === 'object' && Object.keys(decision_maker).length === 0)) && finalApprovalPolicy === 'manual') {
+      console.log(`⚠️  Decision maker is null but approval_policy is "manual". Automatically changing to "auto".`);
+      finalApprovalPolicy = 'auto';
+    }
     
     if (!company_id || !company_name || !finalApprovalPolicy) {
       throw new Error('Missing required fields: company_id, company_name, approval_policy (or decision_maker_policy)');
