@@ -135,11 +135,60 @@ export class SkillsEngineClient {
             if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
               // PRIORITY 1: If it has 'data' field (Coordinator result format), use that
               // This is the most common case - Coordinator wraps Skills Engine response
-              if (breakdown.data && typeof breakdown.data === 'object') {
-                console.log(`   🔍 Found nested 'data' field (Coordinator result format), extracting breakdown from data`);
-                const extractedData = breakdown.data;
-                console.log(`   Extracted data keys: ${Object.keys(extractedData).join(', ')}`);
-                breakdown = extractedData;
+              if (breakdown.data) {
+                let extractedData = breakdown.data;
+                
+                // Handle if data is a string (might be double-stringified)
+                if (typeof extractedData === 'string') {
+                  try {
+                    extractedData = JSON.parse(extractedData);
+                    console.log(`   🔍 Parsed stringified data field`);
+                  } catch (e) {
+                    console.warn(`   ⚠️ Failed to parse stringified data: ${e.message}`);
+                  }
+                }
+                
+                if (extractedData && typeof extractedData === 'object') {
+                  console.log(`   🔍 Found nested 'data' field (Coordinator result format), extracting breakdown from data`);
+                  console.log(`   Extracted data type: ${typeof extractedData}`);
+                  console.log(`   Extracted data keys: ${Object.keys(extractedData).join(', ')}`);
+                  
+                  // Check if data itself contains the breakdown or if breakdown is nested deeper
+                  // Skills Engine might return: { data: { breakdown: {...} } } or { data: { skillBreakdown: {...} } }
+                  if (extractedData.breakdown) {
+                    const breakdownData = typeof extractedData.breakdown === 'string' ? JSON.parse(extractedData.breakdown) : extractedData.breakdown;
+                    if (breakdownData && typeof breakdownData === 'object') {
+                      console.log(`   🔍 Found data.breakdown, extracting from there`);
+                      breakdown = breakdownData;
+                    }
+                  } else if (extractedData.skillBreakdown) {
+                    const skillBreakdownData = typeof extractedData.skillBreakdown === 'string' ? JSON.parse(extractedData.skillBreakdown) : extractedData.skillBreakdown;
+                    if (skillBreakdownData && typeof skillBreakdownData === 'object') {
+                      console.log(`   🔍 Found data.skillBreakdown, extracting from there`);
+                      breakdown = skillBreakdownData;
+                    }
+                  } else if (extractedData.data) {
+                    const nestedData = typeof extractedData.data === 'string' ? JSON.parse(extractedData.data) : extractedData.data;
+                    if (nestedData && typeof nestedData === 'object') {
+                      console.log(`   🔍 Found data.data, extracting from there`);
+                      breakdown = nestedData;
+                    }
+                  } else {
+                    // Check if extractedData itself is the breakdown (has competency keys with arrays)
+                    const extractedKeys = Object.keys(extractedData);
+                    const hasCompetencyStructure = extractedKeys.some(key => 
+                      Array.isArray(extractedData[key]) && extractedData[key].length > 0
+                    );
+                    if (hasCompetencyStructure) {
+                      console.log(`   ✅ Extracted data is the breakdown (has competency structure)`);
+                      breakdown = extractedData;
+                    } else {
+                      console.warn(`   ⚠️ Extracted data doesn't have competency structure. Keys: ${extractedKeys.join(', ')}`);
+                      console.warn(`   Full extracted data preview: ${JSON.stringify(extractedData).substring(0, 500)}`);
+                      breakdown = extractedData; // Use it anyway, validation will catch if wrong
+                    }
+                  }
+                }
               }
               // PRIORITY 2: Check if breakdown itself is the skills breakdown (has competency keys with arrays)
               // This happens if Skills Engine returns breakdown directly without Coordinator wrapper
