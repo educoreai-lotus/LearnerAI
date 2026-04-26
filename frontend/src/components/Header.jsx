@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useApp } from '../context/AppContext';
+import { logout } from '../auth/logout';
 
 /**
  * Header Component
@@ -14,6 +15,17 @@ export default function Header() {
   const [logoUrl, setLogoUrl] = useState(null);
   const [logoError, setLogoError] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [logoutBusy, setLogoutBusy] = useState(false);
+
+  const handleLogout = async () => {
+    if (logoutBusy) return;
+    setLogoutBusy(true);
+    try {
+      await logout();
+    } finally {
+      setLogoutBusy(false);
+    }
+  };
 
   // Get API base URL
   const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:5000';
@@ -137,8 +149,21 @@ export default function Header() {
             </nav>
           </div>
 
-          {/* Right Side - Notifications, User, Theme Toggle */}
-          <div className="flex items-center gap-6">
+          {/* Right Side - Logout, Notifications, User, Theme Toggle */}
+          <div className="flex items-center gap-4 sm:gap-6">
+            <button
+              type="button"
+              onClick={handleLogout}
+              disabled={logoutBusy}
+              className={`hidden sm:inline-flex px-3 py-2 rounded-lg text-sm font-medium transition-all duration-300 ease-in-out border ${
+                isDayMode
+                  ? 'border-gray-300 text-gray-700 hover:bg-emerald-50 hover:text-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed'
+                  : 'border-gray-600 text-gray-200 hover:bg-emerald-900/20 hover:text-emerald-300 disabled:opacity-50 disabled:cursor-not-allowed'
+              }`}
+            >
+              {logoutBusy ? 'Logging out...' : 'Logout'}
+            </button>
+
             {/* Notification Button */}
             <button
               onClick={() => navigate('/notifications')}
@@ -306,6 +331,18 @@ export default function Header() {
         } shadow-lg backdrop-blur-md`}
       >
         <div className="max-w-7xl mx-auto px-4 py-4">
+          <button
+            type="button"
+            onClick={handleLogout}
+            disabled={logoutBusy}
+            className={`w-full mb-3 px-4 py-3 rounded-lg font-medium text-left transition-all duration-300 ease-in-out border ${
+              isDayMode
+                ? 'border-gray-300 text-gray-700 hover:bg-emerald-50 disabled:opacity-50 disabled:cursor-not-allowed'
+                : 'border-gray-600 text-gray-200 hover:bg-emerald-900/20 disabled:opacity-50 disabled:cursor-not-allowed'
+            }`}
+          >
+            {logoutBusy ? 'Logging out...' : 'Logout'}
+          </button>
           <nav className="flex flex-col gap-2">
             {navItems.map((item) => {
               const isActive = isActiveRoute(item.path);
