@@ -19,6 +19,18 @@ class ApiService {
     }
   }
 
+  storeRotatedToken(token) {
+    if (!token || typeof token !== 'string') {
+      return;
+    }
+    try {
+      localStorage.setItem('token', token);
+      localStorage.setItem('authToken', token);
+    } catch (error) {
+      // Keep request flow resilient if localStorage is unavailable.
+    }
+  }
+
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
     const token = this.getStoredToken();
@@ -37,15 +49,40 @@ class ApiService {
 
     try {
       const response = await fetch(url, config);
-      const data = await response.json();
+      const rotatedToken = response.headers.get('X-New-Access-Token');
+      if (rotatedToken) {
+        this.storeRotatedToken(rotatedToken);
+      }
+
+      const text = await response.text();
+      let data = null;
+      if (text) {
+        try {
+          data = JSON.parse(text);
+        } catch {
+          data = { message: text };
+        }
+      } else {
+        data = {};
+      }
 
       if (!response.ok) {
-        throw new Error(data.message || `API Error: ${response.status}`);
+        const message =
+          data?.error ||
+          data?.message ||
+          `Request failed with status ${response.status}`;
+        const err = new Error(message);
+        err.status = response.status;
+        err.data = data;
+        throw err;
       }
 
       return data;
     } catch (error) {
-      console.error('API Request failed:', error);
+      if (error && typeof error.status === 'number') {
+        throw error;
+      }
+      console.error('API Request failed:', error?.message || error);
       throw error;
     }
   }
@@ -159,10 +196,8 @@ class ApiService {
 
   // Authentication
   async validateToken(token) {
-    return this.request('/auth/validate-token', {
-      method: 'POST',
-      body: { token },
-    });
+    // Legacy no-op kept for compatibility while auth is enforced server-side per request.
+    return { valid: !!token };
   }
 }
 

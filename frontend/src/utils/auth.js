@@ -118,25 +118,9 @@ export async function initializeAuthFromUrl() {
     return null;
   }
 
-  // If token is provided, optionally validate it (but don't require it)
-  let validatedUserInfo = null;
-  if (urlParams.token) {
-    try {
-      const api = (await import('../services/api')).default;
-      try {
-        validatedUserInfo = await api.validateToken(urlParams.token);
-      } catch (validationError) {
-        // Token validation is optional - continue without it
-        console.log('Token validation skipped (optional):', validationError.message);
-      }
-    } catch (error) {
-      console.log('Token validation not available (optional):', error.message);
-    }
-  }
-
-  // Infer role from path if not provided in URL params or validated info
+  // Infer role from path if not provided in URL params
   let inferredRole = null;
-  if (!validatedUserInfo?.role && !urlParams.role) {
+  if (!urlParams.role) {
     const path = window.location.pathname;
     if (path.startsWith('/company')) {
       inferredRole = 'company';
@@ -147,12 +131,13 @@ export async function initializeAuthFromUrl() {
     }
   }
 
-  // Use validated info if available, otherwise use URL params directly
+  // Use URL params directly for user bootstrap.
+  // Token validity is enforced by backend middleware on protected API routes.
   const user = {
-    id: validatedUserInfo?.user_id || urlParams.user_id || urlParams.company_id,
-    company_id: validatedUserInfo?.company_id || urlParams.company_id,
-    role: validatedUserInfo?.role || urlParams.role || inferredRole || 'learner',
-    tenantId: validatedUserInfo?.company_id || urlParams.company_id,
+    id: urlParams.user_id || urlParams.company_id,
+    company_id: urlParams.company_id,
+    role: urlParams.role || inferredRole || 'learner',
+    tenantId: urlParams.company_id,
   };
 
   // Store user info (token is optional - can be null)

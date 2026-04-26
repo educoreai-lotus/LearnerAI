@@ -36,6 +36,25 @@ export default function UserView() {
   const [learningPath, setLearningPath] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pathLoading, setPathLoading] = useState(false);
+  const [authError, setAuthError] = useState(null);
+  const [coursesRefreshPending, setCoursesRefreshPending] = useState(false);
+
+  const AUTH_MESSAGE_401 =
+    'You are not authenticated. Please return to EduCore and open Learning Path again.';
+  const AUTH_MESSAGE_403 =
+    "You do not have permission to view this user's learning path.";
+
+  const applyAuthFailure = (status) => {
+    if (status === 401) {
+      setAuthError(AUTH_MESSAGE_401);
+    } else if (status === 403) {
+      setAuthError(AUTH_MESSAGE_403);
+    }
+    setCourses([]);
+    setSelectedCourse(null);
+    setLearningPath(null);
+    setPathLoading(false);
+  };
 
   // Update userId when auth changes (check after auth initialization completes)
   useEffect(() => {
@@ -70,9 +89,15 @@ export default function UserView() {
     loadUserData();
   }, [userId]);
 
-  const loadUserData = async () => {
+  const loadUserData = async (opts = {}) => {
+    const soft = !!opts.soft;
     try {
-      setLoading(true);
+      if (soft) {
+        setCoursesRefreshPending(true);
+      } else {
+        setLoading(true);
+        setAuthError(null);
+      }
       const response = await api.getCoursesByUser(userId);
       const coursesData = response.courses || [];
       
@@ -94,7 +119,8 @@ export default function UserView() {
       });
       
       setCourses(Array.from(courseMap.values()));
-      
+      setAuthError(null);
+
       if (coursesData.length > 0 && !selectedCourse) {
         const firstCourse = coursesData[0].competency_target_name || coursesData[0].competencyTargetName;
         if (firstCourse) {
@@ -103,9 +129,14 @@ export default function UserView() {
         }
       }
     } catch (error) {
-      console.error('Failed to load user data:', error);
+      if (error?.status === 401 || error?.status === 403) {
+        applyAuthFailure(error.status);
+      } else {
+        console.error('Failed to load user data:', error);
+      }
     } finally {
       setLoading(false);
+      setCoursesRefreshPending(false);
     }
   };
 
@@ -224,8 +255,12 @@ export default function UserView() {
         setLearningPath(null);
       }
     } catch (error) {
-      console.error('Failed to load learning path:', error);
-      setLearningPath(null);
+      if (error?.status === 401 || error?.status === 403) {
+        applyAuthFailure(error.status);
+      } else {
+        console.error('Failed to load learning path:', error);
+        setLearningPath(null);
+      }
     } finally {
       setPathLoading(false);
     }
@@ -264,105 +299,130 @@ export default function UserView() {
             </p>
           </div>
 
-          {/* Course Selection */}
-          <Card className="mb-8">
-            <div className="flex items-center space-x-4">
-              <label htmlFor="course-select" className="text-neutral-900 dark:text-neutral-50 font-medium">
-                Select Course:
-              </label>
-              <select
-                id="course-select"
-                value={selectedCourse || ''}
-                onChange={(e) => handleCourseChange(e.target.value)}
-                className="flex-1 px-4 py-3 rounded-input bg-white dark:bg-slate-800 border border-neutral-300 dark:border-neutral-600 text-neutral-900 dark:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-700 dark:focus:ring-primary-400 focus:border-transparent transition-all duration-fast"
-              >
-                <option value="">-- Select a course --</option>
-                {courses.map((course) => (
-                  <option key={course.id} value={course.id}>
-                    {course.name}
-                  </option>
-                ))}
-              </select>
-              <PrimaryButton onClick={() => loadUserData()}>
-                Refresh
-              </PrimaryButton>
-            </div>
-          </Card>
-
-          {/* Learning Path Timeline */}
-          {selectedCourse && (
-            <Card>
-              {pathLoading ? (
-                <div className="py-12 flex items-center justify-center">
-                  <LoadingSpinner size="lg" />
-                </div>
-              ) : learningPath ? (
-                <>
-                  <div className="mb-6 pb-4 border-b border-neutral-200 dark:border-neutral-700">
-                    <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
-                      {learningPath.pathTitle || 'Learning Path'}
-                    </h2>
-                    
-                    {/* Path Goal */}
-                    {learningPath.pathGoal && (
-                      <p className="text-base font-medium text-primary-700 dark:text-primary-400 mb-2">
-                        {learningPath.pathGoal}
-                      </p>
-                    )}
-                    
-                    {/* Path Description */}
-                    {learningPath.pathDescription && (
-                      <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 leading-relaxed">
-                        {learningPath.pathDescription}
-                      </p>
-                    )}
-                    
-                    <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
-                      {learningPath.totalDurationHours && (
-                        <span>
-                          <strong>Total Duration:</strong> {learningPath.totalDurationHours} hours
-                        </span>
-                      )}
-                      {learningPath.estimatedCompletion && (
-                        <span>
-                          <strong>Estimated Completion:</strong> {learningPath.estimatedCompletion}
-                        </span>
-                      )}
-                      {learningPath.approved !== undefined && (
-                        <span className={`px-2 py-1 rounded text-xs ${
-                          learningPath.approved 
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400' 
-                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
-                        }`}>
-                          {learningPath.approved ? 'Approved' : 'Pending Approval'}
-                        </span>
-                      )}
-                    </div>
-                  </div>
-                  <LearningPathTimeline path={learningPath} />
-                </>
-              ) : (
-                <div className="text-center py-12 text-neutral-500 dark:text-neutral-500">
-                  <p>No learning path available for this course.</p>
+          {authError ? (
+            <Card className="border-2 border-red-300 dark:border-red-800 bg-red-50 dark:bg-red-950/40">
+              <div className="py-6 px-2 sm:px-4">
+                <h2 className="text-lg font-semibold text-red-800 dark:text-red-200 mb-2">
+                  Unable to load learning paths
+                </h2>
+                <p className="text-red-900 dark:text-red-100 leading-relaxed">{authError}</p>
+                <div className="mt-4">
                   <PrimaryButton
-                    variant="primary"
-                    className="mt-4"
-                    onClick={() => {
-                      // TODO: Trigger path generation
-                      alert('Path generation feature coming soon!');
-                    }}
+                    disabled={coursesRefreshPending}
+                    onClick={() => loadUserData({ soft: true })}
                   >
-                    Generate Learning Path
+                    Try again
                   </PrimaryButton>
                 </div>
-              )}
+              </div>
             </Card>
-          )}
+          ) : (
+            <>
+              {/* Course Selection */}
+              <Card className="mb-8">
+                <div className="flex items-center space-x-4">
+                  <label htmlFor="course-select" className="text-neutral-900 dark:text-neutral-50 font-medium">
+                    Select Course:
+                  </label>
+                  <select
+                    id="course-select"
+                    value={selectedCourse || ''}
+                    onChange={(e) => handleCourseChange(e.target.value)}
+                    className="flex-1 px-4 py-3 rounded-input bg-white dark:bg-slate-800 border border-neutral-300 dark:border-neutral-600 text-neutral-900 dark:text-neutral-50 focus:outline-none focus:ring-2 focus:ring-primary-700 dark:focus:ring-primary-400 focus:border-transparent transition-all duration-fast"
+                  >
+                    <option value="">-- Select a course --</option>
+                    {courses.map((course) => (
+                      <option key={course.id} value={course.id}>
+                        {course.name}
+                      </option>
+                    ))}
+                  </select>
+                  <PrimaryButton disabled={coursesRefreshPending} onClick={() => loadUserData()}>
+                    Refresh
+                  </PrimaryButton>
+                </div>
+              </Card>
 
-          {!selectedCourse && (
-            <Card className="text-center py-12">
-              <p className="text-neutral-500 dark:text-neutral-500">Please select a course to view your learning path</p>
-            </Card>
+              {/* Learning Path Timeline */}
+              {selectedCourse && (
+                <Card>
+                  {pathLoading ? (
+                    <div className="py-12 flex items-center justify-center">
+                      <LoadingSpinner size="lg" />
+                    </div>
+                  ) : learningPath ? (
+                    <>
+                      <div className="mb-6 pb-4 border-b border-neutral-200 dark:border-neutral-700">
+                        <h2 className="text-2xl font-bold text-neutral-900 dark:text-neutral-50 mb-2">
+                          {learningPath.pathTitle || 'Learning Path'}
+                        </h2>
+
+                        {/* Path Goal */}
+                        {learningPath.pathGoal && (
+                          <p className="text-base font-medium text-primary-700 dark:text-primary-400 mb-2">
+                            {learningPath.pathGoal}
+                          </p>
+                        )}
+
+                        {/* Path Description */}
+                        {learningPath.pathDescription && (
+                          <p className="text-sm text-neutral-600 dark:text-neutral-400 mb-4 leading-relaxed">
+                            {learningPath.pathDescription}
+                          </p>
+                        )}
+
+                        <div className="flex flex-wrap items-center gap-4 text-sm text-neutral-600 dark:text-neutral-400">
+                          {learningPath.totalDurationHours && (
+                            <span>
+                              <strong>Total Duration:</strong> {learningPath.totalDurationHours} hours
+                            </span>
+                          )}
+                          {learningPath.estimatedCompletion && (
+                            <span>
+                              <strong>Estimated Completion:</strong> {learningPath.estimatedCompletion}
+                            </span>
+                          )}
+                          {learningPath.approved !== undefined && (
+                            <span
+                              className={`px-2 py-1 rounded text-xs ${
+                                learningPath.approved
+                                  ? 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-400'
+                                  : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-400'
+                              }`}
+                            >
+                              {learningPath.approved ? 'Approved' : 'Pending Approval'}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <LearningPathTimeline path={learningPath} />
+                    </>
+                  ) : (
+                    <div className="text-center py-12 text-neutral-500 dark:text-neutral-500">
+                      <p>No learning path available for this course.</p>
+                      <PrimaryButton
+                        variant="primary"
+                        className="mt-4"
+                        onClick={() => {
+                          // TODO: Trigger path generation
+                          alert('Path generation feature coming soon!');
+                        }}
+                      >
+                        Generate Learning Path
+                      </PrimaryButton>
+                    </div>
+                  )}
+                </Card>
+              )}
+
+              {!selectedCourse && (
+                <Card className="text-center py-12">
+                  <p className="text-neutral-500 dark:text-neutral-500">
+                    Please select a course to view your learning path
+                  </p>
+                </Card>
+              )}
+            </>
           )}
         </div>
       </main>
