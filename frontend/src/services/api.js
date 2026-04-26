@@ -11,11 +11,21 @@ class ApiService {
     this.baseUrl = `${API_URL}/api/${API_VERSION}`;
   }
 
+  getStoredToken() {
+    try {
+      return localStorage.getItem('token') || localStorage.getItem('authToken');
+    } catch (error) {
+      return null;
+    }
+  }
+
   async request(endpoint, options = {}) {
     const url = `${this.baseUrl}${endpoint}`;
+    const token = this.getStoredToken();
     const config = {
       headers: {
         'Content-Type': 'application/json',
+        ...(token ? { Authorization: `Bearer ${token}` } : {}),
         ...options.headers,
       },
       ...options,

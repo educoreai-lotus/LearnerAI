@@ -57,6 +57,7 @@ export function setAuth(user, token) {
     }
     if (token) {
       localStorage.setItem('token', token);
+      localStorage.setItem('authToken', token);
     }
   } catch (error) {
     console.error('Failed to save auth to localStorage:', error);
@@ -92,11 +93,14 @@ export function isAuthenticated() {
  */
 export function getUrlParams() {
   const params = new URLSearchParams(window.location.search);
+  const accessToken = params.get('access_token');
+  const legacyToken = params.get('token');
   return {
     user_id: params.get('user_id'),
     company_id: params.get('company_id'),
     role: params.get('role'),
-    token: params.get('token'),
+    access_token: accessToken,
+    token: accessToken || legacyToken,
   };
 }
 
@@ -155,12 +159,13 @@ export async function initializeAuthFromUrl() {
   setAuth(user, urlParams.token || null);
   
   // Keep user_id / company_id visible in the URL (Directory-style deep links).
-  // Only strip sensitive params like token to avoid leaking it in the browser history.
+  // Only strip sensitive params like tokens to avoid leaking them in browser history.
   try {
     const url = new URL(window.location.href);
     const params = url.searchParams;
-    if (params.has('token')) {
+    if (params.has('token') || params.has('access_token')) {
       params.delete('token');
+      params.delete('access_token');
       // Note: keep role/user_id/company_id so the URL remains shareable and debuggable
       const next = `${url.pathname}${params.toString() ? `?${params.toString()}` : ''}${url.hash || ''}`;
       window.history.replaceState({}, '', next);
