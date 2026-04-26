@@ -1,4 +1,6 @@
 import express from 'express';
+import { createAuthenticate } from '../../middleware/auth.js';
+import { requireSelfUser } from '../../middleware/authorization.js';
 
 const router = express.Router();
 
@@ -6,7 +8,8 @@ const router = express.Router();
  * Initialize routes with dependencies
  */
 export function createCoursesRouter(dependencies) {
-  const { courseRepository } = dependencies;
+  const { courseRepository, coordinatorClient } = dependencies;
+  const authenticate = createAuthenticate({ coordinatorClient });
 
   /**
    * GET /api/v1/courses
@@ -95,7 +98,7 @@ export function createCoursesRouter(dependencies) {
    * GET /api/v1/courses/user/:userId
    * Get all courses by user_id
    */
-  router.get('/user/:userId', async (req, res) => {
+  router.get('/user/:userId', authenticate, requireSelfUser('userId'), async (req, res) => {
     try {
       const { userId } = req.params;
       const courses = await courseRepository.getCoursesByUser(userId);

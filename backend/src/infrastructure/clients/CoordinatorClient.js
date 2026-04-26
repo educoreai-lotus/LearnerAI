@@ -69,6 +69,14 @@ export class CoordinatorClient {
   }
 
   async postFillContentMetrics(body, options = {}) {
+    return this._postSignedJson('/api/fill-content-metrics', body, options);
+  }
+
+  async postRequest(body, options = {}) {
+    return this._postSignedJson('/request', body, options);
+  }
+
+  async _postSignedJson(pathname, body, options = {}) {
     if (!this.baseUrl) {
       throw new Error('COORDINATOR_URL is not set');
     }
@@ -83,7 +91,8 @@ export class CoordinatorClient {
     }
 
     const signature = generateSignature(this.serviceName, this.privateKeyPem, body);
-    const url = `${this.baseUrl}/api/fill-content-metrics`;
+    const normalizedPath = String(pathname || '').startsWith('/') ? pathname : `/${pathname || ''}`;
+    const url = `${this.baseUrl}${normalizedPath}`;
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
