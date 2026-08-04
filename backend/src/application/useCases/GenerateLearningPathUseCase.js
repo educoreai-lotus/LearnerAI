@@ -660,26 +660,30 @@ export class GenerateLearningPathUseCase {
           }
         : skillsGap.toJSON(); // Fallback if skillsRawData not available (backward compatibility)
       
-      // Extract skills explicitly to make it clearer for the AI
+      // Extract skills explicitly to aid Prompt 3 (reference prompt combines ALL skills across 2×2)
       const initialSkills = this._extractSkillsFromInitialGap(initialGapForPrompt3);
       const expandedSkills = this._extractSkillsFromExpandedBreakdown(expandedBreakdownForPrompt3);
+      const combinedSkills = [...new Set([...initialSkills, ...expandedSkills])];
       
       // DEBUG: Log extracted skills
-      console.log(`📋 [EXTRACTED SKILLS FOR PROMPT 3]`);
+      console.log(`📋 [REFERENCE PROMPT PIPELINE DEBUG] EXTRACTED SKILLS FOR PROMPT 3`);
       console.log(`   Initial Gap Skills (${initialSkills.length}): ${initialSkills.join(', ')}`);
       console.log(`   Expanded Breakdown Skills (${expandedSkills.length}): ${expandedSkills.join(', ')}`);
+      console.log(`   Combined unique skills (${combinedSkills.length}): ${combinedSkills.join(', ')}`);
       
-      // Add explicit skill lists to make it crystal clear for the AI
+      // Explicit skill lists for the model — do NOT inject module-by-source separation.
+      // Reference Prompt 3 owns pedagogical ordering: combine all input skills across 2 modules × 2 steps.
       const initialGapWithSkills = {
         ...initialGapForPrompt3,
-        EXTRACTED_SKILLS: initialSkills, // Explicit list of skills to use
-        INSTRUCTION: `You MUST use ONLY these ${initialSkills.length} skills from Initial Skills Gap: ${initialSkills.join(', ')}`
+        EXTRACTED_SKILLS: initialSkills,
+        INSTRUCTION: `Initial Skills Gap skills (${initialSkills.length}): ${initialSkills.join(', ') || '(none)'}. These are part of the COMPLETE skill set. Combine them with Expanded Breakdown skills and distribute ALL skills across exactly 2 modules × 2 steps as specified in the prompt. Do not invent skills.`
       };
       
       const expandedBreakdownWithSkills = {
         ...expandedBreakdownForPrompt3,
-        EXTRACTED_SKILLS: expandedSkills, // Explicit list of skills to use
-        INSTRUCTION: `You MUST use ONLY these ${expandedSkills.length} skills from Expanded Breakdown: ${expandedSkills.join(', ')}`
+        EXTRACTED_SKILLS: expandedSkills,
+        COMPLETE_COMBINED_SKILL_LIST: combinedSkills,
+        INSTRUCTION: `Expanded Breakdown skills (${expandedSkills.length}): ${expandedSkills.join(', ') || '(none)'}. COMPLETE combined skill list (${combinedSkills.length}): ${combinedSkills.join(', ') || '(none)'}. Use ONLY skills from the inputs. Combine Initial Gap + Expanded Breakdown into one pedagogical sequence across exactly 2 modules × 2 steps. Do NOT reserve Module 1 exclusively for gap skills or Module 2 exclusively for expansion skills — follow the prompt's combined ordering rules.`
       };
       
       let fullPrompt3 = prompt3
@@ -1028,61 +1032,30 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
-   * Extract skills from initial gap structure
+   * Extract skills from initial gap structure for Prompt 3.
+   * Uses _extractSkillNamesFromGap for current/legacy gap shapes; keeps root micro/nano fallbacks.
    * @private
    */
   _extractSkillsFromInitialGap(initialGap) {
+    if (!initialGap || typeof initialGap !== 'object') {
+      return [];
+    }
+
     const skills = [];
-    
-    // Helper function to extract skills from a competency map structure
-    const extractFromCompetencyMap = (competencyMap) => {
-      if (!competencyMap || typeof competencyMap !== 'object') return;
-      
-      // Check if it's a competency map (object with competency names as keys, arrays as values)
-      const isCompetencyMap = Object.values(competencyMap).every(value => 
-        Array.isArray(value) || typeof value === 'string'
-      );
-      
-      if (isCompetencyMap) {
-        Object.values(competencyMap).forEach(skillArray => {
-          if (Array.isArray(skillArray)) {
-            skills.push(...skillArray);
-          } else if (typeof skillArray === 'string') {
-            skills.push(skillArray);
-          }
-        });
-      }
-    };
-    
-    // Try to extract from skills_raw_data directly (if it's a competency map)
+
     if (initialGap.skills_raw_data) {
-      extractFromCompetencyMap(initialGap.skills_raw_data);
+      skills.push(...this._extractSkillNamesFromGap(initialGap.skills_raw_data));
+      if (initialGap.skills_raw_data.gap) {
+        skills.push(...this._extractSkillNamesFromGap(initialGap.skills_raw_data.gap));
+      }
+    } else {
+      skills.push(...this._extractSkillNamesFromGap(initialGap));
+      if (initialGap.gap) {
+        skills.push(...this._extractSkillNamesFromGap(initialGap.gap));
+      }
     }
-    
-    // Try to extract from skills_raw_data.gap (if gap is a competency map)
-    if (initialGap.skills_raw_data?.gap) {
-      extractFromCompetencyMap(initialGap.skills_raw_data.gap);
-    }
-    
-    // Try to extract from skills_raw_data.gap.missing_skills_map
-    if (initialGap.skills_raw_data?.gap?.missing_skills_map) {
-      const missingSkillsMap = initialGap.skills_raw_data.gap.missing_skills_map;
-      extractFromCompetencyMap(missingSkillsMap);
-    }
-    
-    // Try to extract from gap directly (if gap is a competency map)
-    if (initialGap.gap) {
-      extractFromCompetencyMap(initialGap.gap);
-    }
-    
-    // Try to extract from gap.missing_skills_map
-    if (initialGap.gap?.missing_skills_map) {
-      const missingSkillsMap = initialGap.gap.missing_skills_map;
-      extractFromCompetencyMap(missingSkillsMap);
-    }
-    
-    // Legacy fallback: Try to extract from old skill array formats (deprecated - should not be used)
-    // This is kept only for backward compatibility with very old data structures
+
+    // Legacy root-level skill arrays (deprecated)
     if (Array.isArray(initialGap.microSkills)) {
       console.warn('⚠️ Using legacy skill array format - consider updating to competency map format');
       skills.push(...initialGap.microSkills);
@@ -1091,67 +1064,54 @@ export class GenerateLearningPathUseCase {
       console.warn('⚠️ Using legacy skill array format - consider updating to competency map format');
       skills.push(...initialGap.nanoSkills);
     }
-    
-    // Remove duplicates and return
-    return [...new Set(skills)];
+
+    return [...new Set(skills.filter(s => typeof s === 'string' && s.length > 0))];
   }
 
   /**
-   * Extract skills from expanded breakdown structure
-   * Handles new format: { "Competency_Name": ["Skill Name 1", "Skill Name 2", ...] }
-   * Also supports old format for backward compatibility
+   * Extract skills from expanded breakdown (Skills Engine skillBreakdown).
+   * Supports string arrays, skill objects ({skill_name|name}), and legacy micro/nano objects.
    * @private
    */
   _extractSkillsFromExpandedBreakdown(expandedBreakdown) {
+    if (!expandedBreakdown || typeof expandedBreakdown !== 'object') {
+      return [];
+    }
+
     const skills = [];
-    
-    // Try to extract from skillBreakdown
+    const pushSkill = (skill) => {
+      if (typeof skill === 'string' && skill.length > 0) {
+        skills.push(skill);
+      } else if (skill && typeof skill === 'object') {
+        const skillName = skill.skill_name || skill.name || skill.skillName;
+        if (skillName && skillName !== 'undefined') {
+          skills.push(skillName);
+        }
+      }
+    };
+
     if (expandedBreakdown.skillBreakdown && typeof expandedBreakdown.skillBreakdown === 'object') {
       Object.values(expandedBreakdown.skillBreakdown).forEach(competencyData => {
-        // NEW FORMAT: Check for array first (array of skill names)
         if (Array.isArray(competencyData)) {
-          competencyData.forEach(skillName => {
-            if (typeof skillName === 'string') {
-              skills.push(skillName);
-            }
-          });
+          competencyData.forEach(pushSkill);
         } else if (competencyData && typeof competencyData === 'object') {
-          // OLD FORMAT: Backward compatibility - extract from microSkills/nanoSkills
-          // Extract from microSkills (legacy)
           if (Array.isArray(competencyData.microSkills)) {
-            competencyData.microSkills.forEach(skill => {
-              if (typeof skill === 'string') {
-                skills.push(skill);
-              } else if (skill?.name) {
-                skills.push(skill.name);
-              }
-            });
+            competencyData.microSkills.forEach(pushSkill);
           }
-          // Extract from nanoSkills (legacy)
           if (Array.isArray(competencyData.nanoSkills)) {
-            competencyData.nanoSkills.forEach(skill => {
-              if (typeof skill === 'string') {
-                skills.push(skill);
-              } else if (skill?.name) {
-                skills.push(skill.name);
-              }
-            });
+            competencyData.nanoSkills.forEach(pushSkill);
           }
-          // Extract from skills array (alternative legacy format)
           if (Array.isArray(competencyData.skills)) {
-            competencyData.skills.forEach(skill => {
-              if (typeof skill === 'string') {
-                skills.push(skill);
-              } else if (skill?.name) {
-                skills.push(skill.name);
-              }
-            });
+            competencyData.skills.forEach(pushSkill);
           }
         }
       });
     }
-    
-    // Remove duplicates and return
+
+    if (skills.length === 0 && Array.isArray(expandedBreakdown.skills)) {
+      expandedBreakdown.skills.forEach(pushSkill);
+    }
+
     return [...new Set(skills)];
   }
 
@@ -1939,67 +1899,6 @@ export class GenerateLearningPathUseCase {
     }
 
     return normalized;
-  }
-
-  /**
-   * Extract skills from initial gap for Prompt 3
-   * @private
-   */
-  _extractSkillsFromInitialGap(initialGap) {
-    if (!initialGap || typeof initialGap !== 'object') {
-      return [];
-    }
-
-    // Use the existing method to extract skills from gap structure
-    if (initialGap.skills_raw_data) {
-      return this._extractSkillNamesFromGap(initialGap.skills_raw_data);
-    }
-
-    // Fallback: try to extract from the gap structure directly
-    return this._extractSkillNamesFromGap(initialGap);
-  }
-
-  /**
-   * Extract skills from expanded breakdown (skillBreakdown from Skills Engine)
-   * @private
-   */
-  _extractSkillsFromExpandedBreakdown(expandedBreakdown) {
-    if (!expandedBreakdown || typeof expandedBreakdown !== 'object') {
-      return [];
-    }
-
-    const skillNames = [];
-
-    // Extract from skillBreakdown (object with competency keys and skill arrays)
-    if (expandedBreakdown.skillBreakdown && typeof expandedBreakdown.skillBreakdown === 'object') {
-      for (const [competencyName, skills] of Object.entries(expandedBreakdown.skillBreakdown)) {
-        if (Array.isArray(skills)) {
-          skills.forEach(skill => {
-            if (typeof skill === 'string') {
-              skillNames.push(skill);
-            } else if (skill && typeof skill === 'object') {
-              // Handle skill objects with skill_name or name
-              const skillName = skill.skill_name || skill.name || skill.skillName || String(skill);
-              if (skillName && skillName !== 'undefined') {
-                skillNames.push(skillName);
-              }
-            }
-          });
-        }
-      }
-    }
-
-    // Also check if skills are directly in the breakdown (fallback)
-    if (skillNames.length === 0 && expandedBreakdown.skills && Array.isArray(expandedBreakdown.skills)) {
-      expandedBreakdown.skills.forEach(skill => {
-        if (typeof skill === 'string') {
-          skillNames.push(skill);
-        }
-      });
-    }
-
-    // Remove duplicates and return
-    return [...new Set(skillNames)];
   }
 }
 
