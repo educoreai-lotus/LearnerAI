@@ -113,11 +113,15 @@ export class SkillsEngineClient {
         console.log(`   Full response: ${JSON.stringify(response, null, 2).substring(0, 2000)}`);
 
         // Extract the breakdown from Coordinator response
-        // Coordinator response format: { requester_service, payload, response: { answer: <data> } }
-        let breakdown = null;
-        
-        // Check if response has nested structure
-        if (response && response.response && response.response.answer) {
+        // Live Skills Engine / Coordinator envelope:
+        //   { payload: { action, description, competencies }, response: { competencies: { Comp: [...] } } }
+        // Legacy Coordinator format: { requester_service, payload, response: { answer: <data> } }
+        let breakdown = this._unwrapCompetencyMap(response?.response?.competencies)
+          || this._unwrapCompetencyMap(response?.competencies);
+
+        if (breakdown) {
+          console.log(`   ✅ Found breakdown in response.response.competencies / response.competencies`);
+        } else if (response && response.response && response.response.answer) {
           // Coordinator returns data in response.answer
           const answerData = response.response.answer;
           console.log(`   📋 Attempting to parse response.response.answer...`);
@@ -255,7 +259,12 @@ export class SkillsEngineClient {
           if (payloadData && (payloadData.action || payloadData.description)) {
             console.warn(`   ⚠️ Response.payload contains request data, not breakdown. Looking for breakdown elsewhere...`);
             // Try to find breakdown in other fields
-            if (response.response && response.response.data) {
+            const recoveredFromCompetencies = this._unwrapCompetencyMap(response?.response?.competencies)
+              || this._unwrapCompetencyMap(response?.competencies);
+            if (recoveredFromCompetencies) {
+              breakdown = recoveredFromCompetencies;
+              console.log(`   ✅ Found breakdown in response.response.competencies after request-echo payload`);
+            } else if (response.response && response.response.data) {
               breakdown = typeof response.response.data === 'string' ? JSON.parse(response.response.data) : response.response.data;
               console.log(`   ✅ Found breakdown in response.response.data`);
             } else {
@@ -292,6 +301,12 @@ export class SkillsEngineClient {
         }
 
         if (breakdown && typeof breakdown === 'object' && !Array.isArray(breakdown)) {
+          // Unwrap { competencies: { Comp: [...] } } so validation sees the competency map
+          const unwrapped = this._unwrapCompetencyMap(breakdown);
+          if (unwrapped) {
+            breakdown = unwrapped;
+          }
+
           // Validate breakdown structure: should have competency names as keys with arrays of skills
           const breakdownKeys = Object.keys(breakdown);
           console.log(`   🔍 Validating breakdown structure...`);
@@ -495,6 +510,34 @@ export class SkillsEngineClient {
     });
     
     return breakdown;
+  }
+
+  /**
+   * Unwrap a Skills Engine competency map from a Coordinator/SE wrapper.
+   * Accepts either the map itself or { competencies: <map> }.
+   * Returns the map only when at least one competency has a non-empty skill array.
+   * @param {*} value
+   * @returns {object|null}
+   * @private
+   */
+  _unwrapCompetencyMap(value) {
+    if (!value || typeof value !== 'object' || Array.isArray(value)) {
+      return null;
+    }
+
+    const hasNonEmptySkillArrays = (obj) =>
+      Object.keys(obj).some((key) => Array.isArray(obj[key]) && obj[key].length > 0);
+
+    if (hasNonEmptySkillArrays(value)) {
+      return value;
+    }
+
+    const inner = value.competencies;
+    if (inner && typeof inner === 'object' && !Array.isArray(inner) && hasNonEmptySkillArrays(inner)) {
+      return inner;
+    }
+
+    return null;
   }
 
   /**
