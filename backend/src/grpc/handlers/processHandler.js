@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { isCourseUuid } from '../../utils/courseIdentity.js';
 
 function nowIso() {
   return new Date().toISOString();
@@ -135,12 +136,30 @@ export class ProcessHandler {
     // Always return an ARRAY (Coordinator rule).
     let data = [];
 
-    // Prefer structured fields if provided.
-    const competencyTargetName = payload?.competency_target_name || payload?.course_id || null;
+    const payloadCourseId = payload?.course_id || null;
+    const competencyTargetName = payload?.competency_target_name || null;
+    const scopedUserId = user_id || payload?.user_id || null;
+
+    // A. Real UUID course_id — never treat course_id as a target name
+    if (isCourseUuid(payloadCourseId)) {
+      const course = await this.getCourseByCourseId(payloadCourseId);
+      data = course ? [course] : [];
+      return { data, metadata: { tenant_id, query_type: 'by_course_id' } };
+    }
+
+    // B. user_id + competency_target_name
+    if (scopedUserId && competencyTargetName) {
+      const course = await this.getCourseByUserAndTarget(scopedUserId, competencyTargetName);
+      data = course ? [course] : [];
+      return { data, metadata: { tenant_id, query_type: 'by_user_and_target' } };
+    }
+
+    // D. STAGE 1 LEGACY TARGET-ONLY FALLBACK — target is still globally unique.
+    // MUST be removed/disabled at final DB cutover. Do not use payload.course_id here.
     if (competencyTargetName) {
       const course = await this.getCourseByCompetencyTargetName(competencyTargetName);
       data = course ? [course] : [];
-      return { data, metadata: { tenant_id, query_type: 'by_competency_target_name' } };
+      return { data, metadata: { tenant_id, query_type: 'legacy_target_only' } };
     }
 
     if (String(query).toLowerCase().includes('recent')) {
@@ -227,11 +246,37 @@ export class ProcessHandler {
     return Array.isArray(data) ? data : [];
   }
 
-  async getCourseByCompetencyTargetName(competencyTargetName) {
-    // Select ONLY the specified fields for RAG sync
+  async getCourseByCourseId(courseId) {
     const { data, error } = await this.client
       .from('courses')
-      .select('competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
+      .select('course_id, competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
+      .eq('course_id', courseId)
+      .maybeSingle();
+
+    if (error) throw new Error(`Failed to get course: ${error.message}`);
+    return data || null;
+  }
+
+  async getCourseByUserAndTarget(userId, competencyTargetName) {
+    const { data, error } = await this.client
+      .from('courses')
+      .select('course_id, competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
+      .eq('user_id', userId)
+      .eq('competency_target_name', competencyTargetName)
+      .maybeSingle();
+
+    if (error) throw new Error(`Failed to get course: ${error.message}`);
+    return data || null;
+  }
+
+  /**
+   * STAGE 1 LEGACY TARGET-ONLY FALLBACK.
+   * Target is still globally unique. Stage 2/C4 cutover blocker.
+   */
+  async getCourseByCompetencyTargetName(competencyTargetName) {
+    const { data, error } = await this.client
+      .from('courses')
+      .select('course_id, competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
       .eq('competency_target_name', competencyTargetName)
       .maybeSingle();
 

@@ -1,4 +1,5 @@
 import express from 'express';
+import { resolveCourse } from '../../utils/courseIdentity.js';
 
 const router = express.Router();
 
@@ -335,21 +336,21 @@ export async function fillDirectoryData(data, { companyRepository, learnerReposi
 export async function fillSkillsEngineData(data, { skillsGapRepository, courseRepository }) {
   const filled = { ...data };
 
-  // If competency_target_name is provided, fill learning path info
-  if (data.competency_target_name && courseRepository) {
+  // Resolve course: UUID course_id → user+target → LEGACY target-only
+  if ((data.course_id || data.competency_target_name) && courseRepository) {
     try {
-      const course = data.user_id && typeof courseRepository.getCourseByUserAndTarget === 'function'
-        ? await courseRepository.getCourseByUserAndTarget(data.user_id, data.competency_target_name)
-        : typeof courseRepository.getCourseById === 'function'
-          ? await courseRepository.getCourseById(data.competency_target_name)
-          : null;
+      const course = await resolveCourse(courseRepository, {
+        courseId: data.course_id,
+        userId: data.user_id,
+        competencyTargetName: data.competency_target_name
+      });
       if (course) {
         filled.learning_path = course.learning_path || filled.learning_path || null;
         filled.approved = course.approved !== undefined ? course.approved : filled.approved || false;
         filled.user_id = course.user_id || filled.user_id || '';
       }
     } catch (error) {
-      console.warn(`[Endpoints] Could not fetch course for ${data.competency_target_name}:`, error.message);
+      console.warn(`[Endpoints] Could not fetch course for ${data.competency_target_name || data.course_id}:`, error.message);
     }
   }
 
@@ -591,16 +592,12 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         );
       }
       
-      // Get course with learning_path (owned by this user)
-      let course = null;
-      if (courseRepository && typeof courseRepository.getCourseByUserAndTarget === 'function') {
-        course = await courseRepository.getCourseByUserAndTarget(data.user_id, data.competency_target_name);
-      } else if (courseRepository && typeof courseRepository.getCourseById === 'function') {
-        const byTarget = await courseRepository.getCourseById(data.competency_target_name);
-        if (byTarget && byTarget.user_id === data.user_id) {
-          course = byTarget;
-        }
-      }
+      // Get course with learning_path (owned by this user; UUID course_id if supplied)
+      const course = await resolveCourse(courseRepository, {
+        courseId: data.course_id,
+        userId: data.user_id,
+        competencyTargetName: data.competency_target_name
+      });
       
       // Convert skills_raw_data to array for Learning Analytics (remove competency names)
       const skillsArray = convertSkillsToArray(skillsGap?.skills_raw_data || {});
@@ -629,14 +626,14 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
 export async function fillCourseBuilderData(data, { courseRepository, skillsGapRepository }) {
   const filled = { ...data };
 
-  // If competency_target_name is provided, fill learning path
-  if (data.competency_target_name && courseRepository) {
+  // Resolve course: UUID course_id → user+target → LEGACY target-only
+  if ((data.course_id || data.competency_target_name) && courseRepository) {
     try {
-      const course = data.user_id && typeof courseRepository.getCourseByUserAndTarget === 'function'
-        ? await courseRepository.getCourseByUserAndTarget(data.user_id, data.competency_target_name)
-        : typeof courseRepository.getCourseById === 'function'
-          ? await courseRepository.getCourseById(data.competency_target_name)
-          : null;
+      const course = await resolveCourse(courseRepository, {
+        courseId: data.course_id,
+        userId: data.user_id,
+        competencyTargetName: data.competency_target_name
+      });
       if (course) {
         filled.learning_path = course.learning_path || filled.learning_path || null;
         filled.user_id = course.user_id || filled.user_id || '';
@@ -1486,9 +1483,13 @@ async function courseBuilderHandler(payload, dependencies) {
     let skillsRawData = null;
     
     try {
-      // Get course/learning path (filter by both user_id and competency_target_name to ensure correct course)
-      if (courseRepository && typeof courseRepository.getCourseByUserAndTarget === 'function') {
-        const course = await courseRepository.getCourseByUserAndTarget(user_id, competency_target_name);
+      // Get course/learning path: UUID course_id if supplied, else user_id + target
+      if (courseRepository) {
+        const course = await resolveCourse(courseRepository, {
+          courseId: mappedPayload.course_id || payload.course_id,
+          userId: user_id,
+          competencyTargetName: competency_target_name
+        });
         if (course) {
             // Parse learning_path if it's a string
             learningPath = course.learning_path;

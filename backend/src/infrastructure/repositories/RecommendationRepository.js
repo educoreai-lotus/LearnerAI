@@ -97,7 +97,32 @@ export class RecommendationRepository {
   }
 
   /**
-   * Get recommendations by base_course_name
+   * Get recommendations linked to an internal course_id.
+   * Preferred personalized read after Phase A.
+   * @param {string} courseId
+   * @returns {Promise<Array<Object>>}
+   */
+  async getRecommendationsByCourseId(courseId) {
+    if (!courseId) {
+      return [];
+    }
+
+    const { data, error } = await this.client
+      .from('recommendations')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      throw new Error(`Failed to get recommendations: ${error.message}`);
+    }
+
+    return data.map(item => this._mapToRecommendation(item));
+  }
+
+  /**
+   * LEGACY: Get recommendations by base_course_name (target string).
+   * Stage 2/C4 cutover blocker for personalized isolation.
    * @param {string} baseCourseName
    * @returns {Promise<Array<Object>>}
    */

@@ -89,24 +89,12 @@ export async function seedDatabase(supabaseUrl, supabaseKey) {
     const createdCourses = [];
     for (const course of mockCourses) {
       try {
-        const competencyName = course.competency_target_name;
-        // Try to create first
-        try {
-          const created = await courseRepo.createCourse(course);
-          createdCourses.push(created);
-          console.log(`  ✅ Created course: ${competencyName}`);
-        } catch (createError) {
-          // If course exists, update it with new learning path
-          if (createError.message.includes('duplicate') || createError.message.includes('unique') || createError.message.includes('violates unique constraint')) {
-            const updated = await courseRepo.updateCourse(competencyName, {
-              learning_path: course.learning_path,
-              approved: course.approved
-            });
-            createdCourses.push(updated);
-            console.log(`  🔄 Updated course: ${competencyName} (with new detailed learning path)`);
-          } else {
-            throw createError;
-          }
+        const result = await upsertSeedCourse(courseRepo, course);
+        createdCourses.push(result.course);
+        if (result.created) {
+          console.log(`  ✅ Created course: ${course.competency_target_name}`);
+        } else {
+          console.log(`  🔄 Updated course: ${course.competency_target_name} (with new detailed learning path)`);
         }
       } catch (error) {
         console.error(`  ❌ Error creating/updating course ${course.competency_target_name}:`, error.message);
@@ -247,7 +235,7 @@ export async function clearSeededData(supabaseUrl, supabaseKey) {
 
     for (const course of mockCourses) {
       try {
-        await courseRepo.deleteCourse(course.competency_target_name);
+        await deleteSeedCourse(courseRepo, course);
         console.log(`  ✅ Deleted course: ${course.competency_target_name}`);
       } catch (error) {
         console.log(`  ⚠️  Could not delete course ${course.competency_target_name}`);
@@ -277,5 +265,79 @@ export async function clearSeededData(supabaseUrl, supabaseKey) {
     console.error('\n❌ Clearing failed:', error);
     throw error;
   }
+}
+
+function isDuplicateError(error) {
+  const message = error?.message || '';
+  return message.includes('duplicate') || message.includes('unique') || message.includes('violates unique constraint');
+}
+
+/**
+ * Seed create/update: identify by user_id + target, then update by course_id when present.
+ * Does not use target-only update when ownership is known.
+ */
+export async function upsertSeedCourse(courseRepo, course) {
+  const target = course.competency_target_name;
+  const userId = course.user_id || null;
+
+  try {
+    const created = await courseRepo.createCourse(course);
+    return { created: true, course: created };
+  } catch (createError) {
+    if (!isDuplicateError(createError)) {
+      throw createError;
+    }
+  }
+
+  const existing = userId && typeof courseRepo.getCourseByUserAndTarget === 'function'
+    ? await courseRepo.getCourseByUserAndTarget(userId, target)
+    : await courseRepo.getCourseById(target);
+
+  const updates = {
+    learning_path: course.learning_path,
+    approved: course.approved
+  };
+
+  if (existing?.course_id && typeof courseRepo.updateCourseById === 'function') {
+    const updated = await courseRepo.updateCourseById(existing.course_id, updates);
+    return { created: false, course: updated };
+  }
+
+  if (userId && typeof courseRepo.updateCourseByUserAndTarget === 'function') {
+    const updated = await courseRepo.updateCourseByUserAndTarget(userId, target, updates);
+    return { created: false, course: updated };
+  }
+
+  const updated = await courseRepo.updateCourse(target, updates);
+  return { created: false, course: updated };
+}
+
+/**
+ * Seed delete: look up owned row, then delete by course_id (or user+target).
+ * Does not use target-only DELETE when ownership is known.
+ */
+export async function deleteSeedCourse(courseRepo, course) {
+  const target = course.competency_target_name;
+  const userId = course.user_id || null;
+
+  const existing = userId && typeof courseRepo.getCourseByUserAndTarget === 'function'
+    ? await courseRepo.getCourseByUserAndTarget(userId, target)
+    : typeof courseRepo.getCourseById === 'function'
+      ? await courseRepo.getCourseById(target)
+      : null;
+
+  if (existing?.course_id && typeof courseRepo.deleteCourseById === 'function') {
+    return await courseRepo.deleteCourseById(existing.course_id);
+  }
+
+  if (userId && typeof courseRepo.deleteCourseByUserAndTarget === 'function') {
+    return await courseRepo.deleteCourseByUserAndTarget(userId, target);
+  }
+
+  if (!existing) {
+    return true;
+  }
+
+  throw new Error(`Cannot safely delete seed course "${target}": missing course_id and user_id`);
 }
 

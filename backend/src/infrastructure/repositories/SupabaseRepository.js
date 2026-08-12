@@ -14,7 +14,36 @@ export class SupabaseRepository {
   }
 
   /**
-   * Get learning path by ID
+   * Get learning path by internal course_id.
+   * @param {string} courseId
+   * @returns {Promise<LearningPath|null>}
+   */
+  async getLearningPathByCourseId(courseId) {
+    if (!courseId) {
+      return null;
+    }
+
+    const { data, error } = await this.client
+      .from('courses')
+      .select('*')
+      .eq('course_id', courseId)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      throw new Error(`Failed to get learning path: ${error.message}`);
+    }
+
+    return this._mapToLearningPath(data);
+  }
+
+  /**
+   * LEGACY TARGET-ONLY LOOKUP.
+   * learningPathId is competency_target_name (still the global PK).
+   * Stage 2/C4 cutover blocker: do not use for personalized reads when
+   * course_id or user+target is available.
    * @param {string} learningPathId
    * @returns {Promise<LearningPath|null>}
    */

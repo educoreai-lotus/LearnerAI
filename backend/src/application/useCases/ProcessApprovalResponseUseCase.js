@@ -1,3 +1,5 @@
+import { resolveApprovalCourse } from '../../utils/courseIdentity.js';
+
 /**
  * ProcessApprovalResponseUseCase
  * Handles approval, rejection, or changes request for learning paths
@@ -124,11 +126,11 @@ export class ProcessApprovalResponseUseCase {
     // NOTE: We do NOT automatically distribute to Course Builder.
     // Course Builder will request data when needed via the request endpoint.
     if (response === 'approved') {
-      // Update the course's approved field to true
+      // Update the course's approved field to true (by course_id when present)
       if (this.courseRepository) {
         try {
-          await this.courseRepository.updateCourse(approval.learningPathId, { approved: true });
-          console.log(`✅ Course ${approval.learningPathId} marked as approved in courses table`);
+          await this._markCourseApproved(approval);
+          console.log(`✅ Course ${approval.courseId || approval.learningPathId} marked as approved in courses table`);
         } catch (error) {
           console.error(`⚠️  Failed to update course approved status: ${error.message}`);
           // Don't fail the approval process if course update fails
@@ -159,7 +161,7 @@ export class ProcessApprovalResponseUseCase {
       try {
         // Get learning path and requester info for notification
         if (this.courseRepository && this.learnerRepository) {
-          const course = await this.courseRepository.getCourseById(approval.learningPathId);
+          const course = await resolveApprovalCourse(this.courseRepository, approval);
           if (course) {
             const learner = await this.learnerRepository.getLearnerById(course.user_id);
             
@@ -190,6 +192,24 @@ export class ProcessApprovalResponseUseCase {
     console.log(`✅ Approval ${approvalId} ${response}${feedback ? ` with feedback: ${feedback}` : ''}`);
 
     return updatedApproval;
+  }
+
+  /**
+   * Mark the approval's course as approved using course_id when available.
+   * LEGACY fallback: learning_path_id (target) if the approval has no course_id.
+   * @private
+   */
+  async _markCourseApproved(approval) {
+    if (approval.courseId && typeof this.courseRepository.updateCourseById === 'function') {
+      return await this.courseRepository.updateCourseById(approval.courseId, { approved: true });
+    }
+
+    // STAGE 1 LEGACY FALLBACK — approval rows with no course_id still use target
+    if (typeof this.courseRepository.updateCourse === 'function') {
+      return await this.courseRepository.updateCourse(approval.learningPathId, { approved: true });
+    }
+
+    return null;
   }
 }
 

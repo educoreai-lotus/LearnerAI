@@ -69,13 +69,17 @@ export function createCoursesRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/courses/:competencyTargetName
-   * Get course by competency_target_name
+   * LEGACY: GET /api/v1/courses/:competencyTargetName
+   * Target is still globally unique. Optional ?user_id= scopes to owned course.
+   * Stage 2/C4 cutover blocker: target-only GET is not a unique identifier after duplicates.
    */
   router.get('/:competencyTargetName', async (req, res) => {
     try {
       const { competencyTargetName } = req.params;
-      const course = await courseRepository.getCourseById(competencyTargetName);
+      const userId = req.query.user_id || null;
+      const course = userId && typeof courseRepository.getCourseByUserAndTarget === 'function'
+        ? await courseRepository.getCourseByUserAndTarget(userId, competencyTargetName)
+        : await courseRepository.getCourseById(competencyTargetName);
 
       if (!course) {
         return res.status(404).json({
@@ -143,14 +147,84 @@ export function createCoursesRouter(dependencies) {
   });
 
   /**
-   * PUT /api/v1/courses/:competencyTargetName
-   * Update course
-   * Note: If learning_path is provided, it should match Prompt 3 structure exactly
+   * GET /api/v1/courses/id/:courseId
+   * Get course by internal course_id
+   */
+  router.get('/id/:courseId', async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const course = await courseRepository.getCourseByCourseId(courseId);
+
+      if (!course) {
+        return res.status(404).json({
+          error: 'Course not found',
+          message: `No course found with course_id: ${courseId}`
+        });
+      }
+
+      res.json({ course });
+    } catch (error) {
+      console.error('Error fetching course:', error);
+      res.status(500).json({
+        error: 'Failed to fetch course',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * PUT /api/v1/courses/id/:courseId
+   * Update course by internal course_id
+   */
+  router.put('/id/:courseId', async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const course = await courseRepository.updateCourseById(courseId, req.body);
+
+      res.json({
+        message: 'Course updated successfully',
+        course
+      });
+    } catch (error) {
+      console.error('Error updating course:', error);
+      res.status(500).json({
+        error: 'Failed to update course',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * DELETE /api/v1/courses/id/:courseId
+   * Delete course by internal course_id
+   */
+  router.delete('/id/:courseId', async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      await courseRepository.deleteCourseById(courseId);
+
+      res.json({
+        message: 'Course deleted successfully'
+      });
+    } catch (error) {
+      console.error('Error deleting course:', error);
+      res.status(500).json({
+        error: 'Failed to delete course',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * LEGACY: PUT /api/v1/courses/:competencyTargetName
+   * Optional ?user_id= uses user+target. Otherwise target-only (still globally unique).
+   * Stage 2/C4 cutover blocker.
    */
   router.put('/:competencyTargetName', async (req, res) => {
     try {
       const { competencyTargetName } = req.params;
       const updates = req.body;
+      const userId = req.query.user_id || updates.user_id || null;
 
       // If learning_path is being updated, validate it matches Prompt 3 structure
       if (updates.learning_path) {
@@ -170,7 +244,9 @@ export function createCoursesRouter(dependencies) {
         }
       }
 
-      const course = await courseRepository.updateCourse(competencyTargetName, updates);
+      const course = userId && typeof courseRepository.updateCourseByUserAndTarget === 'function'
+        ? await courseRepository.updateCourseByUserAndTarget(userId, competencyTargetName, updates)
+        : await courseRepository.updateCourse(competencyTargetName, updates);
 
       res.json({
         message: 'Course updated successfully',
@@ -186,13 +262,19 @@ export function createCoursesRouter(dependencies) {
   });
 
   /**
-   * DELETE /api/v1/courses/:competencyTargetName
-   * Delete course
+   * LEGACY: DELETE /api/v1/courses/:competencyTargetName
+   * Optional ?user_id= deletes only that user's course. Otherwise target-only (still globally unique).
+   * Stage 2/C4 cutover blocker: target-only DELETE would remove every same-target course.
    */
   router.delete('/:competencyTargetName', async (req, res) => {
     try {
       const { competencyTargetName } = req.params;
-      await courseRepository.deleteCourse(competencyTargetName);
+      const userId = req.query.user_id || null;
+      if (userId && typeof courseRepository.deleteCourseByUserAndTarget === 'function') {
+        await courseRepository.deleteCourseByUserAndTarget(userId, competencyTargetName);
+      } else {
+        await courseRepository.deleteCourse(competencyTargetName);
+      }
 
       res.json({
         message: 'Course deleted successfully'
@@ -208,4 +290,3 @@ export function createCoursesRouter(dependencies) {
 
   return router;
 }
-

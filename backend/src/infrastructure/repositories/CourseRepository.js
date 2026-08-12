@@ -62,7 +62,9 @@ export class CourseRepository {
   }
 
   /**
-   * Get course by competency_target_name
+   * LEGACY TARGET-ONLY LOOKUP.
+   * Competency target is still the global PK. Stage 2/C4 cutover blocker:
+   * do not use this for personalized reads when course_id or user+target is available.
    * @param {string} competencyTargetName
    * @returns {Promise<Object|null>}
    */
@@ -173,20 +175,47 @@ export class CourseRepository {
   }
 
   /**
-   * Update course
+   * Update course by internal course_id.
+   * Preferred write identity after Phase A.
+   * @param {string} courseId
+   * @param {Object} updates
+   * @returns {Promise<Object>}
+   */
+  async updateCourseById(courseId, updates) {
+    if (!courseId) {
+      throw new Error('courseId is required to update a course by id');
+    }
+
+    const { data, error } = await this.client
+      .from('courses')
+      .update(this._buildUpdateData(updates))
+      .eq('course_id', courseId)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update course: ${error.message}`);
+    }
+
+    return this._mapToCourse(data);
+  }
+
+  /**
+   * Update the course owned by this user for this competency target.
+   * @param {string} userId
    * @param {string} competencyTargetName
    * @param {Object} updates
    * @returns {Promise<Object>}
    */
-  async updateCourse(competencyTargetName, updates) {
-    const updateData = {};
-    if (updates.learning_path !== undefined) updateData.learning_path = updates.learning_path;
-    if (updates.approved !== undefined) updateData.approved = updates.approved;
-    if (updates.gap_id !== undefined) updateData.gap_id = updates.gap_id;
+  async updateCourseByUserAndTarget(userId, competencyTargetName, updates) {
+    if (!userId || !competencyTargetName) {
+      throw new Error('userId and competencyTargetName are required');
+    }
 
     const { data, error } = await this.client
       .from('courses')
-      .update(updateData)
+      .update(this._buildUpdateData(updates))
+      .eq('user_id', userId)
       .eq('competency_target_name', competencyTargetName)
       .select()
       .single();
@@ -199,7 +228,79 @@ export class CourseRepository {
   }
 
   /**
-   * Delete course
+   * LEGACY TARGET-ONLY UPDATE.
+   * Safe only while competency_target_name remains globally unique.
+   * Personalized runtime paths must use updateCourseById or updateCourseByUserAndTarget.
+   * @param {string} competencyTargetName
+   * @param {Object} updates
+   * @returns {Promise<Object>}
+   */
+  async updateCourse(competencyTargetName, updates) {
+    const { data, error } = await this.client
+      .from('courses')
+      .update(this._buildUpdateData(updates))
+      .eq('competency_target_name', competencyTargetName)
+      .select()
+      .single();
+
+    if (error) {
+      throw new Error(`Failed to update course: ${error.message}`);
+    }
+
+    return this._mapToCourse(data);
+  }
+
+  /**
+   * Delete course by internal course_id.
+   * Preferred destructive identity — never deletes another user's same-target row.
+   * @param {string} courseId
+   * @returns {Promise<boolean>}
+   */
+  async deleteCourseById(courseId) {
+    if (!courseId) {
+      throw new Error('courseId is required to delete a course by id');
+    }
+
+    const { error } = await this.client
+      .from('courses')
+      .delete()
+      .eq('course_id', courseId);
+
+    if (error) {
+      throw new Error(`Failed to delete course: ${error.message}`);
+    }
+
+    return true;
+  }
+
+  /**
+   * Delete the course owned by this user for this competency target.
+   * @param {string} userId
+   * @param {string} competencyTargetName
+   * @returns {Promise<boolean>}
+   */
+  async deleteCourseByUserAndTarget(userId, competencyTargetName) {
+    if (!userId || !competencyTargetName) {
+      throw new Error('userId and competencyTargetName are required');
+    }
+
+    const { error } = await this.client
+      .from('courses')
+      .delete()
+      .eq('user_id', userId)
+      .eq('competency_target_name', competencyTargetName);
+
+    if (error) {
+      throw new Error(`Failed to delete course: ${error.message}`);
+    }
+
+    return true;
+  }
+
+  /**
+   * LEGACY TARGET-ONLY DELETE.
+   * Safe only while competency_target_name remains globally unique.
+   * Do not use in personalized or seed paths when course_id or user_id is known.
    * @param {string} competencyTargetName
    * @returns {Promise<boolean>}
    */
@@ -214,6 +315,17 @@ export class CourseRepository {
     }
 
     return true;
+  }
+
+  /**
+   * @private
+   */
+  _buildUpdateData(updates) {
+    const updateData = {};
+    if (updates.learning_path !== undefined) updateData.learning_path = updates.learning_path;
+    if (updates.approved !== undefined) updateData.approved = updates.approved;
+    if (updates.gap_id !== undefined) updateData.gap_id = updates.gap_id;
+    return updateData;
   }
 
   /**

@@ -70,7 +70,37 @@ export class ApprovalRepository {
   }
 
   /**
-   * Get approval by learning path ID
+   * Get the latest approval for an internal course_id.
+   * Preferred lookup after Phase A backfill.
+   * @param {string} courseId
+   * @returns {Promise<PathApproval|null>}
+   */
+  async getApprovalByCourseId(courseId) {
+    if (!courseId) {
+      return null;
+    }
+
+    const { data, error } = await this.client
+      .from('path_approvals')
+      .select('*')
+      .eq('course_id', courseId)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      throw new Error(`Failed to get approval: ${error.message}`);
+    }
+
+    return this._mapToPathApproval(data);
+  }
+
+  /**
+   * LEGACY TARGET-ONLY LOOKUP (learning_path_id = competency_target_name).
+   * Stage 2/C4 cutover blocker once two users share a target.
    * @param {string} learningPathId
    * @returns {Promise<PathApproval|null>}
    */

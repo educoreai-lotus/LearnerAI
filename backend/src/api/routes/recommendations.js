@@ -34,7 +34,7 @@ export function createRecommendationsRouter(dependencies) {
    */
   router.post('/', async (req, res) => {
     try {
-      const { recommendation_id, user_id, base_course_name, suggested_courses, sent_to_rag } = req.body;
+      const { recommendation_id, user_id, base_course_name, course_id, suggested_courses, sent_to_rag } = req.body;
 
       // Validate required fields
       if (!user_id || !suggested_courses) {
@@ -48,6 +48,7 @@ export function createRecommendationsRouter(dependencies) {
         recommendation_id,
         user_id,
         base_course_name,
+        course_id: course_id || null,
         suggested_courses,
         sent_to_rag: sent_to_rag !== undefined ? sent_to_rag : false
       });
@@ -60,32 +61,6 @@ export function createRecommendationsRouter(dependencies) {
       console.error('Error creating recommendation:', error);
       res.status(500).json({
         error: 'Failed to create recommendation',
-        message: error.message
-      });
-    }
-  });
-
-  /**
-   * GET /api/v1/recommendations/:recommendationId
-   * Get recommendation by recommendation_id
-   */
-  router.get('/:recommendationId', async (req, res) => {
-    try {
-      const { recommendationId } = req.params;
-      const recommendation = await recommendationRepository.getRecommendationById(recommendationId);
-
-      if (!recommendation) {
-        return res.status(404).json({
-          error: 'Recommendation not found',
-          message: `No recommendation found with recommendation_id: ${recommendationId}`
-        });
-      }
-
-      res.json({ recommendation });
-    } catch (error) {
-      console.error('Error fetching recommendation:', error);
-      res.status(500).json({
-        error: 'Failed to fetch recommendation',
         message: error.message
       });
     }
@@ -115,8 +90,31 @@ export function createRecommendationsRouter(dependencies) {
   });
 
   /**
-   * GET /api/v1/recommendations/course/:baseCourseName
-   * Get recommendations by base_course_name
+   * GET /api/v1/recommendations/course-id/:courseId
+   * Get recommendations linked to an internal course_id
+   */
+  router.get('/course-id/:courseId', async (req, res) => {
+    try {
+      const { courseId } = req.params;
+      const recommendations = await recommendationRepository.getRecommendationsByCourseId(courseId);
+
+      res.json({
+        course_id: courseId,
+        count: recommendations.length,
+        recommendations
+      });
+    } catch (error) {
+      console.error('Error fetching recommendations:', error);
+      res.status(500).json({
+        error: 'Failed to fetch recommendations',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * LEGACY: GET /api/v1/recommendations/course/:baseCourseName
+   * Target-name list. Stage 2/C4 cutover blocker for personalized isolation.
    */
   router.get('/course/:baseCourseName', async (req, res) => {
     try {
@@ -157,6 +155,32 @@ export function createRecommendationsRouter(dependencies) {
       console.error('Error fetching recommendations:', error);
       res.status(500).json({
         error: 'Failed to fetch recommendations',
+        message: error.message
+      });
+    }
+  });
+
+  /**
+   * GET /api/v1/recommendations/:recommendationId
+   * Get recommendation by recommendation_id
+   */
+  router.get('/:recommendationId', async (req, res) => {
+    try {
+      const { recommendationId } = req.params;
+      const recommendation = await recommendationRepository.getRecommendationById(recommendationId);
+
+      if (!recommendation) {
+        return res.status(404).json({
+          error: 'Recommendation not found',
+          message: `No recommendation found with recommendation_id: ${recommendationId}`
+        });
+      }
+
+      res.json({ recommendation });
+    } catch (error) {
+      console.error('Error fetching recommendation:', error);
+      res.status(500).json({
+        error: 'Failed to fetch recommendation',
         message: error.message
       });
     }

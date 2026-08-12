@@ -16,10 +16,18 @@ export class DistributePathUseCase {
    * @param {string} learningPathId - This is actually competency_target_name (primary key of courses table)
    * @returns {Promise<Object>} Distribution results
    */
-  async execute(learningPathId) {
-    // Get learning path from repository
-    // Note: learningPathId is actually competency_target_name (primary key of courses table)
-    const learningPath = await this.repository.getLearningPathById(learningPathId);
+  async execute(learningPathId, options = {}) {
+    const courseId = options.courseId || null;
+
+    // Prefer internal course_id when present; legacy argument is competency_target_name
+    let learningPath = null;
+    if (courseId && typeof this.repository.getLearningPathByCourseId === 'function') {
+      learningPath = await this.repository.getLearningPathByCourseId(courseId);
+    }
+    if (!learningPath) {
+      // STAGE 1 LEGACY TARGET-ONLY FALLBACK
+      learningPath = await this.repository.getLearningPathById(learningPathId);
+    }
     if (!learningPath) {
       throw new Error(`Learning path ${learningPathId} not found`);
     }

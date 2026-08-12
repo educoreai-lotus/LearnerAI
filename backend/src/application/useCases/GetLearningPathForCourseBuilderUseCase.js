@@ -39,21 +39,20 @@ export class GetLearningPathForCourseBuilderUseCase {
     // Path is not approved yet - wait for approval
     console.log(`⏳ Learning path ${competencyTargetName} is not approved yet. Waiting for approval...`);
 
-    // Poll for approval status
+    const courseId = course.course_id || null;
+
+    // Poll for approval status using the owned course's course_id when present
     while (Date.now() - startTime < maxWaitTime) {
-      // Check if path is now approved
-      const updatedCourse = await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
+      const updatedCourse = await this._reloadOwnedCourse(userId, competencyTargetName, courseId);
       if (updatedCourse && updatedCourse.approved === true) {
         console.log(`✅ Learning path ${competencyTargetName} is now approved. Returning data.`);
         return await this._buildResponseData(updatedCourse, userId, competencyTargetName, true);
       }
 
-      // Check approval status
-      const approval = await this.approvalRepository.getApprovalByLearningPathId(competencyTargetName);
+      const approval = await this._getOwnedApproval(courseId, competencyTargetName);
       if (approval && approval.status === 'approved') {
-        // Approval was just approved - update course and return
-        await this.courseRepository.updateCourse(competencyTargetName, { approved: true });
-        const finalCourse = await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
+        await this._markOwnedCourseApproved(userId, competencyTargetName, courseId);
+        const finalCourse = await this._reloadOwnedCourse(userId, competencyTargetName, courseId);
         console.log(`✅ Learning path ${competencyTargetName} approved. Returning data.`);
         return await this._buildResponseData(finalCourse, userId, competencyTargetName, true);
       }
@@ -97,6 +96,54 @@ export class GetLearningPathForCourseBuilderUseCase {
       throw new Error(`Learning path ${competencyTargetName} does not belong to user ${userId}`);
     }
     return byTarget;
+  }
+
+  /**
+   * Reload the owned course. Prefer course_id after the initial user+target resolve.
+   * @private
+   */
+  async _reloadOwnedCourse(userId, competencyTargetName, courseId) {
+    if (courseId && typeof this.courseRepository.getCourseByCourseId === 'function') {
+      const byId = await this.courseRepository.getCourseByCourseId(courseId);
+      if (byId) {
+        return byId;
+      }
+    }
+    return await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
+  }
+
+  /**
+   * Approval polling prefers course_id; falls back to learning_path_id (target).
+   * @private
+   */
+  async _getOwnedApproval(courseId, competencyTargetName) {
+    if (courseId && typeof this.approvalRepository.getApprovalByCourseId === 'function') {
+      const byCourseId = await this.approvalRepository.getApprovalByCourseId(courseId);
+      if (byCourseId) {
+        return byCourseId;
+      }
+    }
+
+    // STAGE 1 LEGACY FALLBACK — approvals without course_id still keyed by target
+    if (typeof this.approvalRepository.getApprovalByLearningPathId === 'function') {
+      return await this.approvalRepository.getApprovalByLearningPathId(competencyTargetName);
+    }
+
+    return null;
+  }
+
+  /**
+   * Never update a known owned course by target alone.
+   * @private
+   */
+  async _markOwnedCourseApproved(userId, competencyTargetName, courseId) {
+    if (courseId && typeof this.courseRepository.updateCourseById === 'function') {
+      return await this.courseRepository.updateCourseById(courseId, { approved: true });
+    }
+    if (typeof this.courseRepository.updateCourseByUserAndTarget === 'function') {
+      return await this.courseRepository.updateCourseByUserAndTarget(userId, competencyTargetName, { approved: true });
+    }
+    return null;
   }
 
   /**

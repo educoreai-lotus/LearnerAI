@@ -339,6 +339,7 @@ describe('Phase B course isolation (transitional schema)', () => {
   describe('Approval compatibility', () => {
     it('creates approval with learning_path_id and populates course_id', async () => {
       const mockApprovalRepository = {
+        getApprovalByCourseId: jest.fn().mockResolvedValue(null),
         getApprovalByLearningPathId: jest.fn().mockResolvedValue(null),
         createApproval: jest.fn().mockImplementation(async (approval) => approval)
       };
@@ -361,7 +362,7 @@ describe('Phase B course isolation (transitional schema)', () => {
       expect(created.courseId).toBe(COURSE_ID_A);
     });
 
-    it('existing approval lookup and approve-by-target remain unchanged', async () => {
+    it('approves the course identified by course_id, not target alone', async () => {
       const approval = new PathApproval({
         id: 'approval-1',
         learningPathId: TARGET,
@@ -378,8 +379,10 @@ describe('Phase B course isolation (transitional schema)', () => {
         }))
       };
       const mockCourseRepository = {
+        updateCourseById: jest.fn().mockResolvedValue({ course_id: COURSE_ID_A, competency_target_name: TARGET, approved: true }),
         updateCourse: jest.fn().mockResolvedValue({ competency_target_name: TARGET, approved: true }),
-        getCourseById: jest.fn()
+        getCourseById: jest.fn(),
+        getCourseByCourseId: jest.fn()
       };
       const useCase = new ProcessApprovalResponseUseCase({
         approvalRepository: mockApprovalRepository,
@@ -390,7 +393,8 @@ describe('Phase B course isolation (transitional schema)', () => {
 
       await useCase.execute('approval-1', 'approved', 'ok');
 
-      expect(mockCourseRepository.updateCourse).toHaveBeenCalledWith(TARGET, { approved: true });
+      expect(mockCourseRepository.updateCourseById).toHaveBeenCalledWith(COURSE_ID_A, { approved: true });
+      expect(mockCourseRepository.updateCourse).not.toHaveBeenCalled();
     });
   });
 

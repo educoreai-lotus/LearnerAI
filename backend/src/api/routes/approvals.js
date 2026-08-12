@@ -6,6 +6,7 @@
 import express from 'express';
 import { ProcessApprovalResponseUseCase } from '../../application/useCases/ProcessApprovalResponseUseCase.js';
 import { GetApprovalDetailsUseCase } from '../../application/useCases/GetApprovalDetailsUseCase.js';
+import { resolveApprovalCourse } from '../../utils/courseIdentity.js';
 
 export function createApprovalsRouter(dependencies) {
   const router = express.Router();
@@ -123,7 +124,7 @@ export function createApprovalsRouter(dependencies) {
 
       // Get learning path and requester info for notification
       try {
-        const course = await courseRepository.getCourseById(approval.learningPathId);
+        const course = await resolveApprovalCourse(courseRepository, approval);
         const learner = course ? await learnerRepository.getLearnerById(course.user_id) : null;
         
         if (course && learner && notificationService) {
@@ -215,7 +216,7 @@ export function createApprovalsRouter(dependencies) {
 
       // Get learning path and requester info for notification
       try {
-        const course = await courseRepository.getCourseById(approval.learningPathId);
+        const course = await resolveApprovalCourse(courseRepository, approval);
         const learner = course ? await learnerRepository.getLearnerById(course.user_id) : null;
         
         if (course && learner && notificationService) {
