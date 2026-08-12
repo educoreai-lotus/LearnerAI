@@ -25,16 +25,8 @@ export class GetLearningPathForCourseBuilderUseCase {
     const pollInterval = options.pollInterval || 1000; // 1 second default
     const startTime = Date.now();
 
-    // Get learning path
-    const course = await this.courseRepository.getCourseById(competencyTargetName);
-    if (!course) {
-      throw new Error(`Learning path not found: ${competencyTargetName}`);
-    }
-
-    // Verify it belongs to the user
-    if (course.user_id !== userId) {
-      throw new Error(`Learning path ${competencyTargetName} does not belong to user ${userId}`);
-    }
+    // Resolve the course owned by this user (user_id + competency_target_name)
+    const course = await this._getOwnedCourse(userId, competencyTargetName);
 
     // Check if approved
     const isApproved = course.approved === true;
@@ -50,7 +42,7 @@ export class GetLearningPathForCourseBuilderUseCase {
     // Poll for approval status
     while (Date.now() - startTime < maxWaitTime) {
       // Check if path is now approved
-      const updatedCourse = await this.courseRepository.getCourseById(competencyTargetName);
+      const updatedCourse = await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
       if (updatedCourse && updatedCourse.approved === true) {
         console.log(`✅ Learning path ${competencyTargetName} is now approved. Returning data.`);
         return await this._buildResponseData(updatedCourse, userId, competencyTargetName, true);
@@ -61,7 +53,7 @@ export class GetLearningPathForCourseBuilderUseCase {
       if (approval && approval.status === 'approved') {
         // Approval was just approved - update course and return
         await this.courseRepository.updateCourse(competencyTargetName, { approved: true });
-        const finalCourse = await this.courseRepository.getCourseById(competencyTargetName);
+        const finalCourse = await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
         console.log(`✅ Learning path ${competencyTargetName} approved. Returning data.`);
         return await this._buildResponseData(finalCourse, userId, competencyTargetName, true);
       }
@@ -82,6 +74,29 @@ export class GetLearningPathForCourseBuilderUseCase {
       message: `Learning path ${competencyTargetName} is not approved yet. Please try again later.`,
       status: 'pending_approval'
     };
+  }
+
+  /**
+   * Owned-course lookup for Course Builder. External contract stays user_id + target.
+   * Owner-mismatch error text is preserved when a different user owns the target.
+   * @private
+   */
+  async _getOwnedCourse(userId, competencyTargetName) {
+    if (typeof this.courseRepository.getCourseByUserAndTarget === 'function') {
+      const owned = await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
+      if (owned) {
+        return owned;
+      }
+    }
+
+    const byTarget = await this.courseRepository.getCourseById(competencyTargetName);
+    if (!byTarget) {
+      throw new Error(`Learning path not found: ${competencyTargetName}`);
+    }
+    if (byTarget.user_id !== userId) {
+      throw new Error(`Learning path ${competencyTargetName} does not belong to user ${userId}`);
+    }
+    return byTarget;
   }
 
   /**

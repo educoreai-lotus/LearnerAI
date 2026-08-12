@@ -18,6 +18,13 @@ export class CourseRepository {
    * @returns {Promise<Object>}
    */
   async createCourse(courseData) {
+    const existing = await this.getCourseById(courseData.competency_target_name);
+    if (existing && existing.user_id && existing.user_id !== courseData.user_id) {
+      throw new Error(
+        `COURSE_OWNERSHIP_COLLISION: competency target "${courseData.competency_target_name}" already belongs to another user`
+      );
+    }
+
     const { data, error } = await this.client
       .from('courses')
       .insert({
@@ -64,6 +71,57 @@ export class CourseRepository {
       .from('courses')
       .select('*')
       .eq('competency_target_name', competencyTargetName)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      throw new Error(`Failed to get course: ${error.message}`);
+    }
+
+    return this._mapToCourse(data);
+  }
+
+  /**
+   * Get the course owned by this user for this competency target.
+   * Both filters are applied in the database query.
+   * @param {string} userId
+   * @param {string} competencyTargetName
+   * @returns {Promise<Object|null>}
+   */
+  async getCourseByUserAndTarget(userId, competencyTargetName) {
+    const { data, error } = await this.client
+      .from('courses')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('competency_target_name', competencyTargetName)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      throw new Error(`Failed to get course: ${error.message}`);
+    }
+
+    return this._mapToCourse(data);
+  }
+
+  /**
+   * Get course by internal course_id (Phase A identity)
+   * @param {string} courseId
+   * @returns {Promise<Object|null>}
+   */
+  async getCourseByCourseId(courseId) {
+    if (!courseId) {
+      return null;
+    }
+
+    const { data, error } = await this.client
+      .from('courses')
+      .select('*')
+      .eq('course_id', courseId)
       .single();
 
     if (error) {
@@ -163,6 +221,7 @@ export class CourseRepository {
    */
   _mapToCourse(record) {
     return {
+      course_id: record.course_id || null,
       competency_target_name: record.competency_target_name,
       user_id: record.user_id,
       gap_id: record.gap_id,

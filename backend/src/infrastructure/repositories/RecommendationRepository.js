@@ -24,6 +24,7 @@ export class RecommendationRepository {
         recommendation_id: recommendationData.recommendation_id || undefined,
         user_id: recommendationData.user_id,
         base_course_name: recommendationData.base_course_name || null,
+        course_id: recommendationData.course_id || null,
         suggested_courses: recommendationData.suggested_courses,
         sent_to_rag: recommendationData.sent_to_rag || false
       })
@@ -185,6 +186,7 @@ export class RecommendationRepository {
       recommendation_id: record.recommendation_id,
       user_id: record.user_id,
       base_course_name: record.base_course_name,
+      course_id: record.course_id || null,
       suggested_courses: record.suggested_courses,
       sent_to_rag: record.sent_to_rag,
       created_at: record.created_at,

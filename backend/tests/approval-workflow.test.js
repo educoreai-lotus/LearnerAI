@@ -65,7 +65,8 @@ describe('Feature: Approval Workflow', () => {
 
     beforeEach(() => {
       mockApprovalRepository = {
-        createApproval: jest.fn()
+        createApproval: jest.fn(),
+        getApprovalByLearningPathId: jest.fn().mockResolvedValue(null)
       };
 
       mockNotificationService = {

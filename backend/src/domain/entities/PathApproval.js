@@ -6,6 +6,7 @@ export class PathApproval {
   constructor({
     id,
     learningPathId,
+    courseId = null,
     companyId,
     decisionMakerId,
     status = 'pending', // 'pending', 'approved', 'rejected', 'changes_requested'
@@ -26,6 +27,7 @@ export class PathApproval {
 
     this.id = id;
     this.learningPathId = learningPathId;
+    this.courseId = courseId || null;
     this.companyId = companyId;
     this.decisionMakerId = decisionMakerId;
     this.status = status;
@@ -57,6 +59,7 @@ export class PathApproval {
     return {
       id: this.id,
       learningPathId: this.learningPathId,
+      courseId: this.courseId,
       companyId: this.companyId,
       decisionMakerId: this.decisionMakerId,
       status: this.status,

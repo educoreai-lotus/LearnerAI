@@ -143,11 +143,25 @@ export class GenerateCourseSuggestionsUseCase {
 
       let savedSuggestion = null;
       if (this.recommendationRepository && typeof this.recommendationRepository.createRecommendation === 'function') {
+        let courseId = null;
+        if (this.learningPathRepository && typeof this.learningPathRepository.getLearningPathByUserAndTarget === 'function') {
+          try {
+            const ownedCourse = await this.learningPathRepository.getLearningPathByUserAndTarget(
+              userId,
+              competencyTargetName
+            );
+            courseId = ownedCourse?.courseId || null;
+          } catch (error) {
+            console.warn(`⚠️  Could not resolve course_id for recommendation: ${error.message}`);
+          }
+        }
+
         // Persist to the current schema (recommendations table)
         // NOTE: sent_to_rag will be set to true when RAG requests the data via batch/demand/GRPC
         const created = await this.recommendationRepository.createRecommendation({
           user_id: userId,
           base_course_name: competencyTargetName,
+          course_id: courseId,
           suggested_courses: {
             originalSuggestions: suggestions,
             enhancedSuggestions: enhancedSuggestions,

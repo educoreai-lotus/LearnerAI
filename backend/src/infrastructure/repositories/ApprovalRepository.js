@@ -19,18 +19,24 @@ export class ApprovalRepository {
    * @returns {Promise<PathApproval>}
    */
   async createApproval(approval) {
+    const insertData = {
+      id: approval.id,
+      learning_path_id: approval.learningPathId,
+      company_id: approval.companyId,
+      decision_maker_id: approval.decisionMakerId,
+      status: approval.status,
+      feedback: approval.feedback || null,
+      approved_at: approval.approvedAt || null,
+      rejected_at: approval.rejectedAt || null
+    };
+
+    if (approval.courseId) {
+      insertData.course_id = approval.courseId;
+    }
+
     const { data, error } = await this.client
       .from('path_approvals')
-      .insert({
-        id: approval.id,
-        learning_path_id: approval.learningPathId,
-        company_id: approval.companyId,
-        decision_maker_id: approval.decisionMakerId,
-        status: approval.status,
-        feedback: approval.feedback || null,
-        approved_at: approval.approvedAt || null,
-        rejected_at: approval.rejectedAt || null
-      })
+      .insert(insertData)
       .select()
       .single();
 
@@ -150,6 +156,10 @@ export class ApprovalRepository {
       feedback: updates.feedback || null
     };
 
+    if (updates.courseId) {
+      updateData.course_id = updates.courseId;
+    }
+
     if (updates.status === 'approved') {
       updateData.approved_at = updates.approvedAt || new Date().toISOString();
       updateData.rejected_at = null;
@@ -204,6 +214,7 @@ export class ApprovalRepository {
     return new PathApproval({
       id: record.id,
       learningPathId: record.learning_path_id,
+      courseId: record.course_id || null,
       companyId: record.company_id,
       decisionMakerId: record.decision_maker_id,
       status: record.status,

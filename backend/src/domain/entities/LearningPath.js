@@ -8,6 +8,7 @@ export class LearningPath {
     userId,
     companyId,
     competencyTargetName, // competency_target_name (primary key of courses table)
+    courseId = null, // Internal UUID identity from Phase A (not the PK during Phase B)
     gapId = null, // Link to original skills gap
     pathSteps = [],
     pathTitle = null,
@@ -22,6 +23,7 @@ export class LearningPath {
     this.userId = userId;
     this.companyId = companyId;
     this.competencyTargetName = competencyTargetName || id; // Use id if not provided
+    this.courseId = courseId || null;
     this.gapId = gapId; // Link to original skills gap
     this.pathSteps = pathSteps; // Array of step objects or learning_modules
     this.pathTitle = pathTitle; // Title of the learning path
@@ -70,6 +72,7 @@ export class LearningPath {
       userId: this.userId,
       companyId: this.companyId,
       competencyTargetName: this.competencyTargetName,
+      courseId: this.courseId,
       gapId: this.gapId,
       pathSteps: this.pathSteps,
       pathTitle: this.pathTitle,

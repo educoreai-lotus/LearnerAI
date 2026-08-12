@@ -49,7 +49,8 @@ describe('Feature: Learning Path Generation', () => {
     mockRepository = {
       saveLearningPath: jest.fn(),
       getLearningPath: jest.fn(), // Use case calls this
-      getLearningPathById: jest.fn(), // SupabaseRepository has this
+      getLearningPathById: jest.fn().mockResolvedValue(null),
+      getLearningPathByUserAndTarget: jest.fn().mockResolvedValue(null),
       getLearningPathsByUser: jest.fn(),
       updateLearningPath: jest.fn()
     };
@@ -92,7 +93,8 @@ describe('Feature: Learning Path Generation', () => {
       createSkillsExpansion: jest.fn().mockResolvedValue({ expansionId: 'exp-123' }),
       updateSkillsExpansion: jest.fn().mockResolvedValue({}),
       getSkillsExpansionById: jest.fn().mockResolvedValue(null),
-      getSkillsExpansionsByGapId: jest.fn().mockResolvedValue([])
+      getSkillsExpansionsByGapId: jest.fn().mockResolvedValue([]),
+      getLatestSkillsExpansionByUserAndGap: jest.fn().mockResolvedValue(null)
     };
 
     // Mock Cache Repository

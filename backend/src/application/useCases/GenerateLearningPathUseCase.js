@@ -148,6 +148,36 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
+   * Personalized course lookup: same user + same target.
+   * A different user's row with the same target is a Phase B collision, not UPDATE MODE.
+   * @private
+   */
+  async _getOwnedExistingCourse(userId, competencyTargetName) {
+    if (typeof this.repository.getLearningPathByUserAndTarget !== 'function') {
+      throw new Error('Learning path repository must implement getLearningPathByUserAndTarget');
+    }
+
+    const ownedCourse = await this.repository.getLearningPathByUserAndTarget(
+      userId,
+      competencyTargetName
+    );
+    if (ownedCourse) {
+      return ownedCourse;
+    }
+
+    if (typeof this.repository.getLearningPathById === 'function') {
+      const byTarget = await this.repository.getLearningPathById(competencyTargetName);
+      if (byTarget && byTarget.userId && byTarget.userId !== userId) {
+        throw new Error(
+          `COURSE_OWNERSHIP_COLLISION: competency target "${competencyTargetName}" already belongs to another user`
+        );
+      }
+    }
+
+    return null;
+  }
+
+  /**
    * ProcessJob - Executes the three-prompt flow asynchronously
    */
   async processJob(job, skillsGap) {
@@ -162,8 +192,8 @@ export class GenerateLearningPathUseCase {
         progress: 10
       });
 
-      // Check if this is an update scenario (learning path exists + expansions exist)
-      const existingCourse = await this.repository.getLearningPathById(competencyTargetName);
+      // Owned course only: same user + same competency target (not a global target-only hit)
+      const existingCourse = await this._getOwnedExistingCourse(skillsGap.userId, competencyTargetName);
       let isUpdateMode = false;
       let existingExpansion = null;
       let existingPrompt1Output = null;
@@ -756,6 +786,7 @@ export class GenerateLearningPathUseCase {
         userId: skillsGap.userId,
         companyId: skillsGap.companyId,
         competencyTargetName: competencyTargetName,
+        courseId: existingCourse?.courseId || null, // Preserve existing course_id on same-user update
         gapId: gapId || null, // Link to original skills gap
         pathSteps: pathData.learning_modules || [], // Always use learning_modules (converted from old format if needed)
         pathTitle: pathData.path_title,
@@ -868,10 +899,11 @@ export class GenerateLearningPathUseCase {
           try {
             const approval = await this.requestPathApprovalUseCase.execute({
               learningPathId: learningPathId,
-            companyId: skillsGap.companyId,
-            decisionMaker: company.decisionMaker,
-            learningPath: learningPath.toJSON()
-          });
+              courseId: learningPath.courseId || null,
+              companyId: skillsGap.companyId,
+              decisionMaker: company.decisionMaker,
+              learningPath: learningPath.toJSON()
+            });
             console.log(`✅ Approval request created successfully: ${approval.id} for path ${learningPathId} (manual approval required)`);
           } catch (approvalError) {
             console.error(`❌ Failed to create approval request: ${approvalError.message}`);

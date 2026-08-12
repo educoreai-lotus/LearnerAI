@@ -37,6 +37,31 @@ export class SupabaseRepository {
   }
 
   /**
+   * Get the personalized course owned by this user for this competency target.
+   * Both filters are applied in the database query (not target-only + reuse).
+   * @param {string} userId
+   * @param {string} competencyTargetName
+   * @returns {Promise<LearningPath|null>}
+   */
+  async getLearningPathByUserAndTarget(userId, competencyTargetName) {
+    const { data, error } = await this.client
+      .from('courses')
+      .select('*')
+      .eq('user_id', userId)
+      .eq('competency_target_name', competencyTargetName)
+      .single();
+
+    if (error) {
+      if (error.code === 'PGRST116') {
+        return null; // Not found
+      }
+      throw new Error(`Failed to get learning path: ${error.message}`);
+    }
+
+    return this._mapToLearningPath(data);
+  }
+
+  /**
    * Get all learning paths for a user
    * @param {string} userId
    * @returns {Promise<Array<LearningPath>>}
@@ -124,14 +149,30 @@ export class SupabaseRepository {
       }
     });
 
+    const competencyTargetName = learningPath.competencyTargetName || learningPath.id;
+    const existingByTarget = await this.getLearningPathById(competencyTargetName);
+
+    // Phase B: competency_target_name is still the global PK. Refuse cross-user overwrite.
+    if (existingByTarget && existingByTarget.userId && existingByTarget.userId !== learningPath.userId) {
+      throw new Error(
+        `COURSE_OWNERSHIP_COLLISION: competency target "${competencyTargetName}" already belongs to another user`
+      );
+    }
+
     // Build upsert data - let database handle timestamps to avoid timezone issues
     const upsertData = {
-      competency_target_name: learningPath.competencyTargetName || learningPath.id, // Primary key
+      competency_target_name: competencyTargetName, // Primary key (unchanged during Phase B)
       user_id: learningPath.userId,
       gap_id: learningPath.gapId || null, // Link to original skills gap
       learning_path: pathData,
       approved: learningPath.status === 'approved' || learningPath.status === 'completed'
     };
+
+    // Same-user update: preserve the existing course_id. New insert: omit so DB DEFAULT applies.
+    const existingCourseId = existingByTarget?.courseId || learningPath.courseId || null;
+    if (existingByTarget && existingCourseId) {
+      upsertData.course_id = existingCourseId;
+    }
     
     // Only set created_at if this is a NEW record (not updating existing)
     // For updates, PostgreSQL will preserve the existing created_at value
@@ -279,6 +320,7 @@ export class SupabaseRepository {
       userId: record.user_id || pathData.learner_id || null,
       companyId: null, // NOT stored in learning_path JSONB (stored in courses table via user_id -> learners table)
       competencyTargetName: record.competency_target_name,
+      courseId: record.course_id || null,
       gapId: record.gap_id || null, // Link to original skills gap
       pathSteps: learningModules, // learning_modules array
       pathTitle: pathTitle,

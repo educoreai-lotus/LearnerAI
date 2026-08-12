@@ -94,7 +94,8 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
     mockRepository = {
       saveLearningPath: jest.fn().mockResolvedValue({ id: 'path-123', competencyTargetName: TARGET }),
       getLearningPath: jest.fn(),
-      getLearningPathById: jest.fn(),
+      getLearningPathById: jest.fn().mockResolvedValue(null),
+      getLearningPathByUserAndTarget: jest.fn().mockResolvedValue(null),
       getLearningPathsByUser: jest.fn(),
       updateLearningPath: jest.fn()
     };
@@ -187,9 +188,10 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
   }
 
   function enterUpdateMode(competencyNames) {
-    mockRepository.getLearningPathById.mockResolvedValue({
+    mockRepository.getLearningPathByUserAndTarget.mockResolvedValue({
       competencyTargetName: TARGET,
-      userId: 'user-123'
+      userId: 'user-123',
+      courseId: 'course-uuid-existing'
     });
     mockSkillsExpansionRepository.getLatestSkillsExpansionByUserAndGap.mockResolvedValue({
       expansion_id: 'exp-existing',
@@ -323,6 +325,7 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
 
   describe('FULL MODE regression', () => {
     it('does not apply UPDATE MODE filtering when no existing course/expansion is present', async () => {
+      mockRepository.getLearningPathByUserAndTarget.mockResolvedValue(null);
       mockRepository.getLearningPathById.mockResolvedValue(null);
       mockExistingGap({ [TARGET]: REMAINING_GAP_SKILLS });
       mockSkillsExpansionRepository.getLatestSkillsExpansionByUserAndGap.mockResolvedValue(null);

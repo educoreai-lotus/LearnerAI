@@ -34,7 +34,9 @@ describe('Feature: Course Suggestions', () => {
     };
 
     mockLearningPathRepository = {
-      getLearningPathById: jest.fn()
+      getLearningPathById: jest.fn(),
+      getLearningPathByUserAndTarget: jest.fn().mockResolvedValue(null),
+      getLearningPathsByUser: jest.fn().mockResolvedValue([])
     };
 
     mockPromptLoader = {

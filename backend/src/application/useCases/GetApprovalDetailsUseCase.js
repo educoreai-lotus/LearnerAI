@@ -36,9 +36,15 @@ export class GetApprovalDetailsUseCase {
     // Note: In a real system, you'd check if userId matches decisionMakerId or is an admin
     // For now, we'll validate in the route handler
 
-    // Get learning path (course) by competency_target_name
+    // Prefer course_id when present; keep target-based learning_path_id compatibility
     console.log(`[GetApprovalDetailsUseCase] Fetching course: ${approval.learningPathId}`);
-    const course = await this.courseRepository.getCourseById(approval.learningPathId);
+    let course = null;
+    if (approval.courseId && typeof this.courseRepository.getCourseByCourseId === 'function') {
+      course = await this.courseRepository.getCourseByCourseId(approval.courseId);
+    }
+    if (!course) {
+      course = await this.courseRepository.getCourseById(approval.learningPathId);
+    }
     if (!course) {
       console.error(`[GetApprovalDetailsUseCase] Course not found for learning_path_id: ${approval.learningPathId}`);
       throw new Error(`Learning path ${approval.learningPathId} not found. The learning path may not have been generated yet.`);

@@ -336,9 +336,13 @@ export async function fillSkillsEngineData(data, { skillsGapRepository, courseRe
   const filled = { ...data };
 
   // If competency_target_name is provided, fill learning path info
-  if (data.competency_target_name && courseRepository && typeof courseRepository.getCourseById === 'function') {
+  if (data.competency_target_name && courseRepository) {
     try {
-      const course = await courseRepository.getCourseById(data.competency_target_name);
+      const course = data.user_id && typeof courseRepository.getCourseByUserAndTarget === 'function'
+        ? await courseRepository.getCourseByUserAndTarget(data.user_id, data.competency_target_name)
+        : typeof courseRepository.getCourseById === 'function'
+          ? await courseRepository.getCourseById(data.competency_target_name)
+          : null;
       if (course) {
         filled.learning_path = course.learning_path || filled.learning_path || null;
         filled.approved = course.approved !== undefined ? course.approved : filled.approved || false;
@@ -587,10 +591,15 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         );
       }
       
-      // Get course with learning_path
+      // Get course with learning_path (owned by this user)
       let course = null;
-      if (courseRepository && typeof courseRepository.getCourseById === 'function') {
-        course = await courseRepository.getCourseById(data.competency_target_name);
+      if (courseRepository && typeof courseRepository.getCourseByUserAndTarget === 'function') {
+        course = await courseRepository.getCourseByUserAndTarget(data.user_id, data.competency_target_name);
+      } else if (courseRepository && typeof courseRepository.getCourseById === 'function') {
+        const byTarget = await courseRepository.getCourseById(data.competency_target_name);
+        if (byTarget && byTarget.user_id === data.user_id) {
+          course = byTarget;
+        }
       }
       
       // Convert skills_raw_data to array for Learning Analytics (remove competency names)
@@ -621,9 +630,13 @@ export async function fillCourseBuilderData(data, { courseRepository, skillsGapR
   const filled = { ...data };
 
   // If competency_target_name is provided, fill learning path
-  if (data.competency_target_name && courseRepository && typeof courseRepository.getCourseById === 'function') {
+  if (data.competency_target_name && courseRepository) {
     try {
-      const course = await courseRepository.getCourseById(data.competency_target_name);
+      const course = data.user_id && typeof courseRepository.getCourseByUserAndTarget === 'function'
+        ? await courseRepository.getCourseByUserAndTarget(data.user_id, data.competency_target_name)
+        : typeof courseRepository.getCourseById === 'function'
+          ? await courseRepository.getCourseById(data.competency_target_name)
+          : null;
       if (course) {
         filled.learning_path = course.learning_path || filled.learning_path || null;
         filled.user_id = course.user_id || filled.user_id || '';
@@ -1474,11 +1487,9 @@ async function courseBuilderHandler(payload, dependencies) {
     
     try {
       // Get course/learning path (filter by both user_id and competency_target_name to ensure correct course)
-      if (courseRepository && typeof courseRepository.getCourseById === 'function') {
-        const course = await courseRepository.getCourseById(competency_target_name);
+      if (courseRepository && typeof courseRepository.getCourseByUserAndTarget === 'function') {
+        const course = await courseRepository.getCourseByUserAndTarget(user_id, competency_target_name);
         if (course) {
-          // Verify this course belongs to the requested user
-          if (course.user_id === user_id) {
             // Parse learning_path if it's a string
             learningPath = course.learning_path;
             if (typeof learningPath === 'string') {
@@ -1490,11 +1501,8 @@ async function courseBuilderHandler(payload, dependencies) {
               }
             }
             console.log(`✅ Found learning path for user ${user_id}, competency ${competency_target_name}`);
-          } else {
-            console.warn(`⚠️  Course found but user_id mismatch: expected ${user_id}, got ${course.user_id}`);
-          }
         } else {
-          console.warn(`⚠️  No course found for competency: ${competency_target_name}`);
+          console.warn(`⚠️  No owned course found for user ${user_id}, competency ${competency_target_name}`);
         }
       }
       
