@@ -116,7 +116,7 @@ describe('Phase B course isolation (transitional schema)', () => {
           user_id: USER_A,
           course_id: COURSE_ID_A
         }),
-        { onConflict: 'competency_target_name' }
+        { onConflict: 'user_id,competency_target_name' }
       );
     });
 
@@ -137,7 +137,7 @@ describe('Phase B course isolation (transitional schema)', () => {
       const upsertPayload = mockClient.upsert.mock.calls[0][0];
       expect(upsertPayload.competency_target_name).toBe(TARGET);
       expect(upsertPayload).not.toHaveProperty('course_id');
-      expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'competency_target_name' });
+      expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'user_id,competency_target_name' });
     });
 
     it('refuses to overwrite a different user\'s same-target row', async () => {

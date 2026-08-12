@@ -181,7 +181,7 @@ export class SupabaseRepository {
     const competencyTargetName = learningPath.competencyTargetName || learningPath.id;
     const existingByTarget = await this.getLearningPathById(competencyTargetName);
 
-    // Phase B: competency_target_name is still the global PK. Refuse cross-user overwrite.
+    // Stage 2: refuse cross-user overwrite. User B + same target stays blocked.
     if (existingByTarget && existingByTarget.userId && existingByTarget.userId !== learningPath.userId) {
       throw new Error(
         `COURSE_OWNERSHIP_COLLISION: competency target "${competencyTargetName}" already belongs to another user`
@@ -190,7 +190,7 @@ export class SupabaseRepository {
 
     // Build upsert data - let database handle timestamps to avoid timezone issues
     const upsertData = {
-      competency_target_name: competencyTargetName, // Primary key (unchanged during Phase B)
+      competency_target_name: competencyTargetName,
       user_id: learningPath.userId,
       gap_id: learningPath.gapId || null, // Link to original skills gap
       learning_path: pathData,
@@ -218,7 +218,7 @@ export class SupabaseRepository {
     const { data, error } = await this.client
       .from('courses')
       .upsert(upsertData, {
-        onConflict: 'competency_target_name'
+        onConflict: 'user_id,competency_target_name'
       })
       .select()
       .single();

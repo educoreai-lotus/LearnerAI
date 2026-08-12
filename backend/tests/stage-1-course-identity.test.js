@@ -635,7 +635,7 @@ describe('Stage 1 course identity preparation', () => {
       expect(mockGemini.executePrompt).not.toHaveBeenCalled();
     });
 
-    it('save still uses onConflict competency_target_name and still throws COURSE_OWNERSHIP_COLLISION', async () => {
+    it('save still throws COURSE_OWNERSHIP_COLLISION for a foreign same-target user', async () => {
       const repository = new SupabaseRepository('https://fake.supabase.co', 'fake-key');
       const mockClient = createMockSupabaseClient();
       repository.client = mockClient;
@@ -652,7 +652,7 @@ describe('Stage 1 course identity preparation', () => {
         status: 'completed'
       }));
 
-      expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'competency_target_name' });
+      expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'user_id,competency_target_name' });
 
       mockClient.single.mockResolvedValue({ data: dbCourseRecord({ userId: USER_A }), error: null });
       await expect(repository.saveLearningPath(new LearningPath({
@@ -670,7 +670,7 @@ describe('Stage 1 course identity preparation', () => {
     const backendDir = join(testsDir, '..');
     const repoRoot = join(backendDir, '..');
 
-    it('does not add a Stage 2/Phase C migration file', () => {
+    it('does not add a Phase C or Stage 1 schema-cutover migration file', () => {
       expect(existsSync(join(repoRoot, 'database', 'migrations', 'phase_a_add_course_id.sql'))).toBe(true);
       expect(existsSync(join(repoRoot, 'database', 'migrations', 'phase_c_course_id.sql'))).toBe(false);
       expect(existsSync(join(repoRoot, 'database', 'migrations', 'stage_1_course_identity.sql'))).toBe(false);
@@ -689,7 +689,7 @@ describe('Stage 1 course identity preparation', () => {
       }
     });
 
-    it('collision guard and target onConflict are still present in source', () => {
+    it('collision guard is still present in source', () => {
       const saveSource = readFileSync(
         join(backendDir, 'src', 'infrastructure', 'repositories', 'SupabaseRepository.js'),
         'utf8'
@@ -698,7 +698,6 @@ describe('Stage 1 course identity preparation', () => {
         join(backendDir, 'src', 'application', 'useCases', 'GenerateLearningPathUseCase.js'),
         'utf8'
       );
-      expect(saveSource).toContain("onConflict: 'competency_target_name'");
       expect(saveSource).toContain('COURSE_OWNERSHIP_COLLISION');
       expect(generateSource).toContain('COURSE_OWNERSHIP_COLLISION');
     });
