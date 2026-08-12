@@ -470,16 +470,16 @@ export class GenerateLearningPathUseCase {
           includeExpansions: true, // Explicitly request lowest level skills (expansions competencies)
           timeoutMs: 300000 // 5 minutes timeout for Skills Engine breakdown (can take long)
         });
-        console.log(`✅ Skills Engine breakdown received for ${competencies.length} competencies (lowest level skills/expansions)`);
+        let receivedTotalSkills = 0;
+        if (skillBreakdown && typeof skillBreakdown === 'object') {
+          Object.values(skillBreakdown).forEach(skills => {
+            if (Array.isArray(skills)) receivedTotalSkills += skills.length;
+            else if (skills && typeof skills === 'object') receivedTotalSkills += Object.keys(skills).length;
+          });
+        }
+        console.log(`✅ Skills Engine breakdown received: competencies=${competencies.length} totalSkills=${receivedTotalSkills}`);
         
-        // DETAILED LOG: Print the full skills breakdown structure
-        console.log(`📋 [SKILLS BREAKDOWN FROM SKILLS ENGINE]`);
-        console.log(`   Competencies requested: ${competencies.length}`);
-        console.log(`   Competencies: ${JSON.stringify(competencies.map(c => c.name || c.competency_name || c), null, 2)}`);
-        console.log(`   Skills breakdown structure:`);
-        console.log(`   ${JSON.stringify(skillBreakdown, null, 2)}`);
-        
-        // Log breakdown summary by competency
+        // Compact per-competency summary (do not pretty-print the full breakdown)
         if (skillBreakdown && typeof skillBreakdown === 'object') {
           Object.keys(skillBreakdown).forEach(competencyName => {
             const skills = skillBreakdown[competencyName];
@@ -511,11 +511,17 @@ export class GenerateLearningPathUseCase {
       if (skillBreakdown) {
         const breakdownBeforeNormalization = JSON.parse(JSON.stringify(skillBreakdown)); // Deep copy for logging
         skillBreakdown = this._normalizeSkillBreakdown(skillBreakdown);
-        console.log(`✅ Normalized skill breakdown: extracted skill names (removed skill_id if present)`);
-        
-        // DETAILED LOG: Print normalized breakdown
-        console.log(`📋 [NORMALIZED SKILLS BREAKDOWN]`);
-        console.log(`   ${JSON.stringify(skillBreakdown, null, 2)}`);
+        let normalizedTotalSkills = 0;
+        const normalizedCompetencyCount = (skillBreakdown && typeof skillBreakdown === 'object')
+          ? Object.keys(skillBreakdown).length
+          : 0;
+        if (skillBreakdown && typeof skillBreakdown === 'object') {
+          Object.values(skillBreakdown).forEach(skills => {
+            if (Array.isArray(skills)) normalizedTotalSkills += skills.length;
+            else if (skills && typeof skills === 'object') normalizedTotalSkills += Object.keys(skills).length;
+          });
+        }
+        console.log(`✅ Normalized skill breakdown: competencies=${normalizedCompetencyCount} totalSkills=${normalizedTotalSkills}`);
         
         // Log comparison if structure changed
         if (JSON.stringify(breakdownBeforeNormalization) !== JSON.stringify(skillBreakdown)) {
@@ -671,11 +677,15 @@ export class GenerateLearningPathUseCase {
       const expandedSkills = this._extractSkillsFromExpandedBreakdown(expandedBreakdownForPrompt3);
       const combinedSkills = [...new Set([...initialSkills, ...expandedSkills])];
       
-      // DEBUG: Log extracted skills
+      // Compact Prompt 3 skill counts (sample first 5 names only — do not dump full arrays)
+      const prompt3SkillSample = (skills) => {
+        if (!skills || skills.length === 0) return '(none)';
+        return `${skills.slice(0, 5).join(', ')}${skills.length > 5 ? '...' : ''}`;
+      };
       console.log(`📋 [REFERENCE PROMPT PIPELINE DEBUG] EXTRACTED SKILLS FOR PROMPT 3`);
-      console.log(`   Initial Gap Skills (${initialSkills.length}): ${initialSkills.join(', ')}`);
-      console.log(`   Expanded Breakdown Skills (${expandedSkills.length}): ${expandedSkills.join(', ')}`);
-      console.log(`   Combined unique skills (${combinedSkills.length}): ${combinedSkills.join(', ')}`);
+      console.log(`   Initial Gap Skills (${initialSkills.length}): ${prompt3SkillSample(initialSkills)}`);
+      console.log(`   Expanded Breakdown Skills (${expandedSkills.length}): ${prompt3SkillSample(expandedSkills)}`);
+      console.log(`   Combined unique skills (${combinedSkills.length}): ${prompt3SkillSample(combinedSkills)}`);
       
       // Explicit skill lists for the model — do NOT inject module-by-source separation.
       // Reference Prompt 3 owns pedagogical ordering: combine all input skills across 2 modules × 2 steps.
