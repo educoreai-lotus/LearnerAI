@@ -21,12 +21,11 @@ export class RequestPathApprovalUseCase {
    * @returns {Promise<PathApproval>}
    */
   async execute({ learningPathId, courseId = null, companyId, decisionMaker, learningPath }) {
-    // Prefer course_id identity; fall back to learning_path_id (target) for legacy rows
+    // True identity is course_id. Target-only lookup is last-resort legacy only.
     let existingApproval = null;
     if (courseId && typeof this.approvalRepository.getApprovalByCourseId === 'function') {
       existingApproval = await this.approvalRepository.getApprovalByCourseId(courseId);
-    }
-    if (!existingApproval && typeof this.approvalRepository.getApprovalByLearningPathId === 'function') {
+    } else if (!courseId && typeof this.approvalRepository.getApprovalByLearningPathId === 'function') {
       existingApproval = await this.approvalRepository.getApprovalByLearningPathId(learningPathId);
     }
     

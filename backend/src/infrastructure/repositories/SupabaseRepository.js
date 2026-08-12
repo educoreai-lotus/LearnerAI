@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { LearningPath } from '../../domain/entities/LearningPath.js';
+import { pickUniqueCourseOrThrow } from '../../utils/courseIdentity.js';
 
 /**
  * SupabaseRepository
@@ -41,28 +42,23 @@ export class SupabaseRepository {
 
   /**
    * LEGACY TARGET-ONLY LOOKUP.
-   * learningPathId is competency_target_name (still the global PK).
-   * Stage 2/C4 cutover blocker: do not use for personalized reads when
-   * course_id or user+target is available.
+   * Target is not unique. 0 -> null, 1 -> that course, >1 -> AMBIGUOUS_COURSE_TARGET.
+   * Do not use for personalized reads when course_id or user+target is available.
    * @param {string} learningPathId
    * @returns {Promise<LearningPath|null>}
    */
   async getLearningPathById(learningPathId) {
-    // Note: learningPathId is actually competency_target_name (primary key of courses table)
     const { data, error } = await this.client
       .from('courses')
       .select('*')
-      .eq('competency_target_name', learningPathId)
-      .single();
+      .eq('competency_target_name', learningPathId);
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Not found
-      }
       throw new Error(`Failed to get learning path: ${error.message}`);
     }
 
-    return this._mapToLearningPath(data);
+    const row = pickUniqueCourseOrThrow(data, learningPathId);
+    return row ? this._mapToLearningPath(row) : null;
   }
 
   /**
@@ -179,14 +175,10 @@ export class SupabaseRepository {
     });
 
     const competencyTargetName = learningPath.competencyTargetName || learningPath.id;
-    const existingByTarget = await this.getLearningPathById(competencyTargetName);
-
-    // Stage 2: refuse cross-user overwrite. User B + same target stays blocked.
-    if (existingByTarget && existingByTarget.userId && existingByTarget.userId !== learningPath.userId) {
-      throw new Error(
-        `COURSE_OWNERSHIP_COLLISION: competency target "${competencyTargetName}" already belongs to another user`
-      );
-    }
+    const ownedExisting = await this.getLearningPathByUserAndTarget(
+      learningPath.userId,
+      competencyTargetName
+    );
 
     // Build upsert data - let database handle timestamps to avoid timezone issues
     const upsertData = {
@@ -198,8 +190,8 @@ export class SupabaseRepository {
     };
 
     // Same-user update: preserve the existing course_id. New insert: omit so DB DEFAULT applies.
-    const existingCourseId = existingByTarget?.courseId || learningPath.courseId || null;
-    if (existingByTarget && existingCourseId) {
+    const existingCourseId = ownedExisting?.courseId || null;
+    if (ownedExisting && existingCourseId) {
       upsertData.course_id = existingCourseId;
     }
     
@@ -345,7 +337,7 @@ export class SupabaseRepository {
     const learningModules = pathData.learning_modules || pathData.pathSteps || [];
     
     return new LearningPath({
-      id: record.competency_target_name, // Primary key is competency_target_name
+      id: record.competency_target_name, // Legacy display id (target). Unique identity is course_id.
       userId: record.user_id || pathData.learner_id || null,
       companyId: null, // NOT stored in learning_path JSONB (stored in courses table via user_id -> learners table)
       competencyTargetName: record.competency_target_name,

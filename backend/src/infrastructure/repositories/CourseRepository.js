@@ -1,4 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
+import { pickUniqueCourseOrThrow } from '../../utils/courseIdentity.js';
 
 /**
  * CourseRepository
@@ -18,13 +19,6 @@ export class CourseRepository {
    * @returns {Promise<Object>}
    */
   async createCourse(courseData) {
-    const existing = await this.getCourseById(courseData.competency_target_name);
-    if (existing && existing.user_id && existing.user_id !== courseData.user_id) {
-      throw new Error(
-        `COURSE_OWNERSHIP_COLLISION: competency target "${courseData.competency_target_name}" already belongs to another user`
-      );
-    }
-
     const { data, error } = await this.client
       .from('courses')
       .insert({
@@ -63,8 +57,8 @@ export class CourseRepository {
 
   /**
    * LEGACY TARGET-ONLY LOOKUP.
-   * Competency target is still the global PK. Stage 2/C4 cutover blocker:
-   * do not use this for personalized reads when course_id or user+target is available.
+   * Target is not unique. 0 -> null, 1 -> that course, >1 -> AMBIGUOUS_COURSE_TARGET.
+   * Do not use for personalized reads when course_id or user+target is available.
    * @param {string} competencyTargetName
    * @returns {Promise<Object|null>}
    */
@@ -72,17 +66,14 @@ export class CourseRepository {
     const { data, error } = await this.client
       .from('courses')
       .select('*')
-      .eq('competency_target_name', competencyTargetName)
-      .single();
+      .eq('competency_target_name', competencyTargetName);
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Not found
-      }
       throw new Error(`Failed to get course: ${error.message}`);
     }
 
-    return this._mapToCourse(data);
+    const row = pickUniqueCourseOrThrow(data, competencyTargetName);
+    return row ? this._mapToCourse(row) : null;
   }
 
   /**
@@ -229,25 +220,18 @@ export class CourseRepository {
 
   /**
    * LEGACY TARGET-ONLY UPDATE.
-   * Safe only while competency_target_name remains globally unique.
-   * Personalized runtime paths must use updateCourseById or updateCourseByUserAndTarget.
+   * Resolves 0/1/>1. Multiple matches throw AMBIGUOUS_COURSE_TARGET.
+   * Mutates only the resolved course_id — never all same-target rows.
    * @param {string} competencyTargetName
    * @param {Object} updates
    * @returns {Promise<Object>}
    */
   async updateCourse(competencyTargetName, updates) {
-    const { data, error } = await this.client
-      .from('courses')
-      .update(this._buildUpdateData(updates))
-      .eq('competency_target_name', competencyTargetName)
-      .select()
-      .single();
-
-    if (error) {
-      throw new Error(`Failed to update course: ${error.message}`);
+    const existing = await this.getCourseById(competencyTargetName);
+    if (!existing?.course_id) {
+      throw new Error(`Failed to update course: no unique course for target "${competencyTargetName}"`);
     }
-
-    return this._mapToCourse(data);
+    return await this.updateCourseById(existing.course_id, updates);
   }
 
   /**
@@ -299,22 +283,20 @@ export class CourseRepository {
 
   /**
    * LEGACY TARGET-ONLY DELETE.
-   * Safe only while competency_target_name remains globally unique.
-   * Do not use in personalized or seed paths when course_id or user_id is known.
+   * Resolves 0/1/>1. Multiple matches throw AMBIGUOUS_COURSE_TARGET.
+   * Deletes only the resolved course_id — never all same-target rows.
    * @param {string} competencyTargetName
    * @returns {Promise<boolean>}
    */
   async deleteCourse(competencyTargetName) {
-    const { error } = await this.client
-      .from('courses')
-      .delete()
-      .eq('competency_target_name', competencyTargetName);
-
-    if (error) {
-      throw new Error(`Failed to delete course: ${error.message}`);
+    const existing = await this.getCourseById(competencyTargetName);
+    if (!existing) {
+      return true;
     }
-
-    return true;
+    if (!existing.course_id) {
+      throw new Error(`Failed to delete course: no unique course for target "${competencyTargetName}"`);
+    }
+    return await this.deleteCourseById(existing.course_id);
   }
 
   /**

@@ -77,25 +77,16 @@ export class GetLearningPathForCourseBuilderUseCase {
 
   /**
    * Owned-course lookup for Course Builder. External contract stays user_id + target.
-   * Owner-mismatch error text is preserved when a different user owns the target.
    * @private
    */
   async _getOwnedCourse(userId, competencyTargetName) {
-    if (typeof this.courseRepository.getCourseByUserAndTarget === 'function') {
-      const owned = await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
-      if (owned) {
-        return owned;
-      }
-    }
-
-    const byTarget = await this.courseRepository.getCourseById(competencyTargetName);
-    if (!byTarget) {
+    const owned = typeof this.courseRepository.getCourseByUserAndTarget === 'function'
+      ? await this.courseRepository.getCourseByUserAndTarget(userId, competencyTargetName)
+      : null;
+    if (!owned) {
       throw new Error(`Learning path not found: ${competencyTargetName}`);
     }
-    if (byTarget.user_id !== userId) {
-      throw new Error(`Learning path ${competencyTargetName} does not belong to user ${userId}`);
-    }
-    return byTarget;
+    return owned;
   }
 
   /**
@@ -113,22 +104,13 @@ export class GetLearningPathForCourseBuilderUseCase {
   }
 
   /**
-   * Approval polling prefers course_id; falls back to learning_path_id (target).
+   * Approval polling uses course_id only. Target-only approval lookup is not used.
    * @private
    */
-  async _getOwnedApproval(courseId, competencyTargetName) {
+  async _getOwnedApproval(courseId, _competencyTargetName) {
     if (courseId && typeof this.approvalRepository.getApprovalByCourseId === 'function') {
-      const byCourseId = await this.approvalRepository.getApprovalByCourseId(courseId);
-      if (byCourseId) {
-        return byCourseId;
-      }
+      return await this.approvalRepository.getApprovalByCourseId(courseId);
     }
-
-    // STAGE 1 LEGACY FALLBACK — approvals without course_id still keyed by target
-    if (typeof this.approvalRepository.getApprovalByLearningPathId === 'function') {
-      return await this.approvalRepository.getApprovalByLearningPathId(competencyTargetName);
-    }
-
     return null;
   }
 

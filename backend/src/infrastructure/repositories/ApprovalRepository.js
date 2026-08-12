@@ -1,5 +1,6 @@
 import { createClient } from '@supabase/supabase-js';
 import { PathApproval } from '../../domain/entities/PathApproval.js';
+import { pickUniqueCourseOrThrow } from '../../utils/courseIdentity.js';
 
 /**
  * ApprovalRepository
@@ -100,7 +101,8 @@ export class ApprovalRepository {
 
   /**
    * LEGACY TARGET-ONLY LOOKUP (learning_path_id = competency_target_name).
-   * Stage 2/C4 cutover blocker once two users share a target.
+   * Not used in personalized flows when course_id is available.
+   * 0 -> null, 1 -> that approval, >1 -> AMBIGUOUS_COURSE_TARGET.
    * @param {string} learningPathId
    * @returns {Promise<PathApproval|null>}
    */
@@ -109,18 +111,14 @@ export class ApprovalRepository {
       .from('path_approvals')
       .select('*')
       .eq('learning_path_id', learningPathId)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .single();
+      .order('created_at', { ascending: false });
 
     if (error) {
-      if (error.code === 'PGRST116') {
-        return null; // Not found
-      }
       throw new Error(`Failed to get approval: ${error.message}`);
     }
 
-    return this._mapToPathApproval(data);
+    const row = pickUniqueCourseOrThrow(data, learningPathId);
+    return row ? this._mapToPathApproval(row) : null;
   }
 
   /**

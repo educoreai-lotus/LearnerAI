@@ -121,8 +121,8 @@ export class RecommendationRepository {
   }
 
   /**
-   * LEGACY: Get recommendations by base_course_name (target string).
-   * Stage 2/C4 cutover blocker for personalized isolation.
+   * LEGACY ADMIN LIST: recommendations by base_course_name (target string).
+   * May include multiple users. Not a personalized singular course read.
    * @param {string} baseCourseName
    * @returns {Promise<Array<Object>>}
    */

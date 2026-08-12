@@ -1,10 +1,12 @@
 /**
- * Course identity helpers for Stage 1 (internal course_id / user+target).
- * Target-only lookup remains a documented LEGACY fallback while the DB PK
- * is still competency_target_name.
+ * Course identity helpers.
+ * Unique course identity is course_id, or user_id + competency_target_name.
+ * Target-only lookup is legacy and must refuse ambiguity.
  */
 
 const UUID_FORMAT = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+export const AMBIGUOUS_COURSE_TARGET = 'AMBIGUOUS_COURSE_TARGET';
 
 /**
  * True when value looks like a UUID (course_id), not a competency target name.
@@ -16,10 +18,49 @@ export function isCourseUuid(value) {
 }
 
 /**
- * Resolve a course using Stage 1 identity priority:
+ * @param {string} target
+ * @returns {Error}
+ */
+export function ambiguousCourseTargetError(target) {
+  const error = new Error(
+    `${AMBIGUOUS_COURSE_TARGET}: competency target "${target}" matches more than one course. Provide user_id or course_id.`
+  );
+  error.code = AMBIGUOUS_COURSE_TARGET;
+  return error;
+}
+
+/**
+ * @param {unknown} error
+ * @returns {boolean}
+ */
+export function isAmbiguousCourseTargetError(error) {
+  return error?.code === AMBIGUOUS_COURSE_TARGET
+    || String(error?.message || '').startsWith(AMBIGUOUS_COURSE_TARGET);
+}
+
+/**
+ * 0 rows -> null, 1 row -> that row, >1 -> AMBIGUOUS_COURSE_TARGET.
+ * @template T
+ * @param {T[]|null|undefined} rows
+ * @param {string} target
+ * @returns {T|null}
+ */
+export function pickUniqueCourseOrThrow(rows, target) {
+  const list = Array.isArray(rows) ? rows : [];
+  if (list.length === 0) {
+    return null;
+  }
+  if (list.length === 1) {
+    return list[0];
+  }
+  throw ambiguousCourseTargetError(target);
+}
+
+/**
+ * Resolve a course:
  * 1. real UUID course_id
  * 2. user_id + competency_target_name
- * 3. LEGACY target-only (current global PK — Stage 2/C4 cutover blocker)
+ * 3. LEGACY target-only (0 / 1 / AMBIGUOUS_COURSE_TARGET)
  *
  * Never treats a non-UUID course_id as a competency target name.
  *
@@ -44,8 +85,6 @@ export async function resolveCourse(courseRepository, identity = {}) {
     return await courseRepository.getCourseByUserAndTarget(userId, competencyTargetName);
   }
 
-  // STAGE 1 LEGACY TARGET-ONLY FALLBACK — target is still globally unique.
-  // MUST be removed/disabled at final DB cutover.
   if (competencyTargetName && typeof courseRepository.getCourseById === 'function') {
     return await courseRepository.getCourseById(competencyTargetName);
   }
@@ -55,7 +94,7 @@ export async function resolveCourse(courseRepository, identity = {}) {
 
 /**
  * Resolve the course for an approval row.
- * Prefers path_approvals.course_id; falls back to learning_path_id (target).
+ * Prefers path_approvals.course_id; target-only is last-resort and ambiguity-safe.
  *
  * @param {Object} courseRepository
  * @param {{ courseId?: string|null, learningPathId?: string|null }} approval
@@ -73,7 +112,6 @@ export async function resolveApprovalCourse(courseRepository, approval) {
     }
   }
 
-  // STAGE 1 LEGACY: approval rows with no course_id still use learning_path_id = target
   if (approval.learningPathId && typeof courseRepository.getCourseById === 'function') {
     return await courseRepository.getCourseById(approval.learningPathId);
   }

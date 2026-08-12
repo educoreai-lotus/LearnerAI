@@ -434,7 +434,7 @@ describe('Stage 1 course identity preparation', () => {
     });
 
     it('keeps Stage 1 legacy target-only fallback when only target is supplied', async () => {
-      mockClient.maybeSingle.mockResolvedValue({ data: dbCourseRecord(), error: null });
+      mockClient.then = (resolve) => resolve({ data: [dbCourseRecord()], error: null });
 
       const result = await handler.handleRealtimeQuery({
         tenant_id: 't1',
@@ -595,9 +595,9 @@ describe('Stage 1 course identity preparation', () => {
       expect(saved.userId).toBe(USER_A);
     });
 
-    it('different user + same target is still blocked before generation', async () => {
+    it('different user + same target proceeds when that user has no owned course', async () => {
       const mockRepository = {
-        saveLearningPath: jest.fn(),
+        saveLearningPath: jest.fn().mockImplementation(async (path) => path),
         getLearningPathById: jest.fn().mockResolvedValue({
           userId: USER_A,
           competencyTargetName: TARGET,
@@ -605,22 +605,54 @@ describe('Stage 1 course identity preparation', () => {
         }),
         getLearningPathByUserAndTarget: jest.fn().mockResolvedValue(null)
       };
-      const mockGemini = { executePrompt: jest.fn() };
+      const mockGemini = {
+        executePrompt: jest.fn().mockImplementation(async (prompt) => {
+          if (typeof prompt === 'string' && prompt.includes('P1')) {
+            return { expanded_competencies_list: [{ competency_name: 'Example' }] };
+          }
+          if (typeof prompt === 'string' && prompt.includes('P2')) {
+            return { competencies_for_skills_engine_processing: [{ competency_name: 'Example' }] };
+          }
+          return VALID_PROMPT3_PATH;
+        })
+      };
+      const mockPromptLoader = {
+        loadPrompt: jest.fn().mockImplementation((name) => {
+          if (name === 'prompt1-skill-expansion') return Promise.resolve('P1 {input}');
+          if (name === 'prompt2-competency-identification') return Promise.resolve('P2 {input}');
+          if (name === 'prompt3-path-creation') {
+            return Promise.resolve('P3 INITIAL_GAP={initialGap}\nEXPANDED_BREAKDOWN={expandedBreakdown}');
+          }
+          return Promise.resolve('DEFAULT {input}');
+        })
+      };
       const useCase = new GenerateLearningPathUseCase({
         geminiClient: mockGemini,
-        skillsEngineClient: { requestSkillBreakdown: jest.fn() },
+        skillsEngineClient: { requestSkillBreakdown: jest.fn().mockResolvedValue({ Example: ['syntaxerror'] }) },
         repository: mockRepository,
         jobRepository: { updateJob: jest.fn().mockResolvedValue({}) },
-        promptLoader: { loadPrompt: jest.fn() },
+        promptLoader: mockPromptLoader,
         cacheRepository: { upsertSkillBreakdown: jest.fn() },
-        checkApprovalPolicyUseCase: { execute: jest.fn() },
+        checkApprovalPolicyUseCase: { execute: jest.fn().mockResolvedValue({ requiresApproval: false }) },
         requestPathApprovalUseCase: { execute: jest.fn() },
         distributePathUseCase: { execute: jest.fn() },
-        skillsGapRepository: { getSkillsGapsByUser: jest.fn() },
-        skillsExpansionRepository: { getLatestSkillsExpansionByUserAndGap: jest.fn() }
+        skillsGapRepository: {
+          getSkillsGapsByUser: jest.fn().mockResolvedValue([{
+            gap_id: 'gap-b',
+            competency_target_name: TARGET,
+            exam_status: 'fail',
+            skills_raw_data: { [TARGET]: ['syntaxerror'] }
+          }])
+        },
+        skillsExpansionRepository: {
+          getLatestSkillsExpansionByUserAndGap: jest.fn().mockResolvedValue(null),
+          createSkillsExpansion: jest.fn(),
+          updateSkillsExpansion: jest.fn()
+        }
       });
+      jest.spyOn(useCase, '_validateLearningPath').mockReturnValue({ valid: true, errors: [] });
 
-      await expect(useCase.processJob(createMockJob({ id: 'job-collision' }), {
+      await useCase.processJob(createMockJob({ id: 'job-b-full' }), {
         userId: USER_B,
         companyId: 'company-1',
         competencyTargetName: TARGET,
@@ -629,13 +661,16 @@ describe('Stage 1 course identity preparation', () => {
         toJSON() {
           return { userId: this.userId, competencyTargetName: this.competencyTargetName };
         }
-      })).rejects.toThrow('COURSE_OWNERSHIP_COLLISION');
+      });
 
-      expect(mockRepository.saveLearningPath).not.toHaveBeenCalled();
-      expect(mockGemini.executePrompt).not.toHaveBeenCalled();
+      expect(mockRepository.getLearningPathByUserAndTarget).toHaveBeenCalledWith(USER_B, TARGET);
+      expect(mockRepository.saveLearningPath).toHaveBeenCalled();
+      const saved = mockRepository.saveLearningPath.mock.calls[0][0];
+      expect(saved.userId).toBe(USER_B);
+      expect(saved.courseId).toBeNull();
     });
 
-    it('save still throws COURSE_OWNERSHIP_COLLISION for a foreign same-target user', async () => {
+    it('save inserts User B same-target as a new course (no collision)', async () => {
       const repository = new SupabaseRepository('https://fake.supabase.co', 'fake-key');
       const mockClient = createMockSupabaseClient();
       repository.client = mockClient;
@@ -654,14 +689,23 @@ describe('Stage 1 course identity preparation', () => {
 
       expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'user_id,competency_target_name' });
 
-      mockClient.single.mockResolvedValue({ data: dbCourseRecord({ userId: USER_A }), error: null });
-      await expect(repository.saveLearningPath(new LearningPath({
+      mockClient.single
+        .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116', message: 'not found' } })
+        .mockResolvedValueOnce({
+          data: dbCourseRecord({ userId: USER_B, courseId: '22222222-2222-2222-2222-222222222222' }),
+          error: null
+        });
+      await repository.saveLearningPath(new LearningPath({
         id: TARGET,
         userId: USER_B,
         competencyTargetName: TARGET,
         pathMetadata: VALID_PROMPT3_PATH,
         status: 'completed'
-      }))).rejects.toThrow('COURSE_OWNERSHIP_COLLISION');
+      }));
+
+      const bPayload = mockClient.upsert.mock.calls[1][0];
+      expect(bPayload.user_id).toBe(USER_B);
+      expect(bPayload).not.toHaveProperty('course_id');
     });
   });
 
@@ -689,7 +733,7 @@ describe('Stage 1 course identity preparation', () => {
       }
     });
 
-    it('collision guard is still present in source', () => {
+    it('COURSE_OWNERSHIP_COLLISION is gone from production save/generate/create', () => {
       const saveSource = readFileSync(
         join(backendDir, 'src', 'infrastructure', 'repositories', 'SupabaseRepository.js'),
         'utf8'
@@ -698,8 +742,13 @@ describe('Stage 1 course identity preparation', () => {
         join(backendDir, 'src', 'application', 'useCases', 'GenerateLearningPathUseCase.js'),
         'utf8'
       );
-      expect(saveSource).toContain('COURSE_OWNERSHIP_COLLISION');
-      expect(generateSource).toContain('COURSE_OWNERSHIP_COLLISION');
+      const createSource = readFileSync(
+        join(backendDir, 'src', 'infrastructure', 'repositories', 'CourseRepository.js'),
+        'utf8'
+      );
+      expect(saveSource).not.toContain('COURSE_OWNERSHIP_COLLISION');
+      expect(generateSource).not.toContain('COURSE_OWNERSHIP_COLLISION');
+      expect(createSource).not.toContain('COURSE_OWNERSHIP_COLLISION');
     });
   });
 });

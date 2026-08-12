@@ -1,5 +1,5 @@
 import { createClient } from '@supabase/supabase-js';
-import { isCourseUuid } from '../../utils/courseIdentity.js';
+import { isCourseUuid, pickUniqueCourseOrThrow } from '../../utils/courseIdentity.js';
 
 function nowIso() {
   return new Date().toISOString();
@@ -154,8 +154,7 @@ export class ProcessHandler {
       return { data, metadata: { tenant_id, query_type: 'by_user_and_target' } };
     }
 
-    // D. STAGE 1 LEGACY TARGET-ONLY FALLBACK — target is still globally unique.
-    // MUST be removed/disabled at final DB cutover. Do not use payload.course_id here.
+    // C. LEGACY TARGET-ONLY: 0 not found, 1 ok, >1 AMBIGUOUS_COURSE_TARGET
     if (competencyTargetName) {
       const course = await this.getCourseByCompetencyTargetName(competencyTargetName);
       data = course ? [course] : [];
@@ -270,18 +269,16 @@ export class ProcessHandler {
   }
 
   /**
-   * STAGE 1 LEGACY TARGET-ONLY FALLBACK.
-   * Target is still globally unique. Stage 2/C4 cutover blocker.
+   * LEGACY TARGET-ONLY: 0 -> null, 1 -> course, >1 -> AMBIGUOUS_COURSE_TARGET.
    */
   async getCourseByCompetencyTargetName(competencyTargetName) {
     const { data, error } = await this.client
       .from('courses')
       .select('course_id, competency_target_name, user_id, gap_id, learning_path, approved, created_at, last_modified_at')
-      .eq('competency_target_name', competencyTargetName)
-      .maybeSingle();
+      .eq('competency_target_name', competencyTargetName);
 
     if (error) throw new Error(`Failed to get course: ${error.message}`);
-    return data || null;
+    return pickUniqueCourseOrThrow(data, competencyTargetName);
   }
 }
 

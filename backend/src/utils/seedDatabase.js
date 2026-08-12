@@ -308,8 +308,7 @@ export async function upsertSeedCourse(courseRepo, course) {
     return { created: false, course: updated };
   }
 
-  const updated = await courseRepo.updateCourse(target, updates);
-  return { created: false, course: updated };
+  throw new Error(`Cannot safely update seed course "${target}": missing course_id and user_id`);
 }
 
 /**

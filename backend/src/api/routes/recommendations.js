@@ -113,8 +113,9 @@ export function createRecommendationsRouter(dependencies) {
   });
 
   /**
-   * LEGACY: GET /api/v1/recommendations/course/:baseCourseName
-   * Target-name list. Stage 2/C4 cutover blocker for personalized isolation.
+   * LEGACY ADMIN LIST: GET /api/v1/recommendations/course/:baseCourseName
+   * Returns every recommendation with this base_course_name (may include multiple users).
+   * Not a personalized singular-course read.
    */
   router.get('/course/:baseCourseName', async (req, res) => {
     try {

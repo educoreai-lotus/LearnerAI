@@ -101,12 +101,12 @@ describe('Feature: Repositories', () => {
 
     it('should get learning path by competency', async () => {
       const mockPath = createMockLearningPath();
-      mockClient.single.mockResolvedValue({
-        data: {
+      mockClient.then = (resolve) => resolve({
+        data: [{
           competency_target_name: mockPath.competencyTargetName,
           user_id: mockPath.userId,
           learning_path: mockPath.learningPath
-        },
+        }],
         error: null
       });
 

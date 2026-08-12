@@ -1,5 +1,5 @@
 import express from 'express';
-import { resolveCourse } from '../../utils/courseIdentity.js';
+import { isAmbiguousCourseTargetError, resolveCourse } from '../../utils/courseIdentity.js';
 
 const router = express.Router();
 
@@ -350,6 +350,9 @@ export async function fillSkillsEngineData(data, { skillsGapRepository, courseRe
         filled.user_id = course.user_id || filled.user_id || '';
       }
     } catch (error) {
+      if (isAmbiguousCourseTargetError(error)) {
+        throw error;
+      }
       console.warn(`[Endpoints] Could not fetch course for ${data.competency_target_name || data.course_id}:`, error.message);
     }
   }
@@ -610,6 +613,9 @@ export async function fillLearningAnalyticsData(data, { courseRepository, skills
         learning_path: course?.learning_path || null
       }];
     } catch (error) {
+      if (isAmbiguousCourseTargetError(error)) {
+        throw error;
+      }
       console.warn(`[Endpoints] Could not fetch analytics data:`, error.message);
       return [];
     }
@@ -640,6 +646,9 @@ export async function fillCourseBuilderData(data, { courseRepository, skillsGapR
         filled.approved = course.approved !== undefined ? course.approved : filled.approved || false;
       }
     } catch (error) {
+      if (isAmbiguousCourseTargetError(error)) {
+        throw error;
+      }
       console.warn(`[Endpoints] Could not fetch course for Course Builder:`, error.message);
     }
   }

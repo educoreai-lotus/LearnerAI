@@ -1,13 +1,13 @@
 import express from 'express';
 import { createAuthenticate } from '../../middleware/auth.js';
 import { requireSelfUser } from '../../middleware/authorization.js';
-
-const router = express.Router();
+import { isAmbiguousCourseTargetError } from '../../utils/courseIdentity.js';
 
 /**
  * Initialize routes with dependencies
  */
 export function createCoursesRouter(dependencies) {
+  const router = express.Router();
   const { courseRepository, coordinatorClient } = dependencies;
   const authenticate = createAuthenticate({ coordinatorClient });
 
@@ -70,8 +70,8 @@ export function createCoursesRouter(dependencies) {
 
   /**
    * LEGACY: GET /api/v1/courses/:competencyTargetName
-   * Target is still globally unique. Optional ?user_id= scopes to owned course.
-   * Stage 2/C4 cutover blocker: target-only GET is not a unique identifier after duplicates.
+   * Optional ?user_id= scopes to owned course.
+   * Target-only: 0 not found, 1 ok, >1 AMBIGUOUS_COURSE_TARGET.
    */
   router.get('/:competencyTargetName', async (req, res) => {
     try {
@@ -91,6 +91,12 @@ export function createCoursesRouter(dependencies) {
       res.json({ course });
     } catch (error) {
       console.error('Error fetching course:', error);
+      if (isAmbiguousCourseTargetError(error)) {
+        return res.status(409).json({
+          error: 'AMBIGUOUS_COURSE_TARGET',
+          message: error.message
+        });
+      }
       res.status(500).json({
         error: 'Failed to fetch course',
         message: error.message
@@ -217,8 +223,7 @@ export function createCoursesRouter(dependencies) {
 
   /**
    * LEGACY: PUT /api/v1/courses/:competencyTargetName
-   * Optional ?user_id= uses user+target. Otherwise target-only (still globally unique).
-   * Stage 2/C4 cutover blocker.
+   * Optional ?user_id= uses user+target. Target-only refuses if multiple matches.
    */
   router.put('/:competencyTargetName', async (req, res) => {
     try {
@@ -254,6 +259,12 @@ export function createCoursesRouter(dependencies) {
       });
     } catch (error) {
       console.error('Error updating course:', error);
+      if (isAmbiguousCourseTargetError(error)) {
+        return res.status(409).json({
+          error: 'AMBIGUOUS_COURSE_TARGET',
+          message: error.message
+        });
+      }
       res.status(500).json({
         error: 'Failed to update course',
         message: error.message
@@ -263,8 +274,8 @@ export function createCoursesRouter(dependencies) {
 
   /**
    * LEGACY: DELETE /api/v1/courses/:competencyTargetName
-   * Optional ?user_id= deletes only that user's course. Otherwise target-only (still globally unique).
-   * Stage 2/C4 cutover blocker: target-only DELETE would remove every same-target course.
+   * Optional ?user_id= deletes only that user's course.
+   * Target-only refuses if multiple matches — never deletes all same-target rows.
    */
   router.delete('/:competencyTargetName', async (req, res) => {
     try {
@@ -281,6 +292,12 @@ export function createCoursesRouter(dependencies) {
       });
     } catch (error) {
       console.error('Error deleting course:', error);
+      if (isAmbiguousCourseTargetError(error)) {
+        return res.status(409).json({
+          error: 'AMBIGUOUS_COURSE_TARGET',
+          message: error.message
+        });
+      }
       res.status(500).json({
         error: 'Failed to delete course',
         message: error.message

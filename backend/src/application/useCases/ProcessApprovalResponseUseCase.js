@@ -204,8 +204,7 @@ export class ProcessApprovalResponseUseCase {
       return await this.courseRepository.updateCourseById(approval.courseId, { approved: true });
     }
 
-    // STAGE 1 LEGACY FALLBACK — approval rows with no course_id still use target
-    if (typeof this.courseRepository.updateCourse === 'function') {
+    if (typeof this.courseRepository.updateCourse === 'function' && approval.learningPathId) {
       return await this.courseRepository.updateCourse(approval.learningPathId, { approved: true });
     }
 

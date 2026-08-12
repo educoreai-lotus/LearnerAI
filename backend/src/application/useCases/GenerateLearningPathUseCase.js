@@ -149,7 +149,7 @@ export class GenerateLearningPathUseCase {
 
   /**
    * Personalized course lookup: same user + same target.
-   * A different user's row with the same target is a Phase B collision, not UPDATE MODE.
+   * A different user's same-target course is a different course, not UPDATE MODE.
    * @private
    */
   async _getOwnedExistingCourse(userId, competencyTargetName) {
@@ -157,24 +157,10 @@ export class GenerateLearningPathUseCase {
       throw new Error('Learning path repository must implement getLearningPathByUserAndTarget');
     }
 
-    const ownedCourse = await this.repository.getLearningPathByUserAndTarget(
+    return await this.repository.getLearningPathByUserAndTarget(
       userId,
       competencyTargetName
     );
-    if (ownedCourse) {
-      return ownedCourse;
-    }
-
-    if (typeof this.repository.getLearningPathById === 'function') {
-      const byTarget = await this.repository.getLearningPathById(competencyTargetName);
-      if (byTarget && byTarget.userId && byTarget.userId !== userId) {
-        throw new Error(
-          `COURSE_OWNERSHIP_COLLISION: competency target "${competencyTargetName}" already belongs to another user`
-        );
-      }
-    }
-
-    return null;
   }
 
   /**
@@ -842,7 +828,10 @@ export class GenerateLearningPathUseCase {
         status: 'completed',
         progress: 100,
         currentStage: 'completed',
-        result: { learningPathId: savedPath.id }
+        result: {
+          learningPathId: savedPath.id, // legacy target string, not a unique course identity
+          courseId: savedPath.courseId || null
+        }
       });
 
       return savedPath;
@@ -891,7 +880,7 @@ export class GenerateLearningPathUseCase {
         console.log(`   - company.decisionMaker: ${company.decisionMaker ? 'configured' : 'NOT configured'}`);
         
         if (this.requestPathApprovalUseCase && company.decisionMaker) {
-          // Use competencyTargetName as learningPathId (it's the primary key in courses table)
+          // learning_path_id remains a display/legacy target string; course_id is the approval identity
           const learningPathId = learningPath.competencyTargetName || learningPath.id;
           console.log(`   - Creating approval request for learning path: ${learningPathId}`);
           console.log(`   - Decision maker: ${company.decisionMaker.employee_id} (${company.decisionMaker.name || company.decisionMaker.email || 'no name/email'})`);

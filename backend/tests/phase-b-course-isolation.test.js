@@ -140,21 +140,29 @@ describe('Phase B course isolation (transitional schema)', () => {
       expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'user_id,competency_target_name' });
     });
 
-    it('refuses to overwrite a different user\'s same-target row', async () => {
-      mockClient.single.mockResolvedValue({
-        data: dbCourseRecord({ userId: USER_A }),
-        error: null
-      });
+    it('allows a different user to insert the same target as a new course', async () => {
+      const courseIdB = '22222222-2222-2222-2222-222222222222';
+      mockClient.single
+        .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116', message: 'not found' } })
+        .mockResolvedValueOnce({
+          data: dbCourseRecord({ userId: USER_B, courseId: courseIdB }),
+          error: null
+        });
 
-      await expect(repository.saveLearningPath(new LearningPath({
+      await repository.saveLearningPath(new LearningPath({
         id: TARGET,
         userId: USER_B,
         competencyTargetName: TARGET,
         pathMetadata: VALID_PROMPT3_PATH,
         status: 'completed'
-      }))).rejects.toThrow('COURSE_OWNERSHIP_COLLISION');
+      }));
 
-      expect(mockClient.upsert).not.toHaveBeenCalled();
+      expect(mockClient.upsert).toHaveBeenCalled();
+      const upsertPayload = mockClient.upsert.mock.calls[0][0];
+      expect(upsertPayload.user_id).toBe(USER_B);
+      expect(upsertPayload.competency_target_name).toBe(TARGET);
+      expect(upsertPayload).not.toHaveProperty('course_id');
+      expect(mockClient.upsert.mock.calls[0][1]).toEqual({ onConflict: 'user_id,competency_target_name' });
     });
   });
 
@@ -286,21 +294,35 @@ describe('Phase B course isolation (transitional schema)', () => {
       expect(saved.competencyTargetName).toBe(TARGET);
     });
 
-    it('does not treat a different user\'s same-target row as existingCourse', async () => {
+    it('User B + same target with no owned course proceeds to FULL MODE', async () => {
       mockRepository.getLearningPathByUserAndTarget.mockResolvedValue(null);
-      mockRepository.getLearningPathById.mockResolvedValue({
-        userId: USER_A,
-        competencyTargetName: TARGET,
-        courseId: COURSE_ID_A
+      mockSkillsGapRepository.getSkillsGapsByUser.mockResolvedValue([{
+        gap_id: 'gap-b',
+        competency_target_name: TARGET,
+        exam_status: 'fail',
+        skills_raw_data: { [TARGET]: ['syntaxerror'] }
+      }]);
+      mockGeminiClient.executePrompt.mockImplementation(async (prompt) => {
+        if (typeof prompt === 'string' && prompt.startsWith('P1 ')) {
+          return { expanded_competencies_list: [{ competency_name: 'Example' }] };
+        }
+        if (typeof prompt === 'string' && prompt.startsWith('P2 ')) {
+          return { competencies_for_skills_engine_processing: [{ competency_name: 'Example' }] };
+        }
+        return VALID_PROMPT3_PATH;
       });
 
-      await expect(
-        useCase.processJob(createMockJob({ id: 'job-collision' }), skillsGap({ userId: USER_B }))
-      ).rejects.toThrow('COURSE_OWNERSHIP_COLLISION');
+      await useCase.processJob(createMockJob({ id: 'job-b-full' }), skillsGap({ userId: USER_B }));
 
       expect(mockRepository.getLearningPathByUserAndTarget).toHaveBeenCalledWith(USER_B, TARGET);
-      expect(mockRepository.saveLearningPath).not.toHaveBeenCalled();
-      expect(mockGeminiClient.executePrompt).not.toHaveBeenCalled();
+      expect(mockPromptLoader.loadPrompt).toHaveBeenCalledWith('prompt1-skill-expansion');
+      expect(mockPromptLoader.loadPrompt).toHaveBeenCalledWith('prompt2-competency-identification');
+      expect(mockPromptLoader.loadPrompt).toHaveBeenCalledWith('prompt3-path-creation');
+      expect(mockRepository.saveLearningPath).toHaveBeenCalled();
+      const saved = mockRepository.saveLearningPath.mock.calls[0][0];
+      expect(saved.userId).toBe(USER_B);
+      expect(saved.competencyTargetName).toBe(TARGET);
+      expect(saved.courseId).toBeNull();
     });
 
     it('different target for the same user is unchanged FULL MODE', async () => {
@@ -435,7 +457,7 @@ describe('Phase B course isolation (transitional schema)', () => {
       expect(result.data).not.toHaveProperty('course_id');
     });
 
-    it('keeps the owner-mismatch error when another user owns the target', async () => {
+    it('does not fall back to another user\'s same-target course', async () => {
       const useCase = new GetLearningPathForCourseBuilderUseCase({
         courseRepository: {
           getCourseByUserAndTarget: jest.fn().mockResolvedValue(null),
@@ -453,8 +475,9 @@ describe('Phase B course isolation (transitional schema)', () => {
       });
 
       await expect(useCase.execute(USER_B, TARGET)).rejects.toThrow(
-        `Learning path ${TARGET} does not belong to user ${USER_B}`
+        `Learning path not found: ${TARGET}`
       );
+      expect(useCase.courseRepository.getCourseById).not.toHaveBeenCalled();
     });
   });
 

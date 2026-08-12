@@ -153,28 +153,34 @@ describe('Stage 2 course identity cutover preparation', () => {
       });
     });
 
-    it('foreign user + same target is blocked before upsert', async () => {
-      mockClient.single.mockResolvedValue({
-        data: dbCourseRecord({ userId: USER_A }),
-        error: null
-      });
+    it('foreign user + same target inserts a new course (no collision)', async () => {
+      mockClient.single
+        .mockResolvedValueOnce({ data: null, error: { code: 'PGRST116', message: 'not found' } })
+        .mockResolvedValueOnce({
+          data: dbCourseRecord({ userId: USER_B, courseId: '22222222-2222-2222-2222-222222222222' }),
+          error: null
+        });
 
-      await expect(repository.saveLearningPath(new LearningPath({
+      await repository.saveLearningPath(new LearningPath({
         id: TARGET,
         userId: USER_B,
         competencyTargetName: TARGET,
         pathMetadata: VALID_PROMPT3_PATH,
         status: 'completed'
-      }))).rejects.toThrow('COURSE_OWNERSHIP_COLLISION');
+      }));
 
-      expect(mockClient.upsert).not.toHaveBeenCalled();
+      expect(mockClient.upsert).toHaveBeenCalled();
+      const upsertPayload = mockClient.upsert.mock.calls[0][0];
+      expect(upsertPayload.user_id).toBe(USER_B);
+      expect(upsertPayload.competency_target_name).toBe(TARGET);
+      expect(upsertPayload).not.toHaveProperty('course_id');
     });
   });
 
-  describe('generation collision guard is unchanged', () => {
-    it('blocks User B + same target before Gemini and before save', async () => {
+  describe('generation collision guard is removed', () => {
+    it('User B + same target proceeds to FULL MODE when B has no owned course', async () => {
       const mockRepository = {
-        saveLearningPath: jest.fn(),
+        saveLearningPath: jest.fn().mockImplementation(async (path) => path),
         getLearningPathById: jest.fn().mockResolvedValue({
           userId: USER_A,
           competencyTargetName: TARGET,
@@ -182,22 +188,53 @@ describe('Stage 2 course identity cutover preparation', () => {
         }),
         getLearningPathByUserAndTarget: jest.fn().mockResolvedValue(null)
       };
-      const mockGemini = { executePrompt: jest.fn() };
+      const mockGemini = {
+        executePrompt: jest.fn().mockImplementation(async (prompt) => {
+          if (typeof prompt === 'string' && prompt.includes('P1')) {
+            return { expanded_competencies_list: [{ competency_name: 'Example' }] };
+          }
+          if (typeof prompt === 'string' && prompt.includes('P2')) {
+            return { competencies_for_skills_engine_processing: [{ competency_name: 'Example' }] };
+          }
+          return VALID_PROMPT3_PATH;
+        })
+      };
       const useCase = new GenerateLearningPathUseCase({
         geminiClient: mockGemini,
-        skillsEngineClient: { requestSkillBreakdown: jest.fn() },
+        skillsEngineClient: { requestSkillBreakdown: jest.fn().mockResolvedValue({ Example: ['syntaxerror'] }) },
         repository: mockRepository,
         jobRepository: { updateJob: jest.fn().mockResolvedValue({}) },
-        promptLoader: { loadPrompt: jest.fn() },
+        promptLoader: {
+          loadPrompt: jest.fn().mockImplementation((name) => {
+            if (name === 'prompt1-skill-expansion') return Promise.resolve('P1 {input}');
+            if (name === 'prompt2-competency-identification') return Promise.resolve('P2 {input}');
+            if (name === 'prompt3-path-creation') {
+              return Promise.resolve('P3 INITIAL_GAP={initialGap}\nEXPANDED_BREAKDOWN={expandedBreakdown}');
+            }
+            return Promise.resolve('DEFAULT {input}');
+          })
+        },
         cacheRepository: { upsertSkillBreakdown: jest.fn() },
-        checkApprovalPolicyUseCase: { execute: jest.fn() },
+        checkApprovalPolicyUseCase: { execute: jest.fn().mockResolvedValue({ requiresApproval: false }) },
         requestPathApprovalUseCase: { execute: jest.fn() },
         distributePathUseCase: { execute: jest.fn() },
-        skillsGapRepository: { getSkillsGapsByUser: jest.fn() },
-        skillsExpansionRepository: { getLatestSkillsExpansionByUserAndGap: jest.fn() }
+        skillsGapRepository: {
+          getSkillsGapsByUser: jest.fn().mockResolvedValue([{
+            gap_id: 'gap-b',
+            competency_target_name: TARGET,
+            exam_status: 'fail',
+            skills_raw_data: { [TARGET]: ['syntaxerror'] }
+          }])
+        },
+        skillsExpansionRepository: {
+          getLatestSkillsExpansionByUserAndGap: jest.fn().mockResolvedValue(null),
+          createSkillsExpansion: jest.fn(),
+          updateSkillsExpansion: jest.fn()
+        }
       });
+      jest.spyOn(useCase, '_validateLearningPath').mockReturnValue({ valid: true, errors: [] });
 
-      await expect(useCase.processJob(createMockJob({ id: 'job-collision' }), {
+      await useCase.processJob(createMockJob({ id: 'job-b-full' }), {
         userId: USER_B,
         companyId: 'company-1',
         competencyTargetName: TARGET,
@@ -206,13 +243,14 @@ describe('Stage 2 course identity cutover preparation', () => {
         toJSON() {
           return { userId: this.userId, competencyTargetName: this.competencyTargetName };
         }
-      })).rejects.toThrow('COURSE_OWNERSHIP_COLLISION');
+      });
 
-      expect(mockRepository.saveLearningPath).not.toHaveBeenCalled();
-      expect(mockGemini.executePrompt).not.toHaveBeenCalled();
+      expect(mockRepository.getLearningPathByUserAndTarget).toHaveBeenCalledWith(USER_B, TARGET);
+      expect(mockRepository.saveLearningPath).toHaveBeenCalled();
+      expect(mockGemini.executePrompt).toHaveBeenCalled();
     });
 
-    it('source still contains all three ownership guards', () => {
+    it('source has user+target upsert and no COURSE_OWNERSHIP_COLLISION', () => {
       const saveSource = readFileSync(
         join(backendDir, 'src', 'infrastructure', 'repositories', 'SupabaseRepository.js'),
         'utf8'
@@ -228,9 +266,9 @@ describe('Stage 2 course identity cutover preparation', () => {
 
       expect(saveSource).toContain("onConflict: 'user_id,competency_target_name'");
       expect(saveSource).not.toContain("onConflict: 'competency_target_name'");
-      expect(saveSource).toContain('COURSE_OWNERSHIP_COLLISION');
-      expect(generateSource).toContain('COURSE_OWNERSHIP_COLLISION');
-      expect(createSource).toContain('COURSE_OWNERSHIP_COLLISION');
+      expect(saveSource).not.toContain('COURSE_OWNERSHIP_COLLISION');
+      expect(generateSource).not.toContain('COURSE_OWNERSHIP_COLLISION');
+      expect(createSource).not.toContain('COURSE_OWNERSHIP_COLLISION');
     });
   });
 
