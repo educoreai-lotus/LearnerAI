@@ -577,6 +577,12 @@ export class GenerateLearningPathUseCase {
               // Store in new format (array of skill names)
               filteredSkillBreakdown[competencyName] = filteredSkills;
               filteredCompetencies.push(competency);
+            } else if (skillsToFilter.length > 0) {
+              // Zero textual overlap, but Skills Engine returned a valid non-empty list.
+              // Keep the real breakdown so UPDATE MODE does not empty Prompt 3 expansion.
+              filteredSkillBreakdown[competencyName] = skillsToFilter;
+              filteredCompetencies.push(competency);
+              console.log(`   ⚠️  No remaining-skill name match for "${competencyName}" — preserving ${skillsToFilter.length} Skills Engine skills`);
             } else {
               console.log(`   ⚠️  Removed competency "${competencyName}" - no remaining skills match`);
             }
