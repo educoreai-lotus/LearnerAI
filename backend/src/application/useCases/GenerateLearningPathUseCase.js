@@ -63,6 +63,43 @@ export class GenerateLearningPathUseCase {
     return lp;
   }
 
+  /**
+   * Build a push context from persisted skills_gap fields without mutating SkillsGap.
+   * Thin generate-path entities only carry userId/companyId/competencyTargetName.
+   * @private
+   */
+  _hydrateCourseBuilderPushContext(skillsGap, persistedGap) {
+    const persisted = persistedGap && typeof persistedGap === 'object' ? persistedGap : null;
+    const userName = persisted?.user_name ?? skillsGap.userName ?? skillsGap.user_name ?? null;
+    const preferredLanguage = persisted?.preferred_language
+      ?? skillsGap.preferred_language
+      ?? skillsGap.preferredLanguage
+      ?? null;
+    const companyName = persisted?.company_name ?? skillsGap.companyName ?? skillsGap.company_name ?? null;
+    const examStatus = persisted?.exam_status ?? skillsGap.examStatus ?? skillsGap.exam_status ?? null;
+    const skillsRawData = persisted?.skills_raw_data ?? skillsGap.skillsRawData ?? skillsGap.skills_raw_data ?? null;
+
+    return {
+      userId: skillsGap.userId,
+      companyId: persisted?.company_id || skillsGap.companyId || null,
+      competencyTargetName: skillsGap.competencyTargetName,
+      user_name: userName,
+      userName,
+      preferred_language: preferredLanguage,
+      preferredLanguage,
+      company_name: companyName,
+      companyName,
+      exam_status: examStatus,
+      examStatus,
+      skills_raw_data: skillsRawData,
+      skillsRawData
+    };
+  }
+
+  _persistedPrompt3Path(savedPath, pathData) {
+    return savedPath?.pathMetadata || savedPath?.learning_path || pathData;
+  }
+
   async _pushApprovedLearningPathToCourseBuilder(skillsGap, pathData) {
     if (!this.coordinatorClient || !this.coordinatorClient.isConfigured()) {
       console.warn('⚠️  CoordinatorClient not configured - skipping push_learning_path');
@@ -189,6 +226,7 @@ export class GenerateLearningPathUseCase {
       let skillsRawData = null;
       let gapId = null;
       let examStatus = null;
+      let persistedGap = null;
       if (this.skillsGapRepository) {
         try {
           // Get the most recent skills gap for this user and competency
@@ -196,6 +234,7 @@ export class GenerateLearningPathUseCase {
           const relevantGap = gaps.find(g => g.competency_target_name === competencyTargetName) || gaps[0];
           
           if (relevantGap) {
+            persistedGap = relevantGap;
             if (relevantGap.skills_raw_data) {
             skillsRawData = relevantGap.skills_raw_data;
             console.log(`✅ Using updated skills_raw_data from database for user ${skillsGap.userId}`);
@@ -812,15 +851,12 @@ export class GenerateLearningPathUseCase {
       // Skip approval if this is an update after exam failure
       await this._handlePathDistribution(savedPath, skillsGap, isUpdateAfterFailure);
 
-      // TEMPORARY: Disable automatic sending to Course Builder
-      // Proactively push approved learning paths to Course Builder via Coordinator
-      // - auto-approval: immediately after generation
-      // - update-after-failure: also auto-approved in our logic
-      // if (learningPath.status === 'approved') {
-      //   await this._pushApprovedLearningPathToCourseBuilder(skillsGap, pathData);
-      // }
+      // Auto-approved / update-after-failure: one Coordinator push after persist + approval.
+      // Manual-approval companies stay pending here and push from ProcessApprovalResponseUseCase.
       if (learningPath.status === 'approved') {
-        console.log('🚫 TEMPORARY: Automatic push to Course Builder disabled. Learning path approved but not sent.');
+        const hydratedGap = this._hydrateCourseBuilderPushContext(skillsGap, persistedGap);
+        const persistedPathData = this._persistedPrompt3Path(savedPath, pathData);
+        await this._pushApprovedLearningPathToCourseBuilder(hydratedGap, persistedPathData);
       }
 
       // Mark job as completed

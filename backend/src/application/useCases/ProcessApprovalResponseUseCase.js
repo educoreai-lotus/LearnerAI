@@ -122,9 +122,7 @@ export class ProcessApprovalResponseUseCase {
       changesRequestedAt: response === 'changes_requested' ? new Date().toISOString() : null
     });
 
-    // If approved, update the course's approved field
-    // NOTE: We do NOT automatically distribute to Course Builder.
-    // Course Builder will request data when needed via the request endpoint.
+    // If approved, update the course's approved field, then push once via Coordinator.
     if (response === 'approved') {
       // Update the course's approved field to true (by course_id when present)
       if (this.courseRepository) {
@@ -137,23 +135,25 @@ export class ProcessApprovalResponseUseCase {
         }
       }
 
-      // TEMPORARY: Disable automatic sending to Course Builder
-      // Proactively push to Course Builder via Coordinator (one request per course/module)
-      // try {
-      //   if (this.courseRepository && this.skillsGapRepository) {
-      //     const course = await this.courseRepository.getCourseById(approval.learningPathId);
-      //     if (course) {
-      //       const skillsGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(
-      //         course.user_id,
-      //         course.competency_target_name
-      //       );
-      //       await this._pushApprovedLearningPathToCourseBuilder({ course, skillsGap });
-      //     }
-      //   }
-      // } catch (e) {
-      //   console.error(`⚠️  Failed to push approved learning path to Coordinator: ${e.message}`);
-      // }
-      console.log(`🚫 TEMPORARY: Automatic push to Course Builder disabled. Approval ${approvalId} processed but learning path not sent.`);
+      try {
+        if (this.courseRepository) {
+          const course = await resolveApprovalCourse(this.courseRepository, approval);
+          if (course) {
+            let skillsGap = null;
+            if (this.skillsGapRepository) {
+              skillsGap = await this.skillsGapRepository.getSkillsGapByUserAndCompetency(
+                course.user_id,
+                course.competency_target_name
+              );
+            }
+            await this._pushApprovedLearningPathToCourseBuilder({ course, skillsGap });
+          } else {
+            console.warn(`⚠️  Approved course not found for Course Builder push (approval ${approvalId})`);
+          }
+        }
+      } catch (e) {
+        console.error(`⚠️  Failed to push approved learning path to Coordinator: ${e.message}`);
+      }
     }
 
     // Send notification to requester (if approved or changes_requested)
