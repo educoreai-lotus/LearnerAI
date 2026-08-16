@@ -1,4 +1,5 @@
 import { resolveApprovalCourse } from '../../utils/courseIdentity.js';
+import { PUSH_LEARNING_PATH_TIMEOUT_MS } from '../../infrastructure/clients/CoordinatorClient.js';
 
 /**
  * ProcessApprovalResponseUseCase
@@ -74,7 +75,9 @@ export class ProcessApprovalResponseUseCase {
     };
 
     try {
-      await this.coordinatorClient.postFillContentMetrics(requestBody);
+      await this.coordinatorClient.postFillContentMetrics(requestBody, {
+        timeoutMs: PUSH_LEARNING_PATH_TIMEOUT_MS
+      });
       console.log('✅ push_learning_path sent to Coordinator (full learning path)');
     } catch (e) {
       console.error(`❌ push_learning_path failed (full learning path): ${e.message}`);

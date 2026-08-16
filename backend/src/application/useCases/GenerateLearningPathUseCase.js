@@ -2,6 +2,7 @@ import { Job } from '../../domain/entities/Job.js';
 import { LearningPath } from '../../domain/entities/LearningPath.js';
 import { v4 as uuidv4 } from 'uuid';
 import { calculateAverageDifficulty, validatePrerequisiteOrder, getDifficultyScoreWithFallback } from '../../infrastructure/knowledge/skillPrerequisites.js';
+import { PUSH_LEARNING_PATH_TIMEOUT_MS } from '../../infrastructure/clients/CoordinatorClient.js';
 
 /**
  * GenerateLearningPathUseCase
@@ -138,7 +139,9 @@ export class GenerateLearningPathUseCase {
     };
 
     try {
-      await this.coordinatorClient.postFillContentMetrics(requestBody);
+      await this.coordinatorClient.postFillContentMetrics(requestBody, {
+        timeoutMs: PUSH_LEARNING_PATH_TIMEOUT_MS
+      });
       console.log('✅ push_learning_path sent to Coordinator (full learning path)');
     } catch (e) {
       console.error(`❌ push_learning_path failed (full learning path): ${e.message}`);

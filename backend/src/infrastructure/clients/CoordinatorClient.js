@@ -1,4 +1,19 @@
+import { Agent } from 'undici';
 import { generateSignature } from '../../utils/signature.js';
+
+/** AbortController + undici budget for personalized Course Builder push only. */
+export const PUSH_LEARNING_PATH_TIMEOUT_MS = 30 * 60 * 1000;
+
+export function longRunningUndiciAgentOptions(timeoutMs) {
+  return {
+    headersTimeout: timeoutMs,
+    bodyTimeout: timeoutMs
+  };
+}
+
+function createLongRunningDispatcher(timeoutMs) {
+  return new Agent(longRunningUndiciAgentOptions(timeoutMs));
+}
 
 function getEnv(name, fallback = undefined) {
   const v = process.env[name];
@@ -96,9 +111,18 @@ export class CoordinatorClient {
 
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
+    let dispatcher = options.dispatcher || null;
+    let createdDispatcher = false;
 
     try {
-      const res = await fetch(url, {
+      // Native fetch/undici keeps independent 5-minute headers/body timeouts.
+      // Align those only for the long-running personalized Course Builder push.
+      if (!dispatcher && timeoutMs >= PUSH_LEARNING_PATH_TIMEOUT_MS) {
+        dispatcher = createLongRunningDispatcher(timeoutMs);
+        createdDispatcher = true;
+      }
+
+      const fetchOptions = {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -107,7 +131,12 @@ export class CoordinatorClient {
         },
         body: JSON.stringify(body),
         signal: controller.signal
-      });
+      };
+      if (dispatcher) {
+        fetchOptions.dispatcher = dispatcher;
+      }
+
+      const res = await fetch(url, fetchOptions);
 
       const text = await res.text();
       if (!res.ok) {
@@ -122,6 +151,13 @@ export class CoordinatorClient {
       }
     } finally {
       clearTimeout(timeout);
+      if (createdDispatcher && dispatcher && typeof dispatcher.close === 'function') {
+        try {
+          await dispatcher.close();
+        } catch {
+          // Dispatcher cleanup must not hide the request result.
+        }
+      }
     }
   }
 }

@@ -2,6 +2,7 @@ import { describe, it, expect, beforeEach, jest } from '@jest/globals';
 import { GenerateLearningPathUseCase } from '../src/application/useCases/GenerateLearningPathUseCase.js';
 import { ProcessApprovalResponseUseCase } from '../src/application/useCases/ProcessApprovalResponseUseCase.js';
 import { PathApproval } from '../src/domain/entities/PathApproval.js';
+import { PUSH_LEARNING_PATH_TIMEOUT_MS } from '../src/infrastructure/clients/CoordinatorClient.js';
 import { createMockJob } from './testHelpers.js';
 
 const USER_ID = 'b2b400ed-bc11-4aa9-a89e-f4a00d0f6321';
@@ -191,7 +192,8 @@ describe('Course Builder personalized course push', () => {
       expect(callOrder).toEqual(['saveLearningPath', 'postFillContentMetrics']);
       expect(distributePathUseCase.execute).not.toHaveBeenCalled();
 
-      const envelope = coordinatorClient.postFillContentMetrics.mock.calls[0][0];
+      const [envelope, options] = coordinatorClient.postFillContentMetrics.mock.calls[0];
+      expect(options).toEqual({ timeoutMs: PUSH_LEARNING_PATH_TIMEOUT_MS });
       expect(envelope.requester_service).toBe('learnerAI');
       expect(envelope.response).toEqual({});
       expect(Object.keys(envelope.response)).toHaveLength(0);
@@ -320,7 +322,8 @@ describe('Course Builder personalized course push', () => {
       expect(callOrder).toEqual(['updateCourseById', 'postFillContentMetrics']);
       expect(distributePathUseCase.execute).not.toHaveBeenCalled();
 
-      const envelope = coordinatorClient.postFillContentMetrics.mock.calls[0][0];
+      const [envelope, options] = coordinatorClient.postFillContentMetrics.mock.calls[0];
+      expect(options).toEqual({ timeoutMs: PUSH_LEARNING_PATH_TIMEOUT_MS });
       expect(envelope.response).toEqual({});
       expect(envelope.payload.user_id).toBe(USER_ID);
       expect(envelope.payload.competency_target_name).toBe(TARGET);
