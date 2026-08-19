@@ -5,6 +5,13 @@ import { calculateAverageDifficulty, validatePrerequisiteOrder, getDifficultySco
 import { PUSH_LEARNING_PATH_TIMEOUT_MS } from '../../infrastructure/clients/CoordinatorClient.js';
 
 /**
+ * Soft total cap for combined path skills sent to Prompt 3.
+ * Limits only the non-authoritative expanded taxonomy portion.
+ * Genuine gap skills are ALWAYS preserved in full even when their count exceeds this value.
+ */
+const MAX_PERSONALIZED_PATH_SKILLS = 10;
+
+/**
  * GenerateLearningPathUseCase
  * Orchestrates the three-prompt flow for learning path generation
  */
@@ -733,7 +740,24 @@ export class GenerateLearningPathUseCase {
       // Extract skills explicitly to aid Prompt 3 (reference prompt combines ALL skills across 2×2)
       const initialSkills = this._extractSkillsFromInitialGap(initialGapForPrompt3);
       const expandedSkills = this._extractSkillsFromExpandedBreakdown(expandedBreakdownForPrompt3);
-      const combinedSkills = [...new Set([...initialSkills, ...expandedSkills])];
+
+      // Build a bounded combined skill list for Prompt 3.
+      // Rule: ALL genuine gap skills are always preserved (even if > MAX_PERSONALIZED_PATH_SKILLS).
+      // Only non-authoritative expansion skills are capped.
+      const uniqueInitialSkills = [...new Set(initialSkills)];
+      const expansionBudget = Math.max(0, MAX_PERSONALIZED_PATH_SKILLS - uniqueInitialSkills.length);
+      const initialSkillSet = new Set(uniqueInitialSkills);
+      const boundedExpansionSkills = [];
+      for (const skill of expandedSkills) {
+        if (boundedExpansionSkills.length >= expansionBudget) break;
+        if (!initialSkillSet.has(skill) && !boundedExpansionSkills.includes(skill)) {
+          boundedExpansionSkills.push(skill);
+        }
+      }
+      const combinedSkills = [...uniqueInitialSkills, ...boundedExpansionSkills];
+
+      console.log(`📊 [SKILL CAP] gap=${uniqueInitialSkills.length} budget=${expansionBudget} expansion_selected=${boundedExpansionSkills.length} combined=${combinedSkills.length} (max=${MAX_PERSONALIZED_PATH_SKILLS})`);
+
       
       // Compact Prompt 3 skill counts (sample first 5 names only — do not dump full arrays)
       const prompt3SkillSample = (skills) => {
