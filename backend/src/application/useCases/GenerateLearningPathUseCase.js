@@ -721,9 +721,11 @@ export class GenerateLearningPathUseCase {
         console.log(`   Structure: ${JSON.stringify(skillBreakdown, null, 2).substring(0, 500)}`);
       }
       
+      // Internal full taxonomy (skillBreakdown) stays intact for cache/update-mode.
+      // Prompt 3 formal skill sources are aligned to combinedSkills only (built below).
       const expandedBreakdownForPrompt3 = {
-        competencies: prompt2OutputFromDB, // From prompt_2_output (filtered in update mode)
-        skillBreakdown: skillBreakdown // From Skills Engine (filtered in update mode) - List of skills at lowest level (expansions)
+        competencies: prompt2OutputFromDB, // From prompt_2_output (filtered in update mode) — competency context, not formal skills
+        skillBreakdown: skillBreakdown // Full SE list kept here for extraction into combinedSkills; Prompt 3 payload uses a bounded copy
       };
       
       // Format initial gap for Prompt 3: Use skills_raw_data (lowest level skills) from database
@@ -769,19 +771,26 @@ export class GenerateLearningPathUseCase {
       console.log(`   Expanded Breakdown Skills (${expandedSkills.length}): ${prompt3SkillSample(expandedSkills)}`);
       console.log(`   Combined unique skills (${combinedSkills.length}): ${prompt3SkillSample(combinedSkills)}`);
       
-      // Explicit skill lists for the model — do NOT inject module-by-source separation.
-      // Reference Prompt 3 owns pedagogical ordering: combine all input skills across 2 modules × 2 steps.
+      // Formal skill contract for Prompt 3: ONLY combinedSkills may appear in skills_in_module / skills_covered.
+      // Do not inject the uncapped Skills Engine taxonomy into Prompt 3 skill-bearing fields.
       const initialGapWithSkills = {
-        ...initialGapForPrompt3,
-        EXTRACTED_SKILLS: initialSkills,
-        INSTRUCTION: `Initial Skills Gap skills (${initialSkills.length}): ${initialSkills.join(', ') || '(none)'}. These are part of the COMPLETE skill set. Combine them with Expanded Breakdown skills and distribute ALL skills across exactly 2 modules × 2 steps as specified in the prompt. Do not invent skills.`
+        userId: initialGapForPrompt3.userId,
+        companyId: initialGapForPrompt3.companyId,
+        competencyTargetName: initialGapForPrompt3.competencyTargetName,
+        skills_raw_data: initialGapForPrompt3.skills_raw_data, // Genuine gap only (authoritative)
+        EXTRACTED_SKILLS: uniqueInitialSkills,
+        INSTRUCTION: `Genuine gap skills (${uniqueInitialSkills.length}): ${uniqueInitialSkills.join(', ') || '(none)'}. These are included in COMPLETE_COMBINED_SKILL_LIST / ALLOWED_FORMAL_SKILLS. Distribute ALL allowed formal skills across exactly 2 modules × 2 steps. Do not invent formal skills.`
       };
       
       const expandedBreakdownWithSkills = {
-        ...expandedBreakdownForPrompt3,
-        EXTRACTED_SKILLS: expandedSkills,
+        competencies: prompt2OutputFromDB, // Competency names / sequencing context only
+        skillBreakdown: {
+          Allowed_Formal_Skills: combinedSkills
+        },
+        EXTRACTED_SKILLS: combinedSkills,
         COMPLETE_COMBINED_SKILL_LIST: combinedSkills,
-        INSTRUCTION: `Expanded Breakdown skills (${expandedSkills.length}): ${expandedSkills.join(', ') || '(none)'}. COMPLETE combined skill list (${combinedSkills.length}): ${combinedSkills.join(', ') || '(none)'}. Use ONLY skills from the inputs. Combine Initial Gap + Expanded Breakdown into one pedagogical sequence across exactly 2 modules × 2 steps. Do NOT reserve Module 1 exclusively for gap skills or Module 2 exclusively for expansion skills — follow the prompt's combined ordering rules.`
+        ALLOWED_FORMAL_SKILLS: combinedSkills,
+        INSTRUCTION: `ALLOWED formal skills (${combinedSkills.length}): ${combinedSkills.join(', ') || '(none)'}. This is the COMPLETE formal skill set. Use EVERY skill from ALLOWED_FORMAL_SKILLS / COMPLETE_COMBINED_SKILL_LIST exactly once in skills_in_module and skills_covered. Do NOT add any formal skill outside this list. Competency metadata is context for sequencing only — not additional formal skills.`
       };
       
       let fullPrompt3 = prompt3
@@ -804,8 +813,8 @@ export class GenerateLearningPathUseCase {
         // Extract learning path structure from Prompt 3 result
         pathData = this._extractPathData(prompt3Result, skillsGap.userId, competencyTargetName);
         
-        // Validate learning path for pedagogical correctness
-        const validation = this._validateLearningPath(pathData);
+        // Validate learning path for pedagogical correctness + formal skill membership
+        const validation = this._validateLearningPath(pathData, combinedSkills);
         
         if (validation.valid) {
           console.log('✅ Learning path validation passed');
@@ -816,17 +825,26 @@ export class GenerateLearningPathUseCase {
         console.warn(`⚠️ Learning path validation failed (attempt ${validationAttempts}/${maxValidationAttempts}):`, validation.errors);
         
         if (validationAttempts >= maxValidationAttempts) {
-          // Log warning but continue - don't fail the entire job
+          // Narrow fail-closed: only exhausted OUT-OF-SET formal skill violations block persistence/push.
+          // Pre-existing structural/pedagogical validation exhaustion remains soft (continue with path).
+          const outOfSet = Array.isArray(validation.outOfSetSkills) ? validation.outOfSetSkills : [];
+          if (outOfSet.length > 0) {
+            console.error(`❌ Formal skill boundary violated after ${maxValidationAttempts} attempts. Failing closed (no save/push).`);
+            console.error('Out-of-set formal skills:', outOfSet);
+            throw new Error(
+              `Learning path validation failed: formal skills outside allowed personalized set after ${maxValidationAttempts} attempts: ${outOfSet.join('; ')}`
+            );
+          }
           console.error(`❌ Learning path validation failed after ${maxValidationAttempts} attempts. Continuing with generated path.`);
           console.error('Validation errors:', validation.errors);
-          // Continue with the path even if validation failed (less strict approach)
-          // Alternatively, throw error to fail the job:
-          // throw new Error(`Learning path validation failed after ${maxValidationAttempts} attempts: ${validation.errors.join('; ')}`);
           break;
         }
         
         // Retry with updated prompt that includes validation feedback
-        fullPrompt3 = this._addValidationFeedbackToPrompt(fullPrompt3, validation.errors);
+        fullPrompt3 = this._addValidationFeedbackToPrompt(fullPrompt3, validation.errors, {
+          allowedSkills: combinedSkills,
+          outOfSetSkills: validation.outOfSetSkills || []
+        });
         console.log(`🔄 Retrying path generation with validation feedback (attempt ${validationAttempts + 1})...`);
         
       } while (validationAttempts < maxValidationAttempts);
@@ -1469,15 +1487,18 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
-   * Validate learning path for pedagogical correctness
+   * Validate learning path for pedagogical correctness and optional formal skill membership.
    * @param {Object} pathData - Extracted path data from Prompt 3
-   * @returns {Object} - { valid: boolean, errors: string[] }
+   * @param {string[]|null} allowedFormalSkills - When provided, every skills_in_module / skills_covered
+   *   value must belong to this set (case-insensitive trim).
+   * @returns {Object} - { valid: boolean, errors: string[], outOfSetSkills: string[] }
    */
-  _validateLearningPath(pathData) {
+  _validateLearningPath(pathData, allowedFormalSkills = null) {
     const errors = [];
+    const outOfSetSkills = [];
     
     if (!pathData.learning_modules || !Array.isArray(pathData.learning_modules)) {
-      return { valid: false, errors: ['Missing or invalid learning_modules'] };
+      return { valid: false, errors: ['Missing or invalid learning_modules'], outOfSetSkills: [] };
     }
     
     const modules = pathData.learning_modules;
@@ -1620,11 +1641,61 @@ export class GenerateLearningPathUseCase {
         errors.push(`Skill "${skill}" appears ${count} times (should appear exactly once)`);
       }
     });
+
+    // Check 5: Formal skill membership against allowed personalized set (combinedSkills)
+    if (Array.isArray(allowedFormalSkills)) {
+      const normalize = (s) => String(s ?? '').trim().toLowerCase();
+      const allowedNormalized = new Set(
+        allowedFormalSkills.map(normalize).filter((s) => s.length > 0)
+      );
+      const seenOutOfSet = new Set();
+      const pathFormalSkills = this._extractFormalSkillEntriesFromPath(pathData);
+      for (const skill of pathFormalSkills) {
+        const key = normalize(skill);
+        if (!key) continue;
+        if (!allowedNormalized.has(key) && !seenOutOfSet.has(key)) {
+          seenOutOfSet.add(key);
+          outOfSetSkills.push(String(skill).trim());
+          errors.push(
+            `Formal skill "${String(skill).trim()}" is outside the allowed personalized skill set and must not appear in skills_in_module or skills_covered`
+          );
+        }
+      }
+    }
     
     return {
       valid: errors.length === 0,
-      errors
+      errors,
+      outOfSetSkills
     };
+  }
+
+  /**
+   * Collect formal skill strings from skills_in_module and skills_covered (preserves first-seen casing).
+   * @private
+   */
+  _extractFormalSkillEntriesFromPath(pathData) {
+    const skills = [];
+    if (!pathData?.learning_modules || !Array.isArray(pathData.learning_modules)) {
+      return skills;
+    }
+    for (const module of pathData.learning_modules) {
+      if (Array.isArray(module.skills_in_module)) {
+        for (const skill of module.skills_in_module) {
+          if (skill != null && String(skill).trim() !== '') skills.push(skill);
+        }
+      }
+      if (Array.isArray(module.steps)) {
+        for (const step of module.steps) {
+          if (Array.isArray(step.skills_covered)) {
+            for (const skill of step.skills_covered) {
+              if (skill != null && String(skill).trim() !== '') skills.push(skill);
+            }
+          }
+        }
+      }
+    }
+    return skills;
   }
 
   /**
@@ -1764,11 +1835,19 @@ export class GenerateLearningPathUseCase {
   }
 
   /**
-   * Add validation feedback to prompt for retry
+   * Add validation feedback to prompt for retry.
+   * When out-of-set formal skills are present, include the allowed set and the invalid names.
    * @private
    */
-  _addValidationFeedbackToPrompt(originalPrompt, validationErrors) {
-    const feedback = `\n\n⚠️ VALIDATION FAILED - Previous attempt had these errors:\n${validationErrors.map(e => `- ${e}`).join('\n')}\n\nPlease regenerate the learning path ensuring these issues are fixed.`;
+  _addValidationFeedbackToPrompt(originalPrompt, validationErrors, options = {}) {
+    const { allowedSkills = null, outOfSetSkills = [] } = options;
+    let feedback = `\n\n⚠️ VALIDATION FAILED - Previous attempt had these errors:\n${validationErrors.map(e => `- ${e}`).join('\n')}\n\nPlease regenerate the learning path ensuring these issues are fixed.`;
+    if (Array.isArray(outOfSetSkills) && outOfSetSkills.length > 0) {
+      const allowedList = Array.isArray(allowedSkills) && allowedSkills.length > 0
+        ? allowedSkills.join(', ')
+        : '(none)';
+      feedback += `\n\nFORMAL SKILL BOUNDARY:\nAllowed formal skills (use ONLY these in skills_in_module and skills_covered):\n[${allowedList}]\n\nOut-of-set formal skills that MUST NOT appear in skills_in_module or skills_covered:\n[${outOfSetSkills.join(', ')}]\nRemove or replace those invalid formal skills. Lesson descriptions may still mention supporting concepts in prose, but they must not be listed as formal skills.`;
+    }
     return originalPrompt + feedback;
   }
 

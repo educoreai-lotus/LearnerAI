@@ -4,31 +4,29 @@ CRITICAL: You MUST use ONLY the skills provided in the input. Do NOT generate sk
 
 Inputs
 
-You will receive two sets of atomic, lowest-level skills:
+You will receive two JSON objects:
 
 Initial Skills Gap: {initialGap}
-- This contains the skills the learner has not yet mastered
-- Extract skills from: skills_raw_data.gap.missing_skills_map (if present)
-- Or from the structure provided - look for arrays of skill names
-- These are the EXACT skills you must include in the learning path
-- IMPORTANT: The initialGap contains "competencyTargetName" - this is the target competency for the learning path
+- Contains competencyTargetName (use exactly as path_title)
+- EXTRACTED_SKILLS lists the genuine gap skills (already included in the allowed formal set)
+- These gap skills must appear in the learning path as part of the allowed formal set
 
 Expanded Competency Breakdown: {expandedBreakdown}
-- This contains additional skills needed to reach the target competency
-- Extract skills from: skillBreakdown (if present) - look for arrays of skill names
-- Or from the structure provided - look for arrays of skill names
-- These are the EXACT skills you must include in the learning path
+- COMPLETE_COMBINED_SKILL_LIST / ALLOWED_FORMAL_SKILLS is the authoritative COMPLETE formal skill set
+- skillBreakdown (if present) lists only those same allowed formal skills
+- competencies (if present) are sequencing/context metadata only — NOT additional formal skills
+- Use ONLY the allowed formal skill list for skills_in_module and skills_covered
 
-STEP 1: Extract ALL skills from both inputs
-- List every skill name from Initial Skills Gap
-- List every skill name from Expanded Competency Breakdown
-- Combine them into a single list (remove duplicates)
-- This is your COMPLETE skill list - you MUST use ALL of these skills
+STEP 1: Take the COMPLETE formal skill list
+- Prefer COMPLETE_COMBINED_SKILL_LIST or ALLOWED_FORMAL_SKILLS from Expanded Competency Breakdown
+- This is your COMPLETE formal skill list - you MUST use ALL of these skills
+- Do NOT pull additional formal skills from competency metadata or invent new ones
 
-STEP 2: Generate learning path using ONLY the extracted skills
-- Every skill in your learning path MUST come from the extracted list
-- Do NOT add skills that are not in the extracted list
+STEP 2: Generate learning path using ONLY the allowed formal skills
+- Every formal skill in skills_in_module and skills_covered MUST come from the allowed list
+- Do NOT add skills that are not in the allowed list
 - Do NOT generate generic skills like "Docker" if the input has "C++" skills
+- Lesson titles/descriptions may explain supporting concepts in prose; those concepts must NOT be listed as formal skills unless they are in the allowed list
 
 All skills are indivisible and must appear exactly once in the learning path.
 

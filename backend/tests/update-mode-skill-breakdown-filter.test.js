@@ -236,11 +236,22 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
 
       const { initialGap, expandedBreakdown } = lastPrompt3Assembly();
       expect(initialGap.EXTRACTED_SKILLS).toEqual(expect.arrayContaining(REMAINING_GAP_SKILLS));
-      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(REAL_ERROR_SKILLS);
-      expect(expandedBreakdown.EXTRACTED_SKILLS.length).toBeGreaterThan(0);
+      // Prompt 3 formal skills are bounded combinedSkills (not the raw uncapped SE list)
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(
+        expect.arrayContaining(REMAINING_GAP_SKILLS)
+      );
+      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
+      expect(expandedBreakdown.ALLOWED_FORMAL_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
+      expect(expandedBreakdown.skillBreakdown.Allowed_Formal_Skills).toEqual(
+        expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST
+      );
       expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST.length).toBeGreaterThan(
         initialGap.EXTRACTED_SKILLS.length
       );
+      // SE preserve still feeds expansion into the combined formal set
+      for (const skill of REAL_ERROR_SKILLS) {
+        expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toContain(skill);
+      }
     });
   });
 
@@ -260,7 +271,8 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
 
       const { expandedBreakdown } = lastPrompt3Assembly();
       expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(['syntaxerror']);
-      expect(expandedBreakdown.skillBreakdown.Example).toEqual(['syntaxerror']);
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(['syntaxerror']);
+      expect(expandedBreakdown.skillBreakdown.Allowed_Formal_Skills).toEqual(['syntaxerror']);
     });
   });
 
@@ -279,7 +291,11 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
       expect(Object.keys(breakdown)).toHaveLength(0);
 
       const { expandedBreakdown } = lastPrompt3Assembly();
-      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual([]);
+      // No SE expansion → formal set is genuine gap only
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(
+        expect.arrayContaining(REMAINING_GAP_SKILLS)
+      );
+      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
     });
 
     it('does not invent skills when Skills Engine returns no usable competency map', async () => {
@@ -294,7 +310,10 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
       expect(Object.keys(breakdown).filter((key) => Array.isArray(breakdown[key]) && breakdown[key].length > 0)).toHaveLength(0);
 
       const { expandedBreakdown } = lastPrompt3Assembly();
-      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual([]);
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(
+        expect.arrayContaining(REMAINING_GAP_SKILLS)
+      );
+      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
     });
   });
 
@@ -315,10 +334,11 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
       expect(breakdown[COMPETENCY_ARCHITECTURE]).toEqual(REAL_ARCHITECTURE_SKILLS);
 
       const { expandedBreakdown } = lastPrompt3Assembly();
-      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expect.arrayContaining([
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(expect.arrayContaining([
         'syntaxerror',
         ...REAL_ARCHITECTURE_SKILLS
       ]));
+      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
       expect(expandedBreakdown.EXTRACTED_SKILLS).not.toContain('throw statement');
     });
   });
@@ -371,10 +391,14 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
 
       const { initialGap, expandedBreakdown } = lastPrompt3Assembly();
       expect(initialGap.EXTRACTED_SKILLS).toEqual(expect.arrayContaining(REMAINING_GAP_SKILLS));
-      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expect.arrayContaining([
-        ...REAL_ERROR_SKILLS,
-        ...REAL_ARCHITECTURE_SKILLS
+      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(expect.arrayContaining([
+        ...REMAINING_GAP_SKILLS
       ]));
+      // Full SE lists remain in cache, not as uncapped Prompt 3 EXTRACTED_SKILLS
+      expect(expandedBreakdown.skillBreakdown.Allowed_Formal_Skills).toEqual(
+        expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST
+      );
     });
   });
 
@@ -395,14 +419,17 @@ describe('UPDATE MODE skill-breakdown filtering', () => {
       const { initialGap, expandedBreakdown } = lastPrompt3Assembly();
       expect(initialGap.skills_raw_data).toEqual({ [TARGET]: REMAINING_GAP_SKILLS });
       expect(initialGap.EXTRACTED_SKILLS).toEqual(expect.arrayContaining(REMAINING_GAP_SKILLS));
-      expect(expandedBreakdown.skillBreakdown[COMPETENCY_ERROR_HANDLING]).toEqual(REAL_ERROR_SKILLS);
-      expect(expandedBreakdown.skillBreakdown[COMPETENCY_ARCHITECTURE]).toEqual(REAL_ARCHITECTURE_SKILLS);
+      // Formal Prompt 3 skills are combinedSkills only (bounded), not raw per-competency SE maps
+      expect(expandedBreakdown.skillBreakdown.Allowed_Formal_Skills).toEqual(
+        expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST
+      );
+      expect(expandedBreakdown.EXTRACTED_SKILLS).toEqual(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST);
       expect(expandedBreakdown.EXTRACTED_SKILLS.length).toBeGreaterThan(0);
       expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST.length).toBeGreaterThan(
         initialGap.EXTRACTED_SKILLS.length
       );
-      expect(new Set(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST)).toEqual(
-        new Set([...initialGap.EXTRACTED_SKILLS, ...expandedBreakdown.EXTRACTED_SKILLS])
+      expect(expandedBreakdown.COMPLETE_COMBINED_SKILL_LIST).toEqual(
+        expect.arrayContaining(REMAINING_GAP_SKILLS)
       );
     });
   });
